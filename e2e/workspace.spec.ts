@@ -1,0 +1,1225 @@
+import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+
+async function openWorkspace(page: import("@playwright/test").Page) {
+  if (await page.getByRole("button", { name: "Open navigation" }).isVisible()) {
+    await page.getByRole("button", { name: "Open navigation" }).click();
+  }
+  await page.locator(".secondary-nav .nav-item").filter({ hasText: "Workspace" }).click();
+}
+
+async function openSettingsCategory(page: import("@playwright/test").Page, category: string) {
+  await page.getByRole("button", { name: "Open settings", exact: true }).click();
+  await page.getByRole("tab", { name: category, exact: true }).click();
+}
+
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => { (window as Window & { __failCompilerFirst?: boolean }).__failCompilerFirst = window.location.search.includes("failCompilerFirst=1"); });
+  await page.route("**/vendor/wasmer-sdk/dist/index.js", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/javascript",
+      body: `const output = (value = "") => ({ text: () => value, truncated: false });
+export class Wasmer {
+  constructor(options = {}) {
+    this.namespace = options.cache?.namespace ?? "default";
+    window.__wasmerCacheNamespace = this.namespace;
+    this.packages = { load: async (reference) => {
+      window.__compilerAttempts = (window.__compilerAttempts ?? 0) + 1;
+      if (typeof reference === "string") {
+        const cacheKey = this.namespace + ":" + reference;
+        const cache = window.__wasmerPackageCache ?? (window.__wasmerPackageCache = []);
+        if (cache.includes(cacheKey)) window.__wasmerCacheHits = (window.__wasmerCacheHits ?? 0) + 1;
+        else {
+          if (window.__failCompilerFirst) throw new Error("Mock compiler download failure");
+          cache.push(cacheKey);
+          window.__compilerPackageDownloads = (window.__compilerPackageDownloads ?? 0) + 1;
+        }
+        return { entrypoint: "clang" };
+      }
+      return { id: "mock-program" };
+    } };
+    this.sandboxes = { create: async () => ({
+      command: (_program, args) => ({ spawn: async () => {
+        const compiling = Array.isArray(args);
+        const mode = window.__cPlaygroundOutcome;
+        return {
+          stdin: { write: async () => {}, close: async () => {} },
+          wait: async () => compiling && mode === "compile-error"
+            ? { reason: "exited", exitCode: 1, stdout: output(), stderr: output("main.c:1: error: expected ';'") }
+            : { reason: "exited", exitCode: !compiling && mode === "runtime-error" ? 7 : 0, stdout: output(!compiling && mode === "runtime-error" ? "mock program output" : ""), stderr: output(!compiling && mode === "runtime-error" ? "mock runtime stderr" : "") },
+          kill: async () => {},
+        };
+      } }),
+      fs: { readFile: async () => new Uint8Array([1]) },
+      installPackage: async () => {},
+      close: async () => {},
+    }) };
+  }
+  async close() {}
+}`,
+    });
+  });
+});
+
+test("workspace explains provider setup when no key is configured", async ({ page }) => {
+  page.on("pageerror", (error) => console.error("Browser page error:", error.message));
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false } } }) }));
+  await page.route("**/api/chat", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Add OPENAI_API_KEY to your local .env.local file to connect OpenAI." }) }));
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await expect(page.getByRole("heading", { name: /learn by understanding/i })).toBeVisible();
+  await openWorkspace(page);
+  await page.screenshot({ path: "work/katalyst-desktop.png", fullPage: true });
+  await expect(page.getByRole("heading", { name: /make room for/i })).toBeVisible();
+  await expect(page.getByText(/connect OpenAI to start chatting/i)).toBeVisible();
+  await page.getByRole("button", { name: /new conversation/i }).click();
+  await page.getByRole("textbox", { name: "Message Katalyst" }).fill("A request that should not get a fake answer");
+  await expect(page.getByRole("button", { name: "Send message" })).toBeEnabled();
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(page.getByText("A request that should not get a fake answer")).toBeVisible();
+  await expect(page.locator(".send-error")).toContainText("OPENAI_API_KEY");
+});
+
+test("switches provider and only shows that provider's model catalog", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false } } }) }));
+  await page.route("**/api/models**", (route) => route.request().url().includes("provider=gemini")
+    ? route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ models: [
+      { providerId: "gemini", id: "gemini-3.8-flash", name: "Gemini 3.8 Flash", capabilities: ["text input", "text output"], pricingStatus: "unknown", source: "gemini-models-api", credentialAccess: "listed-for-key" },
+      { providerId: "gemini", id: "gemini-3.7-flash", name: "Gemini 3.7 Flash", capabilities: ["text input", "text output"], pricingStatus: "unknown", source: "gemini-models-api", credentialAccess: "listed-for-key" },
+    ], refreshedAt: Date.now(), cached: false }) })
+    : route.continue());
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await openWorkspace(page);
+  await page.locator(".provider-selector").click();
+  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "Gemini" }).click();
+  await expect(page.locator(".provider-selector")).toContainText("Gemini");
+  await openSettingsCategory(page, "AI Providers");
+  const geminiSettings = page.locator(".settings-card").filter({ hasText: "Gemini" });
+  await page.getByLabel("Gemini session API key").fill("ephemeral-gemini-key");
+  await geminiSettings.getByRole("button", { name: "Save & refresh models" }).click();
+  await expect(geminiSettings).toContainText("2 supported models");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.locator(".model-selector").click();
+  await expect(page.locator(".model-dropdown")).toContainText("Gemini 3.8 Flash");
+  await expect(page.locator(".model-dropdown")).not.toContainText("GPT-6");
+  await page.locator(".model-dropdown .dropdown-row").filter({ hasText: "Gemini 3.7 Flash" }).click();
+  await expect(page.locator(".model-selector")).toContainText("Gemini 3.7 Flash");
+  await openSettingsCategory(page, "AI Providers");
+  await expect(page.locator(".settings-card").filter({ hasText: "Gemini" })).toContainText("Session credentials set for this tab");
+  await expect(page.locator(".settings-card").filter({ hasText: "Gemini" })).toContainText("Active provider for new requests");
+});
+
+test("configures Cloudflare with a session token and account ID, then sends the selected model", async ({ page }) => {
+  const accountId = "0123456789abcdef0123456789abcdef";
+  let sentProvider = "";
+  let sentModel = "";
+  let sentToken = "";
+  let sentAccount = "";
+  let cloudflareCatalogRequestCount = 0;
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { cloudflare: { configured: false, tokenConfigured: false, accountConfigured: false }, openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  await page.route("**/api/models**", (route) => {
+    if (!route.request().url().includes("provider=cloudflare")) return route.continue();
+    cloudflareCatalogRequestCount += 1;
+    if (cloudflareCatalogRequestCount > 1) return route.fulfill({ status: 403, contentType: "application/json", body: JSON.stringify({ error: "Cloudflare denied access to this account.", errorKind: "permission" }) });
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ provider: "cloudflare", models: [
+      { providerId: "cloudflare", id: "@cf/google/gemma-4-26b-a4b-it", name: "Gemma 4 26B A4B IT", capabilities: ["text input", "text output"], pricingStatus: "unknown", source: "cloudflare-models-api", namespace: "Cloudflare Workers AI", credentialAccess: "listed-for-key" },
+    ], diagnostic: { sourceCount: 1, compatibleCount: 1, excludedCount: 0, message: "1 of 1 Cloudflare catalog entries support text generation through Chat Completions." }, refreshedAt: Date.now(), cached: false }) })
+  });
+  await page.route("**/api/chat", async (route) => {
+    const request = route.request().postDataJSON() as { provider: string; model: string };
+    const headers = route.request().headers();
+    sentProvider = request.provider;
+    sentModel = request.model;
+    sentToken = headers["x-katalyst-provider-key"] ?? "";
+    sentAccount = headers["x-katalyst-cloudflare-account-id"] ?? "";
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "Cloudflare answered the lesson question." }) });
+  });
+  await page.goto("/");
+  await openWorkspace(page);
+  await page.locator(".provider-selector").click();
+  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "Cloudflare Workers AI" }).click();
+  await openSettingsCategory(page, "AI Providers");
+  await page.getByLabel("Cloudflare account ID").fill(accountId);
+  await page.getByLabel("Cloudflare Workers AI session API key").fill("tab-cloudflare-secret");
+  const settingsCard = page.locator(".settings-card").filter({ hasText: "Cloudflare Workers AI" });
+  await settingsCard.getByRole("button", { name: "Save & refresh models" }).click();
+  await expect(settingsCard).toContainText("1 supported model");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.locator(".model-selector").click();
+  await expect(page.locator(".model-dropdown")).toContainText("Gemma 4 26B A4B IT");
+  await page.locator(".model-dropdown .dropdown-row").filter({ hasText: "Gemma 4 26B A4B IT" }).click();
+  await openSettingsCategory(page, "AI Providers");
+  await settingsCard.getByRole("button", { name: "Test inference" }).click();
+  await expect(settingsCard).toContainText("Inference succeeded using @cf/google/gemma-4-26b-a4b-it.");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Help me understand C compilation");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(page.getByText("Cloudflare answered the lesson question.")).toBeVisible();
+  await openSettingsCategory(page, "AI Providers");
+  await expect(settingsCard).toContainText("Inference succeeded");
+  await settingsCard.getByRole("button", { name: "Save & refresh models" }).click();
+  await expect(settingsCard.locator(".inline-error")).toContainText("Cloudflare denied access");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(page.locator(".provider-selector")).toContainText("Cloudflare Workers AI");
+  await expect(page.locator(".model-selector")).toContainText("Gemma 4 26B A4B IT");
+  expect({ sentProvider, sentModel, sentToken, sentAccount }).toEqual({ sentProvider: "cloudflare", sentModel: "@cf/google/gemma-4-26b-a4b-it", sentToken: "tab-cloudflare-secret", sentAccount: accountId });
+  const localRecord = await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1") ?? "");
+  expect(localRecord).not.toContain("tab-cloudflare-secret");
+  expect(localRecord).not.toContain(accountId);
+});
+
+test("explains empty and filtered Cloudflare catalogs in Settings and the model picker", async ({ page }) => {
+  let refreshCount = 0;
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "cloudflare", defaultModel: "", providers: { cloudflare: { configured: false, tokenConfigured: false, accountConfigured: false }, openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  await page.route("**/api/models**", async (route) => {
+    if (!route.request().url().includes("provider=cloudflare")) return route.continue();
+    refreshCount += 1;
+    const empty = refreshCount === 1;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
+      provider: "cloudflare",
+      models: [],
+      diagnostic: empty
+        ? { sourceCount: 0, compatibleCount: 0, excludedCount: 0, message: "Cloudflare returned an empty model catalog for this account." }
+        : { sourceCount: 3, compatibleCount: 0, excludedCount: 3, message: "Cloudflare returned 3 catalog entries, but none could be confirmed as text-generation models for Chat Completions." },
+      refreshedAt: Date.now(), cached: false,
+    }) });
+  });
+  await page.goto("/");
+  await openSettingsCategory(page, "AI Providers");
+  const card = page.locator(".settings-card").filter({ hasText: "Cloudflare Workers AI" });
+  await page.getByLabel("Cloudflare account ID").fill("0123456789abcdef0123456789abcdef");
+  await page.getByLabel("Cloudflare Workers AI session API key").fill("mock-cloudflare-token");
+  const refresh = card.getByRole("button", { name: "Save & refresh models" });
+  await refresh.click();
+  await expect(card.locator(".model-catalog-diagnostic")).toContainText("empty model catalog");
+  await refresh.click();
+  await expect(card.locator(".model-catalog-diagnostic")).toContainText("3 catalog entries");
+  await page.locator(".model-selector").click();
+  await expect(page.locator(".model-dropdown .model-empty")).toContainText("none could be confirmed as text-generation models");
+  expect(refreshCount).toBe(2);
+});
+
+test("includes an enabled skill in the model request and shows what was applied", async ({ page }) => {
+  let sentRequest: { provider: string; context?: string } | undefined;
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false } } }) }));
+  await page.route("**/api/chat", async (route) => {
+    sentRequest = route.request().postDataJSON() as { provider: string; context?: string };
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "Mocked response for the UI test." }) });
+  });
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await page.getByRole("button", { name: /skill library/i }).click();
+  await page.getByRole("checkbox", { name: "Enable Clear technical writing" }).check();
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Explain a concept");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(page.getByText("Mocked response for the UI test.")).toBeVisible();
+  await expect(page.locator(".applied-skills")).toContainText("Clear technical writing");
+  expect(sentRequest?.provider).toBe("openai");
+  expect(sentRequest?.context).toContain("Use plain language.");
+});
+
+test("imports and enables a local Markdown skill", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false } } }) }));
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await page.getByRole("button", { name: /skill library/i }).click();
+  await page.getByRole("button", { name: /import a skill/i }).click();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "meeting-notes.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("---\nname: Meeting notes\ndescription: Summarize decisions and owners.\n---\n\nList each decision, owner, and due date."),
+  });
+  await expect(page.getByRole("heading", { name: "Meeting notes" })).toBeVisible();
+  const toggle = page.getByRole("checkbox", { name: "Enable Meeting notes" });
+  await toggle.check();
+  await expect(toggle).toBeChecked();
+});
+
+test("keeps session-only keys out of localStorage and sends them in a request header", async ({ page }) => {
+  let sentKey = "";
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false } } }) }));
+  await page.route("**/api/chat", async (route) => {
+    sentKey = route.request().headers()["x-katalyst-provider-key"] ?? "";
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "Session key answer" }) });
+  });
+  await page.goto("/");
+  await openSettingsCategory(page, "AI Providers");
+  await page.getByLabel("OpenAI session API key").fill("tab-only-secret");
+  const openAiSettings = page.locator(".settings-card").filter({ has: page.getByRole("heading", { name: "OpenAI", exact: true }) });
+  await openAiSettings.getByRole("button", { name: "Save for this tab" }).click();
+  const persisted = await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1") ?? "");
+  expect(persisted).not.toContain("tab-only-secret");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Use the session key");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("Session key answer")).toBeVisible();
+  expect(sentKey).toBe("tab-only-secret");
+  await openSettingsCategory(page, "AI Providers");
+  await openAiSettings.getByRole("button", { name: "Clear session key" }).click();
+  await expect(page.getByLabel("OpenAI session API key")).toHaveValue("");
+  await page.reload();
+  await openSettingsCategory(page, "AI Providers");
+  await expect(page.getByLabel("OpenAI session API key")).toHaveValue("");
+});
+
+test("filters OpenRouter catalog prices and routes the selected model without a fallback", async ({ page }) => {
+  let sentRequest: { provider: string; model: string } | undefined;
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false } } }) }));
+  await page.route("**/api/models**", (route) => route.request().url().includes("provider=openrouter")
+    ? route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ models: [
+      { providerId: "openrouter", id: "openrouter/free", name: "Free model routing", capabilities: ["text input", "text output"], contextLimit: 200000, pricing: { inputPerMillion: 0, outputPerMillion: 0 }, pricingStatus: "free", source: "openrouter-router", namespace: "OpenRouter", credentialAccess: "not-verified", freeRouting: true },
+      { providerId: "openrouter", id: "publisher/free-demo:free", name: "Publisher Free Demo", capabilities: ["text input", "text output"], contextLimit: 4096, pricing: { inputPerMillion: 0, outputPerMillion: 0 }, pricingStatus: "free", source: "openrouter-models-api", namespace: "publisher", credentialAccess: "not-verified" },
+      { providerId: "openrouter", id: "publisher/paid-demo", name: "Publisher Paid Demo", capabilities: ["text input", "text output"], contextLimit: 8192, pricing: { inputPerMillion: 1.25, outputPerMillion: 2.5 }, pricingStatus: "paid", source: "openrouter-models-api", namespace: "publisher", credentialAccess: "not-verified" },
+    ], refreshedAt: Date.now(), cached: false }) })
+    : route.continue());
+  await page.route("**/api/chat", async (route) => {
+    sentRequest = route.request().postDataJSON() as { provider: string; model: string };
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "Selected OpenRouter model answered." }) });
+  });
+  await page.goto("/");
+  await openWorkspace(page);
+  await page.locator(".provider-selector").click();
+  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "OpenRouter" }).click();
+  await openSettingsCategory(page, "AI Providers");
+  await page.getByLabel("OpenRouter session API key").fill("tab-router-key");
+  const openRouterSettings = page.locator(".settings-card").filter({ hasText: "OpenRouter" });
+  await openRouterSettings.getByRole("button", { name: "Save & refresh models" }).click();
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.locator(".model-selector").click();
+  await page.getByLabel("Filter by price").selectOption("free");
+  await expect(page.locator(".model-dropdown")).toContainText("Publisher Free Demo");
+  await expect(page.locator(".model-dropdown")).not.toContainText("Publisher Paid Demo");
+  await page.getByLabel("Filter by price").selectOption("paid");
+  await expect(page.locator(".model-dropdown")).toContainText("$1.25");
+  await page.getByLabel("Search models").fill("Publisher Paid Demo");
+  await expect(page.locator(".model-dropdown .dropdown-row")).toHaveCount(1);
+  await page.locator(".model-dropdown .dropdown-row").filter({ hasText: "Publisher Paid Demo" }).click();
+  await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Use the selected model");
+  await page.getByRole("button", { name: "Send message" }).click();
+  await expect(page.getByText("Selected OpenRouter model answered.")).toBeVisible();
+  expect(sentRequest?.provider).toBe("openrouter");
+  expect(sentRequest?.model).toBe("publisher/paid-demo");
+});
+
+test("opens the mobile navigation without horizontal overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.addInitScript(() => window.localStorage.setItem("katalyst.sidebar.collapsed.v1", "true"));
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false } } }) }));
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await page.screenshot({ path: "work/katalyst-mobile.png", fullPage: true });
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  const sidebar = page.locator(".sidebar");
+  await expect(sidebar).toHaveClass(/sidebar-open/);
+  await expect(sidebar).not.toHaveClass(/sidebar-collapsed/);
+  await expect(sidebar.getByRole("button", { name: "Learning Home" })).toBeVisible();
+  await expect(sidebar.getByRole("navigation", { name: "Main navigation" })).toBeVisible();
+  const dimensions = await page.evaluate(() => ({ body: document.body.scrollWidth, viewport: window.innerWidth }));
+  expect(dimensions.body).toBeLessThanOrEqual(dimensions.viewport);
+});
+
+test("collapses and restores navigation preference and uses the KATALYST breadcrumb", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  const sidebar = page.locator(".sidebar");
+  await page.waitForFunction(() => window.localStorage.getItem("katalyst.sidebar.collapsed.v1") === "false");
+  await page.getByRole("button", { name: "Collapse navigation" }).click();
+  await expect(sidebar).toHaveClass(/sidebar-collapsed/);
+  await page.waitForFunction(() => window.localStorage.getItem("katalyst.sidebar.collapsed.v1") === "true");
+
+  await page.reload();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await expect(page.getByRole("button", { name: "Expand navigation" })).toBeVisible();
+  await expect(sidebar).toHaveClass(/sidebar-collapsed/);
+  await page.getByRole("button", { name: "Expand navigation" }).click();
+  await expect(sidebar).not.toHaveClass(/sidebar-collapsed/);
+  await page.waitForFunction(() => window.localStorage.getItem("katalyst.sidebar.collapsed.v1") === "false");
+
+  await page.getByRole("button", { name: "Open settings", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+  await page.getByRole("button", { name: "KATALYST", exact: true }).click();
+  await expect(page.getByRole("heading", { name: /learn by understanding/i })).toBeVisible();
+});
+
+test("keeps a fully collapsed, accessible icon rail at desktop and tablet widths", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  for (const width of [1440, 1280, 1024, 800, 768]) {
+    await page.setViewportSize({ width, height: 800 });
+    const sidebar = page.locator(".sidebar");
+    await page.getByRole("button", { name: "Collapse navigation" }).click();
+    await expect(sidebar).toHaveClass(/sidebar-collapsed/);
+    await expect.poll(() => sidebar.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(76);
+    await expect(page.getByRole("button", { name: "Expand navigation" })).toBeVisible();
+    await expect(sidebar.getByRole("button", { name: "Learning Home" })).toHaveAttribute("title", "Learning Home");
+    await expect(sidebar.getByRole("button", { name: "Workspace", exact: true })).toHaveAttribute("title", "Workspace");
+    await expect(sidebar.locator(".section-heading").first()).toBeHidden();
+    await expect(sidebar.locator(".provider-state")).toBeHidden();
+    await expect(sidebar.locator(".account-entry > span:nth-child(2)")).toBeHidden();
+    await expect(sidebar.locator(".account-entry > .avatar")).toBeVisible();
+    await expect(sidebar.locator(".brand-mark")).toBeHidden();
+    await expect(sidebar.locator('.nav-item[aria-current="page"]')).toBeVisible();
+    if (width === 800) {
+      const workspaceIcon = sidebar.getByRole("button", { name: "Workspace", exact: true });
+      await workspaceIcon.focus();
+      await page.keyboard.press("Enter");
+      await expect(workspaceIcon).toHaveClass(/selected/);
+    }
+    const dimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+    expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
+    await page.getByRole("button", { name: "Expand navigation" }).click();
+    await expect.poll(() => sidebar.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(252);
+  }
+});
+
+test("keeps the editor and rendered lesson code dark in both appearance themes", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await page.getByRole("button", { name: "Open settings", exact: true }).click();
+  await page.getByRole("button", { name: "Light", exact: true }).click();
+  await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  await expect(page.getByLabel("C source code")).toBeVisible();
+
+  const editor = page.locator(".c-source-editor-host .cm-editor");
+  const terminal = page.locator(".learning-code-panel .c-console-output");
+  const codeBlock = page.locator(".lesson-copy .markdown-code-block").first();
+  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(37, 39, 36)");
+  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(245, 241, 232)");
+  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(37, 39, 36)");
+  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(245, 241, 232)");
+  await expect.poll(() => codeBlock.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(37, 39, 36)");
+  await expect.poll(() => codeBlock.locator(".markdown-code-heading").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(51, 49, 46)");
+
+  await page.getByRole("button", { name: "Open settings", exact: true }).click();
+  await page.getByRole("button", { name: "Dark", exact: true }).click();
+  await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
+  await page.getByRole("button", { name: /start learning|continue this course/i }).click();
+  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(23, 25, 22)");
+  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(242, 238, 229)");
+  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(23, 25, 22)");
+  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(242, 238, 229)");
+  await expect.poll(() => codeBlock.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(23, 25, 22)");
+  const dimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+  expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
+});
+
+test("shows expected example output without horizontal page overflow in both themes", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  const expectedOutput = page.locator(".lesson-example-run");
+  await expect(expectedOutput).toContainText("Hello, C!");
+
+  for (const [theme, expectedBackground] of [["Light", "rgb(170, 75, 47)"], ["Dark", "rgb(150, 71, 47)"]] as const) {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.getByRole("button", { name: "Open settings", exact: true }).click();
+    await page.getByRole("button", { name: theme, exact: true }).click();
+    await page.getByRole("button", { name: "Learning Home", exact: true }).click();
+    await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", theme.toLowerCase());
+    const primary = page.locator(".learning-hero-actions .primary-button");
+    const colors = await primary.evaluate((element) => {
+      const parse = (value: string) => value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
+      const linear = (value: number) => { const channel = value / 255; return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4; };
+      const luminance = (color: number[]) => 0.2126 * linear(color[0]!) + 0.7152 * linear(color[1]!) + 0.0722 * linear(color[2]!);
+      const background = parse(getComputedStyle(element).backgroundColor);
+      const foreground = parse(getComputedStyle(element).color);
+      const light = Math.max(luminance(background), luminance(foreground));
+      const dark = Math.min(luminance(background), luminance(foreground));
+      return { background: getComputedStyle(element).backgroundColor, contrast: (light + 0.05) / (dark + 0.05) };
+    });
+    expect(colors.background).toBe(expectedBackground);
+    expect(colors.contrast).toBeGreaterThanOrEqual(4.5);
+    await primary.click();
+    await expect(expectedOutput).toBeVisible();
+
+    for (const width of [1440, 1024, 390]) {
+      await page.setViewportSize({ width, height: 850 });
+      const dimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+      expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
+      await expect(expectedOutput).toBeVisible();
+    }
+  }
+});
+
+test("dismisses provider and model pickers outside and with Escape while preserving menu interaction", async ({ page }) => {
+  await page.goto("/");
+  await openWorkspace(page);
+  const providerButton = page.locator(".provider-selector");
+  await providerButton.click();
+  await expect(page.locator(".provider-dropdown")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".provider-dropdown")).toHaveCount(0);
+  await expect(providerButton).toBeFocused();
+
+  await providerButton.click();
+  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "OpenAI" }).click();
+  await page.locator(".model-selector").click();
+  await expect(page.locator(".model-dropdown")).toBeVisible();
+  await page.getByLabel("Search models").fill("GPT");
+  await expect(page.locator(".model-dropdown")).toBeVisible();
+  await page.getByLabel("Filter by price").selectOption("free");
+  await expect(page.locator(".model-dropdown")).toBeVisible();
+  await page.locator(".model-dropdown").getByRole("button", { name: "Refresh model catalog" }).click();
+  await expect(page.locator(".model-dropdown")).toBeVisible();
+  await page.locator(".topbar .breadcrumbs").click();
+  await expect(page.locator(".model-dropdown")).toHaveCount(0);
+
+  await page.locator(".model-selector").click();
+  await page.keyboard.press("Escape");
+  await expect(page.locator(".model-dropdown")).toHaveCount(0);
+  await expect(page.locator(".model-selector")).toBeFocused();
+});
+
+test("renders one settings category and preserves category selection across app navigation", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open settings" }).click();
+  await expect(page.getByRole("heading", { name: "Appearance" })).toBeVisible();
+  await expect(page.locator(".settings-card")).toHaveCount(1);
+
+  await page.getByRole("tab", { name: "AI Providers" }).click();
+  await expect(page.getByRole("heading", { name: "AI Providers" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Models", exact: true })).toHaveCount(0);
+  await expect(page.locator(".settings-section-nav")).toHaveCSS("position", "static");
+
+  await page.getByRole("tab", { name: "Models" }).click();
+  await expect(page.getByRole("heading", { name: "Models", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "AI Providers" })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Workspace" }).click();
+  await expect(page.getByRole("heading", { name: "Workspace", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Learning Home" }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Workspace" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: "Workspace backup" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Appearance" })).toHaveCount(0);
+});
+
+test("keeps the C Playground usable on a phone viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "C Playground", exact: true }).click();
+  await expect.poll(() => page.locator(".sidebar").evaluate((element) => element.getBoundingClientRect().right)).toBeLessThanOrEqual(0);
+  await expect(page.getByRole("heading", { name: "C Workbench" })).toBeVisible();
+  await expect(page.getByLabel("C source code")).toBeVisible();
+  await expect(page.getByLabel("Program input stdin · one line at a time")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run code" })).toBeVisible();
+  const dimensions = await page.evaluate(() => ({ body: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+  expect(dimensions.body).toBeLessThanOrEqual(dimensions.viewport);
+  await page.screenshot({ path: "work/katalyst-mobile-playground.png", fullPage: true });
+});
+
+test("fits the C Workbench at desktop, laptop, tablet, and mobile widths", async ({ page }) => {
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 768, height: 900 }, { width: 375, height: 812 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    if (viewport.width <= 760) await page.getByRole("button", { name: "Open navigation" }).click();
+    await page.getByRole("button", { name: "C Playground", exact: true }).click();
+    await expect(page.locator(".c-editor-pane")).toBeVisible();
+    const layout = await page.evaluate(() => {
+      const editor = document.querySelector(".c-editor-pane")!.getBoundingClientRect();
+      const terminal = document.querySelector(".c-output-pane")!.getBoundingClientRect();
+      return { editorX: editor.x, editorY: editor.y, editorWidth: editor.width, editorBottom: editor.bottom, terminalX: terminal.x, terminalY: terminal.y, terminalWidth: terminal.width, viewportWidth: window.innerWidth, pageWidth: document.documentElement.scrollWidth };
+    });
+    expect(layout.pageWidth).toBeLessThanOrEqual(layout.viewportWidth);
+    if (viewport.width > 860) {
+      expect(layout.editorWidth).toBeGreaterThan(layout.terminalWidth);
+      expect(layout.editorX).toBeLessThan(layout.terminalX);
+      expect(Math.abs(layout.editorY - layout.terminalY)).toBeLessThan(12);
+    } else {
+      expect(layout.terminalY).toBeGreaterThan(layout.editorBottom - 10);
+    }
+  }
+});
+
+test("selects Ollama, discovers a local model, and sends a local generation request", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  await page.route("**/api/models?provider=ollama**", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ provider: "ollama", models: [{ providerId: "ollama", id: "qwen2.5:7b", name: "qwen2.5:7b", namespace: "Local Ollama", capabilities: ["text generation", "local"], pricingStatus: "unknown", source: "ollama-tags-api", credentialAccess: "not-verified", local: true, sizeBytes: 4_681_000_000, parameterSize: "7B", quantization: "Q4_K_M" }] }) }));
+  let requestBody: Record<string, unknown> | undefined;
+  let requestHeaders: Record<string, string> | undefined;
+  await page.route("**/api/chat", async (route) => {
+    requestBody = route.request().postDataJSON() as Record<string, unknown>;
+    requestHeaders = await route.request().allHeaders();
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "Local Ollama answer", provider: "ollama", model: "qwen2.5:7b", usage: { inputTokens: 9, outputTokens: 5 } }) });
+  });
+  await page.goto("/");
+  await openWorkspace(page);
+  await page.locator(".provider-selector").click();
+  await page.getByRole("button", { name: /Ollama Local setup/ }).click();
+  await openSettingsCategory(page, "AI Providers");
+  await page.locator(".settings-card").filter({ hasText: "Ollama" }).getByRole("button", { name: "Save & refresh models" }).click();
+  await expect(page.locator(".settings-card").filter({ hasText: "Ollama" })).toContainText("1 supported model");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(page.locator(".model-selector")).toContainText("Choose model");
+  await page.locator(".model-selector").click();
+  await page.locator(".model-results").getByRole("button", { name: /qwen2\.5:7b/ }).click();
+  await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Use local inference");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(page.getByText("Local Ollama answer")).toBeVisible();
+  expect(requestBody).toMatchObject({ provider: "ollama", model: "qwen2.5:7b" });
+  expect(requestHeaders).toMatchObject({ "x-katalyst-ollama-url": "http://localhost:11434" });
+  expect(requestHeaders).not.toHaveProperty("x-katalyst-provider-key");
+  await expect(page.getByText(/local usage · no cloud charge/)).toBeVisible();
+});
+
+const markdownProviderCases = [
+  { provider: "openai", name: "OpenAI", model: "gpt-6-luna", displayModel: "GPT-6 Luna" },
+  { provider: "gemini", name: "Gemini", model: "gemini-3.8-flash", displayModel: "gemini-3.8-flash" },
+  { provider: "openrouter", name: "OpenRouter", model: "openrouter/free", displayModel: "openrouter/free" },
+  { provider: "ollama", name: "Ollama", model: "qwen2.5:7b", displayModel: "qwen2.5:7b" },
+] as const;
+
+const assistantMarkdownReply = "# Provider response\n\n**Bold** and *italic*.\n\n1. First\n   - Nested\n\n| Item | State |\n| --- | --- |\n| Markdown | rendered |\n\n```ts\nconst answer = 42;\n// A deliberately long code line to check that the code panel scrolls horizontally on small screens without stretching the page.\n```\n\n[Safe link](https://example.com)";
+
+for (const { provider, name, model, displayModel } of markdownProviderCases) {
+  test(`renders ${name} Markdown responses with code and tables`, async ({ page }) => {
+    if (provider === "openai") await page.setViewportSize({ width: 375, height: 812 });
+    await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: true }, gemini: { configured: true }, openrouter: { configured: true }, ollama: { configured: true } } }) }));
+    await page.route("**/api/models**", (route) => {
+      const requestedProvider = new URL(route.request().url()).searchParams.get("provider");
+      const models = requestedProvider === "gemini" ? [{ providerId: "gemini", id: model, name: model, capabilities: ["text input", "text output"], pricingStatus: "unknown", source: "gemini-models-api", credentialAccess: "listed-for-key" }]
+        : requestedProvider === "openrouter" ? [{ providerId: "openrouter", id: model, name: model, capabilities: ["text input", "text output"], pricingStatus: "free", source: "openrouter-router", credentialAccess: "not-verified", freeRouting: true }]
+          : requestedProvider === "ollama" ? [{ providerId: "ollama", id: model, name: model, namespace: "Local Ollama", capabilities: ["text generation", "local"], pricingStatus: "unknown", source: "ollama-tags-api", credentialAccess: "not-verified", local: true }]
+            : [{ providerId: "openai", id: model, name: "GPT-6 Luna", capabilities: ["text input", "text output"], pricingStatus: "unknown", source: "built-in", credentialAccess: "not-verified" }];
+      return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ provider: requestedProvider, models, refreshedAt: Date.now(), cached: false }) });
+    });
+    let requestProvider = "";
+    await page.route("**/api/chat", async (route) => {
+      const request = route.request().postDataJSON() as { provider: string; model: string };
+      requestProvider = request.provider;
+      await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: assistantMarkdownReply, provider: request.provider, model: request.model }) });
+    });
+
+    await page.goto("/");
+    await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+    await openWorkspace(page);
+    if (provider !== "openai") {
+      await page.locator(".provider-selector").click();
+      await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: name }).click();
+    }
+    if (provider === "gemini" || provider === "ollama") {
+      await page.locator(".model-selector").click();
+      await page.locator(".model-dropdown .dropdown-row").filter({ hasText: displayModel }).click();
+    }
+    await expect(page.locator(".model-selector")).toContainText(displayModel);
+    await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Please format **this** answer.");
+    await page.getByRole("button", { name: "Send message", exact: true }).click();
+
+    await expect(page.locator(".message.user p")).toHaveText("Please format **this** answer.");
+    const response = page.locator(".message.assistant .assistant-markdown");
+    await expect(response.getByRole("heading", { name: "Provider response" })).toBeVisible();
+    await expect(response.locator("strong")).toHaveText("Bold");
+    await expect(response.locator("table")).toBeVisible();
+    await expect(response.locator(".markdown-code-language")).toHaveText("ts");
+    const copyCode = response.getByRole("button", { name: "Copy code" });
+    await expect(copyCode).toBeVisible();
+    expect(await response.locator(".markdown-code-scroll pre").innerText()).toContain("const answer = 42;");
+    if (provider === "openai") {
+      const codeOverflow = await response.locator(".markdown-code-scroll").evaluate((element) => element.scrollWidth > element.clientWidth);
+      const tableOverflow = await response.locator(".markdown-table-scroll").evaluate((element) => element.scrollWidth > element.clientWidth);
+      const pageWidths = await page.evaluate(() => ({ body: document.body.scrollWidth, viewport: window.innerWidth }));
+      expect(codeOverflow).toBe(true);
+      expect(tableOverflow).toBe(true);
+      expect(pageWidths.body).toBeLessThanOrEqual(pageWidths.viewport);
+    }
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"]);
+    await copyCode.click();
+    await expect(response.getByRole("button", { name: "Code copied" })).toBeVisible();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain("const answer = 42;");
+    expect(requestProvider).toBe(provider);
+  });
+}
+
+test("starts the C learning path and records progress independently of the workspace", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await expect(page.getByRole("heading", { name: /learn by understanding/i })).toBeVisible();
+  await expect(page.getByText(/your activity will appear here/i)).toBeVisible();
+
+  const workspaceBefore = await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"));
+  await page.getByRole("button", { name: "My Learning", exact: true }).click();
+  await expect(page.getByRole("heading", { name: /your learning starts when you do/i })).toBeVisible();
+  await page.getByRole("button", { name: "Explore courses", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "C Programming Foundations" })).toBeVisible();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
+  await expect(page.locator(".lesson-copy pre code")).toContainText("int main(void)");
+  await page.getByRole("button", { name: /mark lesson complete/i }).click();
+  await expect(page.getByRole("button", { name: /lesson completed/i })).toBeVisible();
+  await page.getByRole("button", { name: "Progress", exact: true }).click();
+  await expect(page.getByText("1 of 13 lessons", { exact: true })).toBeVisible();
+  await page.waitForFunction(() => window.localStorage.getItem("katalyst.learning.v1")?.includes("source-to-output") === true);
+  expect(await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"))).toBe(workspaceBefore);
+
+  await page.reload();
+  await page.getByRole("button", { name: "My Learning", exact: true }).click();
+  await expect(page.locator(".my-learning-row")).toContainText("1 of 13 lessons complete");
+});
+
+test("keeps the integrated lesson workspace and Practice Lab within a phone viewport", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await expect(page.getByText("13 LESSONS", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "13 lessons. 5 modules." })).toBeVisible();
+  const courseDimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+  expect(courseDimensions.document).toBeLessThanOrEqual(courseDimensions.viewport);
+  await page.getByRole("button", { name: /start learning/i }).click();
+  await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Learn" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Code" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Kat" })).toBeVisible();
+  await page.getByRole("tab", { name: "Code" }).click();
+  await expect(page.getByRole("tab", { name: "Code" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByLabel("C source code")).toBeVisible();
+  await page.getByRole("tab", { name: "Kat" }).click();
+  await expect(page.getByRole("tab", { name: "Kat" })).toHaveAttribute("aria-selected", "true");
+  const lessonComposer = page.getByRole("region", { name: "AI Tutor Kat" }).locator(".tutor-composer");
+  await expect(lessonComposer).toBeVisible();
+  const composerBounds = await lessonComposer.evaluate((element) => ({ top: element.getBoundingClientRect().top, bottom: element.getBoundingClientRect().bottom, viewport: window.innerHeight }));
+  expect(composerBounds.top).toBeGreaterThanOrEqual(0);
+  expect(composerBounds.bottom).toBeLessThanOrEqual(composerBounds.viewport);
+  const tutorPanel = page.locator(".learning-kat-panel .integrated-tutor-panel");
+  const tutorPanelBottom = await tutorPanel.evaluate((element) => element.getBoundingClientRect().bottom);
+  const tutorFootnoteBottom = await page.getByRole("region", { name: "AI Tutor Kat" }).locator(".tutor-footnote").evaluate((element) => element.getBoundingClientRect().bottom);
+  expect(tutorFootnoteBottom).toBeLessThanOrEqual(tutorPanelBottom + 1);
+  await expect(page.locator(".learning-view.learning-lesson")).toHaveCSS("overflow-y", "auto");
+  const lessonDimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+  expect(lessonDimensions.document).toBeLessThanOrEqual(lessonDimensions.viewport);
+  await page.screenshot({ path: "work/katalyst-learning-lesson.png", fullPage: true });
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Practice Lab" }).click();
+  await expect(page.getByRole("heading", { name: /make your thinking/i })).toBeVisible();
+  const practiceDimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+  expect(practiceDimensions.document).toBeLessThanOrEqual(practiceDimensions.viewport);
+});
+
+test("navigates the expanded course and renders exercise metadata and starter code", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await expect(page.getByRole("heading", { name: "13 lessons. 5 modules." })).toBeVisible();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  const pagination = page.getByRole("navigation", { name: "Lesson navigation" });
+  for (let index = 0; index < 4; index += 1) await pagination.getByRole("button").last().click();
+  await expect(page.getByRole("heading", { name: "Choose a path with if" })).toBeVisible();
+  await page.getByText("Course navigation").click();
+  await page.getByRole("button", { name: "Work with C strings" }).click();
+  await expect(page.getByRole("heading", { name: "Work with C strings" })).toBeVisible();
+  await expect(page.locator(".lesson-checkpoint")).toContainText("What marks the end of a C string");
+  await page.getByRole("button", { name: "Practice Lab", exact: true }).click();
+  await expect(page.locator(".practice-card")).toHaveCount(13);
+  await expect(page.locator(".practice-card").filter({ hasText: "Read and report a value" })).toContainText("Practice goal:");
+  await expect(page.locator(".practice-card").filter({ hasText: "Read and report a value" }).getByText("View starter code")).toBeVisible();
+});
+
+test("switches lesson panels before the three columns become too narrow", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 850 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
+  for (const width of [1200, 1120, 1024]) {
+    await page.setViewportSize({ width, height: 850 });
+    await expect(page.getByRole("tab", { name: "Learn" })).toBeVisible();
+    const dimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+    expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
+    await page.getByRole("tab", { name: "Learn" }).click();
+    await page.getByRole("tab", { name: "Code" }).click();
+    await expect(page.getByRole("tab", { name: "Code" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByLabel("C source code")).toBeVisible();
+  }
+});
+
+test("routes lesson, code, and tutor-style context through integrated Kat without persisting turns", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: true }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  let request: { provider: string; model: string; messages: { role: string; content: string }[]; context: string } | undefined;
+  await page.route("**/api/chat", async (route) => {
+    request = route.request().postDataJSON() as typeof request;
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "Start by checking the loop condition." }) });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  await expect(page.getByRole("heading", { name: "Kat", exact: true })).toBeVisible();
+  await expect(page.locator(".tutor-context-note")).toContainText("lesson and coding activity when they help answer your question");
+  await page.getByRole("button", { name: "Socratic tutor" }).click();
+  await page.getByRole("button", { name: "Explain this code" }).click();
+  await expect(page.locator(".tutor-message.assistant")).toContainText("Start by checking the loop condition.");
+  await page.screenshot({ path: "work/katalyst-kat-integrated.png", fullPage: false });
+  expect(request).toMatchObject({ provider: "openai", model: "gpt-6-luna" });
+  expect(request).toMatchObject({ assistantSurface: "kat" });
+  expect(request?.messages.at(-1)?.content).toContain("Walk through my current editor code");
+  expect(request?.context).toContain("From source code to output");
+  expect(request?.context).toContain("Use questions and small hints");
+  expect(request?.context).toContain("Explain how C source code becomes a running program.");
+  expect(request?.context).toContain("Trace the first program");
+  expect(request?.context).toContain("currentEditorCode");
+  expect(request?.context).toContain("#include <stdio.h>");
+  expect(request?.context).toContain("Do not execute code");
+  const workspace = await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1") ?? "");
+  expect(workspace).not.toContain("Walk through my current editor code");
+});
+
+test("keeps a general Kat question primary and applies only enabled skills after opt-in", async ({ page }) => {
+  const requests: Array<{ messages: Array<{ role: string; content: string }>; context?: string }> = [];
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: true }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  await page.route("**/api/chat", async (route) => {
+    requests.push(route.request().postDataJSON() as (typeof requests)[number]);
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "A bicycle tire holds pressurized air and provides grip and cushioning." }) });
+  });
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await page.getByRole("button", { name: /skill library/i }).click();
+  await page.getByRole("checkbox", { name: "Enable Clear technical writing" }).check();
+  await expect(page.getByRole("checkbox", { name: "Enable Code review" })).not.toBeChecked();
+  await page.getByRole("button", { name: "AI Tutor", exact: true }).click();
+
+  const tutor = page.getByRole("region", { name: "AI Tutor Kat" });
+  await expect(tutor.getByRole("button", { name: "Explain this code" })).toHaveCount(0);
+  await expect(tutor.getByRole("button", { name: "Explain this concept" })).toHaveCount(0);
+  const useSkills = tutor.getByRole("checkbox", { name: "Use enabled workspace skills" });
+  await expect(useSkills).not.toBeChecked();
+  await tutor.getByRole("textbox", { name: "Ask Kat a question" }).fill("How does a bicycle tire work?");
+  await tutor.getByRole("button", { name: "Send question to Kat" }).click();
+  await expect(tutor.locator(".tutor-message.assistant")).toContainText("bicycle tire");
+  await expect(tutor.locator(".tutor-response-route").first()).toHaveAttribute("aria-label", "Response from OpenAI, model gpt-6-luna");
+  const generalContext = JSON.parse(requests[0].context ?? "{}") as Record<string, unknown>;
+  expect(requests[0].messages.at(-1)?.content).toBe("How does a bicycle tire work?");
+  expect(requests[0]).toMatchObject({ assistantSurface: "kat" });
+  expect(generalContext.lessonContent).toBeUndefined();
+  expect(generalContext.enabledSkillGuidance).toBeUndefined();
+
+  await useSkills.check();
+  await tutor.getByRole("textbox", { name: "Ask Kat a question" }).fill("What is the purpose of main in C?");
+  await tutor.getByRole("button", { name: "Send question to Kat" }).click();
+  await expect(tutor.locator(".tutor-message.user").last()).toContainText("Skills used: Clear technical writing");
+  const skillContext = JSON.parse(requests[1].context ?? "{}") as { enabledSkillGuidance?: string };
+  expect(skillContext.enabledSkillGuidance).toContain("Use plain language.");
+  expect(skillContext.enabledSkillGuidance).not.toContain("Review the code for correctness");
+});
+
+test("keeps Kat's composer below the message scroller and preserves an upward reading position", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: true }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  let responseNumber = 0;
+  await page.route("**/api/chat", async (route) => {
+    responseNumber += 1;
+    const paragraphs = Array.from({ length: 24 }, (_, index) => `Response ${responseNumber}, paragraph ${index + 1}. This explanation stays readable while the learner reviews the conversation.`);
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: paragraphs.join("\n\n") }) });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  const tutor = page.getByRole("region", { name: "AI Tutor Kat" });
+  const conversation = tutor.locator(".tutor-conversation");
+  const input = tutor.getByRole("textbox", { name: "Ask Kat a question" });
+
+  await input.fill("First question");
+  await input.press("Shift+Enter");
+  await input.type("with a second line");
+  const expandedHeight = await input.evaluate((element) => element.getBoundingClientRect().height);
+  expect(expandedHeight).toBeGreaterThan(42);
+  expect(expandedHeight).toBeLessThanOrEqual(130);
+  await input.press("Enter");
+  await expect(tutor.locator(".tutor-message.assistant")).toHaveCount(1);
+  await expect.poll(() => conversation.evaluate((element) => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThanOrEqual(2);
+  const messageBounds = await tutor.locator(".tutor-message.assistant").last().evaluate((element) => ({ bottom: element.getBoundingClientRect().bottom, conversationBottom: element.parentElement!.getBoundingClientRect().bottom }));
+  expect(messageBounds.bottom).toBeLessThanOrEqual(messageBounds.conversationBottom);
+  const flowBounds = await conversation.evaluate((element) => ({ bottom: element.getBoundingClientRect().bottom, composerTop: element.parentElement!.querySelector(".tutor-composer")!.getBoundingClientRect().top }));
+  expect(flowBounds.bottom).toBeLessThanOrEqual(flowBounds.composerTop);
+
+  await conversation.evaluate((element) => { element.scrollTop = 0; });
+  await expect.poll(() => conversation.evaluate((element) => element.scrollTop)).toBe(0);
+  await input.fill("Second question");
+  await input.press("Enter");
+  await expect(tutor.locator(".tutor-message.assistant")).toHaveCount(2);
+  await expect.poll(() => conversation.evaluate((element) => element.scrollTop)).toBe(0);
+});
+
+test("loads lesson examples in the integrated editor and preserves drafts across learning views", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  await expect(page.getByRole("heading", { name: "Try the idea yourself" })).toBeVisible();
+  await page.getByRole("button", { name: /load lesson example/i }).click();
+  const source = page.getByLabel("C source code");
+  await expect(source).toContainText(/Hello, C!/);
+  await expect.poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem("katalyst.c.playground.v1") ?? "{}").source)).toMatch(/Hello, C!/);
+  await source.fill("#include <stdio.h>\nint main(void) { printf(\"Saved\"); return 0; }\n");
+  await page.getByRole("button", { name: /next lesson/i }).click();
+  await expect(page.getByRole("heading", { name: "Give values a name" })).toBeVisible();
+  await expect(page.getByLabel("C source code")).toContainText(/Saved/);
+  await page.getByRole("button", { name: "Reset example" }).click();
+  await expect(page.getByLabel("C source code")).toContainText(/Hello, C!/);
+  const resetDraft = await page.evaluate(() => JSON.parse(window.localStorage.getItem("katalyst.c.playground.v1") ?? "{}"));
+  expect(resetDraft.source).toContain("Hello, C!");
+  expect(resetDraft.stdin).toBe("");
+});
+
+test("initializes the compiler in the background and retries a failed setup", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/?failCompilerFirst=1");
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  await expect(page.locator(".c-playground")).toHaveAttribute("data-compiler-state", "failed");
+  await expect(page.locator(".c-playground-notice")).toContainText("The C11 compiler could not be prepared.");
+  await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
+  await page.getByRole("tab", { name: "Code" }).click();
+  await expect(page.getByRole("button", { name: "Retry compiler setup" })).toBeVisible();
+  await page.evaluate(() => { (window as Window & { __failCompilerFirst?: boolean }).__failCompilerFirst = false; });
+  await page.getByRole("button", { name: "Retry compiler setup" }).click();
+  await expect(page.locator(".c-playground")).toHaveAttribute("data-compiler-state", "ready");
+  await expect(page.getByRole("button", { name: "Run code" })).toBeEnabled();
+  const attempts = await page.evaluate(() => (window as Window & { __compilerAttempts?: number }).__compilerAttempts);
+  expect(attempts).toBeGreaterThanOrEqual(3);
+});
+
+test("shows compile and runtime failures clearly and reuses the prepared compiler", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  const runButton = page.getByRole("button", { name: "Run code" });
+  await expect(runButton).toBeEnabled();
+
+  await page.evaluate(() => { (window as Window & { __cPlaygroundOutcome?: string }).__cPlaygroundOutcome = "compile-error"; });
+  await runButton.click();
+  await expect(page.locator(".c-run-status")).toContainText("Compilation failed.");
+  await expect(page.locator(".c-playground-error")).toContainText("The C compiler could not build this program.");
+  await expect(page.locator(".c-compiler-diagnostics")).toContainText("expected ';'");
+
+  await page.evaluate(() => { (window as Window & { __cPlaygroundOutcome?: string }).__cPlaygroundOutcome = "runtime-error"; });
+  await runButton.click();
+  await expect(page.locator(".c-run-status")).toContainText("runtime error");
+  await expect(page.locator(".c-playground-error")).toContainText("exited with status 7");
+  await expect(page.locator(".c-console-output")).toContainText("mock program output");
+  await expect(page.locator(".c-output-stream.stderr")).toContainText("mock runtime stderr");
+  await page.getByRole("button", { name: "Clear terminal output" }).click();
+  await expect(page.locator(".c-output-stream.stderr")).toHaveCount(0);
+  await expect(page.locator(".c-console-output")).toContainText("Run the example to see its output here.");
+  const cache = await page.evaluate(() => {
+    const testWindow = window as Window & { __compilerPackageDownloads?: number; __wasmerCacheHits?: number; __wasmerCacheNamespace?: string };
+    return { downloads: testWindow.__compilerPackageDownloads, hits: testWindow.__wasmerCacheHits, namespace: testWindow.__wasmerCacheNamespace };
+  });
+  expect(cache.downloads).toBe(1);
+  expect(cache.hits).toBeGreaterThan(0);
+  expect(cache.namespace).toBe("katalyst-c-playground");
+});
+
+test("compiles and runs a C program with stdin in the browser sandbox", async ({ page }) => {
+  test.skip(process.env.RUN_C_PLAYGROUND_INTEGRATION !== "1", "first use downloads a large compiler package; run with RUN_C_PLAYGROUND_INTEGRATION=1");
+  test.setTimeout(360_000);
+  await page.unroute("**/vendor/wasmer-sdk/dist/index.js");
+  const browserErrors: string[] = [];
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  page.on("requestfailed", (request) => browserErrors.push(`${request.url()}: ${request.failure()?.errorText ?? "request failed"}`));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
+  await expect(page.locator(".c-playground")).toHaveAttribute("data-compiler-state", "ready", { timeout: 330_000 });
+  await page.getByLabel("C source code").fill("#include <stdio.h>\nint main(void) { int value = getchar(); printf(\"Read: %c\\n\", value); return 0; }\n");
+  await page.getByLabel("Program input stdin · one line at a time").fill("K\n");
+  await page.getByRole("button", { name: "Run code" }).click();
+  const runResult = await Promise.race([
+    page.locator(".c-playground-error").waitFor({ state: "visible", timeout: 330_000 }).then(async () => ({ error: await page.locator(".c-playground-error").innerText() })),
+    page.locator(".c-console-output").getByText("Read: K").waitFor({ state: "visible", timeout: 330_000 }).then(() => ({ output: "Read: K" })),
+  ]);
+  if ("error" in runResult) throw new Error(`C compiler integration failed: ${runResult.error}\n${browserErrors.join("\n")}`);
+  await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
+  const widths = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+  expect(widths.document).toBeLessThanOrEqual(widths.viewport);
+  await page.screenshot({ path: "work/katalyst-c-playground.png", fullPage: true });
+});
+
+test("preserves corrupt browser data until the user explicitly starts a fresh workspace", async ({ page }) => {
+  const corruptRecord = "{this is not valid json";
+  await page.addInitScript((raw) => window.localStorage.setItem("katalyst.workspace.v1", raw), corruptRecord);
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await expect(page.getByText("Saved workspace needs recovery")).toBeVisible();
+  expect(await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"))).toBe(corruptRecord);
+
+  page.on("dialog", (dialog) => dialog.accept());
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download original record" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^katalyst-original-workspace-.*\.txt$/);
+  await page.getByRole("button", { name: "Start a new workspace" }).click();
+  await expect(page.getByText("Saved workspace needs recovery")).toHaveCount(0);
+  const fresh = JSON.parse((await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"))) ?? "null") as { projects: { id: string }[] };
+  expect(fresh.projects).toEqual([{ id: "default-project", name: "My workspace", instructions: "", chats: [] }]);
+});
+
+test("edits and resends a message, retries the assistant with regeneration, and preserves model metadata", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: true }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  let calls = 0;
+  await page.route("**/api/chat", (route) => {
+    calls += 1;
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: `Answer ${calls}`, provider: "openai", model: "gpt-6-luna", usage: { inputTokens: 10, outputTokens: 4 } }) });
+  });
+  await page.goto("/");
+  await openWorkspace(page);
+  const composer = page.getByRole("textbox", { name: "Message Katalyst" });
+  await composer.fill("Original question");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(page.getByText("Answer 1")).toBeVisible();
+  await expect(page.getByText(/10 input tokens · 4 output tokens/)).toBeVisible();
+
+  await page.getByRole("button", { name: "Edit and resend message" }).click();
+  await expect(composer).toHaveValue("Original question");
+  await composer.fill("Edited question");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(page.locator(".message.user p").filter({ hasText: "Edited question" })).toBeVisible();
+  await expect(page.getByText("Answer 2")).toBeVisible();
+  await expect(page.locator(".message.user p").filter({ hasText: "Original question" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Regenerate response" }).click();
+  await expect(page.getByText("Answer 3")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Copy message 2" })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Search conversations" }).fill("Edited question");
+  await expect(page.locator(".chat-link").filter({ hasText: "Edited question" })).toBeVisible();
+});
+
+test("retries a failed provider request without duplicating the user turn", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: true }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  let calls = 0;
+  await page.route("**/api/chat", (route) => {
+    calls += 1;
+    return route.fulfill(calls === 1
+      ? { status: 502, contentType: "application/json", body: JSON.stringify({ error: "Temporary provider outage" }) }
+      : { status: 200, contentType: "application/json", body: JSON.stringify({ text: "Recovered response", provider: "openai", model: "gpt-6-luna" }) });
+  });
+  await page.goto("/");
+  await openWorkspace(page);
+  await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Please retry this");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(page.locator(".send-error")).toContainText("Temporary provider outage");
+  await page.getByRole("button", { name: "Retry request" }).click();
+  await expect(page.getByText("Recovered response")).toBeVisible();
+  await expect(page.locator(".message.user p")).toHaveCount(1);
+  expect(calls).toBe(2);
+});
+
+test("exports a secret-free workspace and restores it through validated settings controls", async ({ page, context }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false } } }) }));
+  await page.addInitScript(() => {
+    if (window.sessionStorage.getItem("portable-workspace-seeded") === "true") return;
+    window.sessionStorage.setItem("portable-workspace-seeded", "true");
+    window.localStorage.setItem("katalyst.workspace.v1", JSON.stringify({
+    projects: [{ id: "portable-project", name: "Portable project", instructions: "Keep answers concise.", chats: [{ id: "portable-chat", title: "Portable conversation", updatedAt: 1_792_000_000_000, messages: [{ role: "user", content: "Remember this conversation." }, { role: "assistant", content: "It will be in the backup." }] }] }],
+    skills: [{ id: "portable-skill", name: "Portable skill", description: "A saved instruction.", instructions: "Use concrete examples.", source: "imported", sourceName: "portable.md", version: "1.0", author: "Example", license: "MIT", compatibility: ["general-ai-instructions"], installedAt: "2026-11-08T00:00:00.000Z", enabled: true }],
+    provider: "openai",
+    models: { openai: "gpt-6-luna", gemini: "gemini-3.8-flash", openrouter: "openrouter/free" },
+    activeChatId: "portable-chat",
+    }));
+  });
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await openSettingsCategory(page, "AI Providers");
+  await page.getByLabel("OpenAI session API key").fill("secret-session-key-not-exported");
+  await page.locator(".settings-card").filter({ has: page.getByRole("heading", { name: "OpenAI", exact: true }) }).getByRole("button", { name: "Save for this tab" }).click();
+  await page.getByRole("tab", { name: "Workspace" }).click();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export workspace" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^katalyst-workspace-.*\.json$/);
+  const filePath = await download.path();
+  if (!filePath) throw new Error("Workspace download did not produce a file.");
+  const backupContents = await readFile(filePath, "utf8");
+  const backup = JSON.parse(backupContents) as { format: string; workspace: { projects: { name: string; chats: { title: string }[] }[]; skills: { license: string }[] } };
+  expect(backup.format).toBe("katalyst-workspace");
+  expect(backup.workspace.projects[0].name).toBe("Portable project");
+  expect(backup.workspace.projects[0].chats[0].title).toBe("Portable conversation");
+  expect(backup.workspace.skills[0].license).toBe("MIT");
+  expect(backupContents).not.toContain("secret-session-key-not-exported");
+  expect(backupContents).not.toContain("sessionKeys");
+
+  await context.clearCookies();
+  await page.evaluate(() => window.localStorage.removeItem("katalyst.workspace.v1"));
+  await page.reload();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await openSettingsCategory(page, "Workspace");
+  await page.getByLabel("Choose a KATALYST backup JSON file").setInputFiles({ name: "workspace.json", mimeType: "application/json", buffer: Buffer.from(backupContents) });
+  await expect(page.getByRole("status")).toContainText("Import complete");
+  await openWorkspace(page);
+  await expect(page.locator(".project-link").filter({ hasText: "Portable project" }).first()).toBeVisible();
+  const restoredWorkspace = await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"));
+  expect(restoredWorkspace).toContain("portable-chat");
+  await page.locator(".project-link").filter({ hasText: "Portable project" }).first().click();
+  await page.locator(".chat-link").filter({ hasText: "Portable conversation" }).click();
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await expect(page.getByText("Remember this conversation.")).toBeVisible();
+  const beforeMalformedImport = await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"));
+  await openSettingsCategory(page, "Workspace");
+  await page.getByLabel("Choose a KATALYST backup JSON file").setInputFiles({ name: "malformed.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify({ format: "katalyst-workspace", schemaVersion: 1, exportedAt: new Date().toISOString(), workspace: {} })) });
+  await expect(page.locator(".backup-card .inline-error")).toContainText("invalid or missing data");
+  expect(await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"))).toBe(beforeMalformedImport);
+});
+
+test("shows available skill discovery and exports imported skill Markdown", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false } } }) }));
+  await page.goto("/");
+  await page.getByRole("button", { name: /skill library/i }).click();
+  await page.getByRole("tab", { name: "Available" }).click();
+  await expect(page.getByRole("heading", { name: "Skill Issue" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /browse skill issue/i })).toHaveAttribute("href", "https://skill-issue.in/");
+  await page.getByRole("tab", { name: /installed/i }).click();
+  await page.getByRole("button", { name: /import a skill/i }).click();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "review-ready.md",
+    mimeType: "text/markdown",
+    buffer: Buffer.from("---\nname: Review ready\ndescription: Explain review findings.\nversion: 1.1\nauthor: Example\nlicense: Apache-2.0\ncompatibility: gemini\n---\n\nLead with correctness and security."),
+  });
+  await expect(page.getByRole("heading", { name: "Review ready" })).toBeVisible();
+  await expect(page.locator(".skill-row").filter({ hasText: "Review ready" })).toContainText("Apache-2.0");
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export Review ready" }).click();
+  const download = await downloadPromise;
+  const filePath = await download.path();
+  if (!filePath) throw new Error("Skill download did not produce a file.");
+  const markdown = await readFile(filePath, "utf8");
+  expect(markdown).toContain("license: Apache-2.0");
+  expect(markdown).toContain("compatibility: gemini");
+  expect(markdown).toContain("Lead with correctness and security.");
+});
+
+test("persists the selected theme and keeps guest access clear when Supabase is not configured", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  await expect(page.getByRole("button", { name: "Guest account settings" })).toBeVisible();
+  await page.getByRole("button", { name: "Open settings" }).click();
+  await expect(page.getByRole("heading", { name: "Appearance" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Dark", exact: true }).click();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "dark");
+  await expect.poll(() => page.evaluate(() => getComputedStyle(document.querySelector(".app-shell")!).colorScheme)).toBe("dark");
+  const darkBackground = await page.locator(".settings-card").first().evaluate((element) => getComputedStyle(element).backgroundColor);
+  expect(darkBackground).not.toBe("rgb(255, 254, 250)");
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem("katalyst.preferences.v1") ?? "{}").theme)).toBe("dark");
+
+  await page.reload();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "dark");
+  await page.getByRole("button", { name: "Open settings" }).click();
+  await page.getByRole("button", { name: "Light", exact: true }).click();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "light");
+  await page.getByRole("button", { name: "System", exact: true }).click();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "system");
+  await page.getByRole("tab", { name: "Account" }).click();
+  await expect(page.locator(".account-settings-card")).toContainText("Account service not configured");
+  await expect(page.locator(".account-settings-card")).toContainText("configure the Supabase URL and publishable key");
+  await expect(page.locator(".account-settings-card").getByRole("button", { name: /continue with google/i })).toHaveCount(0);
+});
+
+test("manages conversations by renaming, pinning, moving, exporting, and confirming deletion", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: true }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  await page.route("**/api/models*", (route) => route.request().url().includes("provider=openai")
+    ? route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ models: [{ providerId: "openai", id: "gpt-6-luna", name: "GPT-6 Luna", capabilities: ["text input", "text output"], pricingStatus: "unknown", source: "built-in", credentialAccess: "not-verified" }] }) })
+    : route.continue());
+  await page.route("**/api/chat", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "A real mocked provider response.", provider: "openai", model: "gpt-6-luna" }) }));
+  await page.goto("/");
+  await openWorkspace(page);
+  await page.getByRole("button", { name: /new conversation/i }).click();
+  await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Preserve this conversation");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(page.getByText("A real mocked provider response.")).toBeVisible();
+
+  let actions = page.getByRole("button", { name: "Actions for Preserve this conversation" });
+  await actions.click();
+  await page.getByRole("button", { name: "Rename", exact: true }).click();
+  await page.getByRole("textbox", { name: "Rename Preserve this conversation" }).fill("Pinned study notes");
+  await page.getByRole("button", { name: "Save conversation name" }).click();
+  actions = page.getByRole("button", { name: "Actions for Pinned study notes" });
+  await actions.click();
+  await page.getByRole("button", { name: "Pin", exact: true }).click();
+  await expect(page.locator(".pinned-section")).toContainText("Pinned study notes");
+
+  await page.getByRole("button", { name: "Create project" }).click();
+  await page.locator(".pinned-section").getByRole("button", { name: "Actions for Pinned study notes" }).click();
+  await page.getByRole("button", { name: "Move to project" }).click();
+  await page.locator(".chat-move-targets").getByRole("button", { name: "Workspace 2" }).click();
+  await expect(page.locator(".conversation-status")).toContainText("Moved conversation to Workspace 2");
+
+  await page.locator(".pinned-section").getByRole("button", { name: "Actions for Pinned study notes" }).click();
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Share / export" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toContain("pinned-study-notes-conversation.md");
+  const filePath = await download.path();
+  if (!filePath) throw new Error("Conversation export did not produce a file.");
+  const shareText = await readFile(filePath, "utf8");
+  expect(shareText).toContain("A real mocked provider response.");
+  expect(shareText).not.toContain("project instructions");
+
+  await page.locator(".pinned-section").getByRole("button", { name: "Actions for Pinned study notes" }).click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.locator(".conversation-status")).toContainText("Conversation deleted");
+  await expect(page.locator(".chat-row").filter({ hasText: "Pinned study notes" })).toHaveCount(0);
+  const stored = await page.evaluate(() => localStorage.getItem("katalyst.workspace.v1") ?? "");
+  expect(stored).not.toContain("A real mocked provider response.");
+});
+
+test("records real AI request metadata and reports it in the local Progress dashboard", async ({ page }) => {
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: true }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  await page.route("**/api/models*", (route) => route.request().url().includes("provider=openai")
+    ? route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ models: [{ providerId: "openai", id: "gpt-6-luna", name: "GPT-6 Luna", capabilities: ["text input", "text output"], pricingStatus: "unknown", source: "built-in", credentialAccess: "not-verified" }] }) })
+    : route.continue());
+  await page.route("**/api/chat", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "The provider returned this answer.", provider: "openai", model: "gpt-6-luna", usage: { inputTokens: 18, outputTokens: 6 } }) }));
+  await page.goto("/");
+  await openWorkspace(page);
+  await page.getByRole("button", { name: /new conversation/i }).click();
+  await page.getByRole("textbox", { name: "Message Katalyst" }).fill("A prompt that must not be stored in analytics");
+  await page.getByRole("button", { name: "Send message", exact: true }).click();
+  await expect(page.getByText("The provider returned this answer.")).toBeVisible();
+  const activity = await page.evaluate(() => JSON.parse(localStorage.getItem("katalyst.ai-activity.v1") ?? "{}").requests);
+  expect(activity).toHaveLength(1);
+  expect(activity[0]).toMatchObject({ provider: "openai", model: "gpt-6-luna", outcome: "complete", usage: { inputTokens: 18, outputTokens: 6 } });
+  expect(JSON.stringify(activity)).not.toContain("A prompt that must not be stored");
+
+  await page.getByRole("button", { name: "Progress", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "See what you have worked through." })).toBeVisible();
+  await expect(page.locator(".ai-dashboard-section")).toContainText("1 request recorded");
+  await expect(page.locator(".ai-dashboard-section")).toContainText("up to 500 recent requests");
+  await expect(page.locator(".ai-dashboard-section")).toContainText("OpenAI");
+  await expect(page.locator(".ai-dashboard-section")).toContainText("18 input tokens reported in 1 request");
+  await expect(page.locator(".ai-dashboard-section")).toContainText("6 output tokens reported in 1 request");
+  await expect(page.locator(".dashboard-metrics")).toContainText("0 of 13 lessons");
+  await expect(page.getByText("Local analytics · not synced")).toBeVisible();
+});
+
+test("allows natural mouse-wheel scrolling through the desktop lesson workspace", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await page.getByRole("button", { name: /start learning/i }).click();
+  await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
+  await expect(page.locator(".c-source-editor-host .cm-editor")).toBeVisible();
+  await page.screenshot({ path: "work/katalyst-m10-lesson-desktop.png", fullPage: true });
+  const scrollBefore = await page.locator(".learning-view").evaluate((element) => ({ top: element.scrollTop, client: element.clientHeight, content: element.scrollHeight }));
+  expect(scrollBefore.content).toBeGreaterThan(scrollBefore.client);
+  await page.mouse.move(250, 450);
+  await page.mouse.wheel(0, 540);
+  await expect.poll(() => page.locator(".learning-view").evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  await expect(page.locator(".learning-panel")).toHaveCSS("overflow-y", "visible");
+  await expect(page.locator(".learning-code-panel")).toBeVisible();
+  await expect(page.locator(".learning-kat-panel")).toBeVisible();
+  const tutorPanel = page.locator(".learning-kat-panel .integrated-tutor-panel");
+  const tutorPanelBottom = await tutorPanel.evaluate((element) => element.getBoundingClientRect().bottom);
+  const tutorFootnoteBottom = await page.getByRole("region", { name: "AI Tutor Kat" }).locator(".tutor-footnote").evaluate((element) => element.getBoundingClientRect().bottom);
+  expect(tutorFootnoteBottom).toBeLessThanOrEqual(tutorPanelBottom + 1);
+  await expect(page.locator(".learning-workspace-header")).toHaveCSS("position", "static");
+  const columns = await page.locator(".learning-workspace-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).map((value) => Number.parseFloat(value)));
+  expect(columns).toHaveLength(3);
+  expect(columns[0] / columns.reduce((sum, value) => sum + value, 0)).toBeGreaterThan(0.24);
+  expect(columns[0] / columns.reduce((sum, value) => sum + value, 0)).toBeLessThan(0.31);
+  expect(columns[1] / columns.reduce((sum, value) => sum + value, 0)).toBeGreaterThan(0.39);
+  expect(columns[2] / columns.reduce((sum, value) => sum + value, 0)).toBeGreaterThan(0.27);
+});
