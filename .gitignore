@@ -7,7 +7,8 @@ playwright-report/
 test-results/
 .env
 .env.*
-!.env.example
+.env.example
+.env.local
 .agents/skills/
 public/vendor/wasmer-sdk/
 work/
