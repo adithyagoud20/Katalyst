@@ -160,6 +160,21 @@ M13 verification on 2026-11-10: `npm run lint` and `npm run typecheck` passed; `
 
 M14 implementation is complete. Verification on 2026-11-10: `npm run lint` and `npm run typecheck` passed; `npm test` passed with 165 tests across 19 files; `KATALYST_E2E_PORT=3293 npm run test:e2e` passed 41 browser tests with one opt-in Wasmer browser compiler test skipped; `npm run build` passed with Next.js 16.4.5. OAuth callback, server session handling, account routes, migration logic, and export/deletion boundaries have mocked/local regression coverage; no live Google OAuth or Supabase project was configured. The 15-assertion pgTAP ownership suite was not run because Supabase CLI, Docker, and psql are unavailable in this checkout. Apply the migration and run `supabase test db` against a local Supabase stack before treating hosted RLS as verified.
 
+### M15 — Shared AI Gateway, Credits, BYOK, Admin Controls & Brevo (implemented)
+
+- [x] Establish a central server-side gateway for all KATALYST-managed Cloudflare Workers AI inference.
+- [x] Implement monthly UTC credit periods (1,000 credits/mo default) for authenticated users without rollover.
+- [x] Implement restricted server-issued guest trials (50 credits default) with cryptographic HMAC session tokens and IP salt hashing.
+- [x] Protect against concurrent overspending via atomic credit reservations and row-level database locking.
+- [x] Settle usage via provider-reported tokens or conservative text-length estimations into a permanent ledger.
+- [x] Enforce clean quota exhaustion states in Kat tutor and the workspace with prompts to sign in or use BYOK.
+- [x] Guarantee BYOK provider isolation (Gemini, OpenAI, OpenRouter, Ollama) with zero credit consumption and no fallback.
+- [x] Provide an administrative management panel in Settings with server-verified admin authorization, global emergency kill switch, policy updates, and audited change logging.
+- [x] Integrate Brevo for transactional notifications (welcome, quota warnings, quota exhausted) without breaking core application flows on delivery failure.
+- [x] Add comprehensive test suites for credit accounting, guest sessions, rate limits, and Brevo delivery (180 passing tests).
+
+M15 verification on 2026-11-10: `npm run lint` and `npm run typecheck` passed cleanly; `npm test` passed with 180 tests across 21 files; OAuth, gateway pipelines, and Brevo delivery were validated with mocked adapters.
+
 ### Future planning (not started)
 
 - Verify a configured Google/Supabase deployment before claiming live account functionality. Review rate limits and provider billing before exposing AI routes publicly.

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.17.0 — Shared AI Gateway, Credits, BYOK, Admin Controls & Brevo (M15)
+
+- Established a central server-side AI Gateway routing all shared Cloudflare Workers AI inference through a strict 11-step pipeline: identity verification, rate limiting, kill-switch checks, model lock, input bounds, atomic credit reservation, settlement, and permanent usage logging.
+- Introduced AI Credit accounting: authenticated users receive a monthly credit allowance (default 1,000 credits) resetting automatically at UTC calendar month boundaries without rollover. Model credit weights scale deductions proportionately based on actual provider-reported tokens or conservative text-length estimations.
+- Added restricted server-issued guest trials (default 50 credits) backed by HMAC-SHA256 signed tamper-resistant session cookies and privacy-conscious IP salt hashing to prevent abuse or trial resets through browser storage deletion.
+- Enforced clean quota exhaustion states in Kat tutor and the workspace, providing structured prompts to sign in with Google or switch to Bring-Your-Own-Key (BYOK) providers.
+- Maintained complete isolation for BYOK providers (Gemini, OpenAI, OpenRouter, and local Ollama): BYOK inference consumes zero KATALYST shared credits and never automatically falls back to Cloudflare or vice versa.
+- Implemented an administrative control suite in Settings with server-verified admin authorization, an emergency global AI kill switch, live usage telemetry, policy adjustments, and audited change logging.
+- Integrated Brevo (Sendinblue) transactional email client with consent-aware, non-blocking workflows for welcome messages, credit warnings, and quota exhaustion notifications.
+- Added comprehensive unit test coverage for credit calculations, UTC periods, guest session cryptography, sliding-window rate limits, and Brevo delivery failure resilience (180 tests passing).
+
+
 ## 0.16.0 — Optional accounts and cloud persistence (M14)
 
 - Added Google OAuth through Supabase Auth with PKCE, cookie session refresh in Next.js 16 `proxy.ts`, verified server-side account routes, and stable Auth user IDs/profile records.

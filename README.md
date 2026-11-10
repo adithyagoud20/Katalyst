@@ -38,6 +38,9 @@ KATALYST is a local-first engineering learning platform for students. Its primar
 - A local Progress dashboard based on actual lesson and workspace data, with AI request counts and provider-reported token totals only. It does not estimate costs or reconstruct activity from before tracking was added.
 - Guest-first access plus optional Google sign-in through Supabase Auth. Guests continue using localStorage; signed-in users can explicitly migrate or merge workspace, conversations, learning progress, and appearance preferences into an account snapshot.
 - Account snapshots are server-validated, revisioned, and protected by database Row Level Security. Cross-device conflicts require an explicit restore or merge choice. Export and confirmed account deletion are available in Settings.
+- Central shared AI Gateway routing all default Cloudflare Workers AI requests through an 11-step pipeline with atomic credit reservations, monthly calendar quotas (1,000 credits/mo), guest trials (50 credits), and permanent usage ledgers.
+- Administrative control panel in Settings with server-verified admin authorization, global emergency kill switch, policy adjustments, and audited change logging.
+- Brevo (Sendinblue) transactional email integration for consent-aware welcome and quota notifications with non-blocking error handling.
 
 Conversation, project, skill, provider selection, local Ollama address, model selection, and pinned state retain the existing `katalyst.workspace.v1` local format. Appearance preferences use `katalyst.preferences.v1`; bounded AI request metadata uses `katalyst.ai-activity.v1`; lesson activity remains in `katalyst.learning.v1`. When signed in and after an explicit migration choice, workspace, progress, and appearance snapshots are synchronized through the Next.js server into a Supabase account row. AI analytics stay local. Kat's in-page tutor conversation is transient. Session BYOK keys and provider server credentials are never included in account snapshots. Browser storage remains available as a local working copy and guest backup; it is not encrypted by KATALYST. Cloud requests are sent to the selected provider and may incur charges under its terms; Ollama inference runs on the KATALYST host.
 
@@ -86,7 +89,12 @@ Install Ollama on the same machine that runs KATALYST, start its local server, i
 | `CLOUDFLARE_API_TOKEN` | For Cloudflare discovery/inference | Server-only Cloudflare API token. Custom tokens need Workers AI - Read and Workers AI - Edit permissions. Never use a `NEXT_PUBLIC_` prefix. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Optional accounts | Supabase project URL. |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Optional accounts | Supabase publishable key; RLS is required because this value is public. |
-| `SUPABASE_SERVICE_ROLE_KEY` | Account deletion | Server-only key used only by the confirmed account deletion route. Never use a `NEXT_PUBLIC_` prefix. |
+| `SUPABASE_SERVICE_ROLE_KEY` | Account deletion | Server-only key used only by the confirmed account deletion route and admin operations. Never use a `NEXT_PUBLIC_` prefix. |
+| `KATALYST_ADMIN_EMAILS` | Admin access | Comma-separated list of bootstrap administrator email addresses. |
+| `BREVO_API_KEY` | Optional email | Server-only Brevo API key for transactional welcome and quota alerts. |
+| `BREVO_SENDER_EMAIL` | Optional email | Transactional sender email address (default: `noreply@katalyst.learn`). |
+| `BREVO_SENDER_NAME` | Optional email | Transactional sender display name (default: `KATALYST`). |
+| `GUEST_SESSION_SECRET` | Guest trial signing | Secret for signing guest HMAC cookies (falls back to service key if omitted). |
 
 Ollama uses no API key or environment variable. Its base URL is saved as local workspace configuration and validated server-side for each request.
 

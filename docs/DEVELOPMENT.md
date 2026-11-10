@@ -47,6 +47,14 @@ Account sync stores one strict JSON snapshot per Auth user row: workspace (inclu
 
 To run database ownership tests, install/configure the Supabase CLI and local Supabase stack, then run `supabase test db`. This repository includes a pgTAP test at `supabase/tests/account_ownership.test.sql`; it is not executed by `npm test` and needs a Supabase database. Route and schema tests run under Vitest without a Supabase project. Live Google OAuth requires real Google/Supabase project configuration and is not proved by mocked route tests.
 
+## M15 AI Gateway, Credits, and Brevo Setup
+
+1. Apply `supabase/migrations/20261111000000_ai_gateway_credits.sql` in the Supabase SQL editor to create the credit periods, reservations, usage ledger, guest sessions, and admin tables.
+2. Configure Cloudflare server credentials in `.env.local`: `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
+3. Set your administrative email in `KATALYST_ADMIN_EMAILS` (e.g. `KATALYST_ADMIN_EMAILS=your-email@example.com`).
+4. (Optional) Configure Brevo for transactional email messaging: `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME`.
+5. Restart the server and sign in. Open **Settings → AI Controls** to manage model credit weights, monthly quotas, and the emergency kill switch.
+
 ## Checks
 
 ```sh

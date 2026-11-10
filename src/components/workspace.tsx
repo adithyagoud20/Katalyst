@@ -8,6 +8,8 @@ import {
 } from "lucide-react";
 import { AssistantMarkdown } from "@/components/assistant-markdown";
 import { BrandMark } from "@/components/brand-mark";
+import { AdminPanel } from "@/components/admin-panel";
+import type { CreditStatus } from "@/lib/ai-gateway/types";
 import { LearningExperience } from "@/components/learning-experience";
 import { publishedLearningCourses, type LearningSection } from "@/lib/learning-curriculum";
 import { makeApplicationHash, readApplicationHash, type ApplicationView } from "@/lib/learning-navigation";
@@ -31,7 +33,7 @@ type Status = { defaultProvider: ProviderId; defaultModel: string; providers: Re
 type ModelCatalogState = { models: ModelMetadata[]; loading: boolean; error: string; errorKind?: string; selectionIssue?: string; diagnostic?: ModelDiscoveryDiagnostic; refreshedAt?: number; cached?: boolean };
 type PricingFilter = "all" | "free" | "paid";
 type AppView = ApplicationView;
-type SettingsCategory = "appearance" | "providers" | "models" | "learning" | "workspace" | "privacy" | "account";
+type SettingsCategory = "appearance" | "providers" | "models" | "learning" | "workspace" | "privacy" | "account" | "admin";
 type InferenceState = Partial<Record<ProviderId, "pending" | "success" | "permission" | "quota" | "network" | "failed">>;
 type AccountPhase = "checking" | "unconfigured" | "guest" | "migration" | "active" | "conflict" | "error";
 type AccountRemote = { snapshot: AccountSnapshot | null; revision: number; updatedAt: string | null };
@@ -190,6 +192,9 @@ export function Workspace() {
   const [accountPreferenceSource, setAccountPreferenceSource] = useState<"account" | "guest">("account");
   const [accountDeleteOpen, setAccountDeleteOpen] = useState(false);
   const [accountDeletePhrase, setAccountDeletePhrase] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [creditStatus, setCreditStatus] = useState<CreditStatus | null>(null);
+  const [quotaNotice, setQuotaNotice] = useState<{ code: string; message: string; requiresSignIn?: boolean; resetDate?: string } | null>(null);
   const accountClient = useMemo(() => createSupabaseBrowserClient(), []);
   const currentWorkspaceRef = useRef(data);
   const currentPreferencesRef = useRef(preferences);
@@ -243,6 +248,23 @@ export function Workspace() {
     if (category) setSettingsCategory(category);
     setView("settings");
   };
+
+  const refreshAiSession = useCallback(async () => {
+    try {
+      const res = await fetch("/api/ai/session");
+      if (res.ok) {
+        const data = await res.json();
+        setIsAdmin(Boolean(data.isAdmin));
+        setCreditStatus(data.creditStatus);
+      }
+    } catch {
+      // Keep existing memory state
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshAiSession();
+  }, [refreshAiSession, accountUser]);
 
   useEffect(() => {
     const restoreLocation = () => {
@@ -650,8 +672,32 @@ export function Workspace() {
           ...(request.context ? { context: request.context } : {}),
         }),
       });
-      const result = await response.json() as { text?: string; provider?: ProviderId; model?: string; usage?: Message["usage"]; error?: string };
-      if (!response.ok) throw new Error(result.error ?? "The model could not answer this request.");
+      const result = await response.json() as {
+        text?: string;
+        provider?: ProviderId;
+        model?: string;
+        usage?: Message["usage"];
+        creditsRemaining?: number;
+        error?: string;
+        code?: string;
+        requiresSignIn?: boolean;
+        resetDate?: string;
+      };
+      if (!response.ok) {
+        if (result.code === "GUEST_TRIAL_EXHAUSTED" || result.code === "MONTHLY_QUOTA_EXHAUSTED" || result.code === "KILL_SWITCH_ACTIVE") {
+          setQuotaNotice({
+            code: result.code,
+            message: result.error ?? "AI credit quota reached.",
+            requiresSignIn: result.requiresSignIn,
+            resetDate: result.resetDate,
+          });
+        }
+        throw new Error(result.error ?? "The model could not answer this request.");
+      }
+      setQuotaNotice(null);
+      if (result.creditsRemaining !== undefined) {
+        setCreditStatus((prev) => prev ? ({ ...prev, ...(prev.isGuest ? { trialCreditsRemaining: result.creditsRemaining } : { creditsRemaining: result.creditsRemaining }) } as CreditStatus) : prev);
+      }
       if (typeof result.text !== "string" || !result.text.trim()) throw new Error("The provider returned an empty response. Retry the request.");
       setInferenceState((current) => ({ ...current, [request.provider]: "success" }));
       const assistantMessage: Message = {
@@ -1551,9 +1597,63 @@ export function Workspace() {
                 {selectedModel && <div className="dropdown-note model-details">{selectedModel.contextLimit ? `${selectedModel.contextLimit.toLocaleString()} token context · ` : data.provider === "ollama" ? "Context limit not reported by the model list · " : ""}{selectedModel.capabilities.join(", ")}. {data.provider === "ollama" ? `${formatModelSize(selectedModel.sizeBytes) ?? "Model size unavailable"}. Disk size does not predict RAM or speed.` : selectedModel.credentialAccess === "listed-for-key" ? "Listed for this API key." : data.provider === "cloudflare" ? "Workers AI quota and billing depend on your Cloudflare plan." : "Model listing; access is not verified."}</div>}
               </div>}
             </div>
+            {(() => {
+              const isByok = data.provider !== "cloudflare" || Boolean(sessionKeys.cloudflare.trim());
+              if (isByok) {
+                return (
+                  <button
+                    type="button"
+                    className="ai-quota-pill quota-byok"
+                    title="Using Bring-Your-Own-Key provider. Shared KATALYST credits are not consumed."
+                    onClick={() => openSettings("providers")}
+                  >
+                    BYOK · {selectedProvider.name}
+                  </button>
+                );
+              }
+              if (creditStatus) {
+                const remaining = creditStatus.isGuest ? creditStatus.trialCreditsRemaining : creditStatus.creditsRemaining;
+                const isExhausted = remaining <= 0;
+                const isLow = remaining > 0 && remaining <= 50;
+                const pillClass = isExhausted ? "quota-exhausted" : isLow ? "quota-low" : "quota-healthy";
+                const label = creditStatus.isGuest
+                  ? `${remaining.toFixed(0)} trial credits`
+                  : `${remaining.toFixed(0)} credits`;
+                return (
+                  <button
+                    type="button"
+                    className={`ai-quota-pill ${pillClass}`}
+                    title={creditStatus.isGuest
+                      ? "Guest trial balance. Sign in with Google to receive monthly credit allowance."
+                      : `Monthly credits. Resets ${creditStatus.resetDate ? new Date(creditStatus.resetDate).toLocaleDateString() : "next month"}.`}
+                    onClick={() => openSettings(creditStatus.isGuest ? "account" : "providers")}
+                  >
+                    ✨ {label}
+                  </button>
+                );
+              }
+              return null;
+            })()}
             <button className="top-icon" aria-label="Open settings" onClick={() => openSettings()}><Settings2 size={18} /></button>
           </div>
         </header>
+
+        {quotaNotice && (
+          <section className="quota-exhausted-banner" role="alert" style={{ margin: "10px 16px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <strong>{quotaNotice.code === "GUEST_TRIAL_EXHAUSTED" ? "Guest AI Trial Exhausted" : quotaNotice.code === "KILL_SWITCH_ACTIVE" ? "AI Maintenance Active" : "Monthly Allowance Exhausted"}</strong>
+              <button className="mini-icon" onClick={() => setQuotaNotice(null)} aria-label="Dismiss"><X size={14} /></button>
+            </div>
+            <p>{quotaNotice.message}</p>
+            <div className="banner-actions">
+              {quotaNotice.requiresSignIn ? (
+                <button type="button" className="primary-button" onClick={() => openSettings("account")}>Continue with Google</button>
+              ) : (
+                <button type="button" className="secondary-button" onClick={() => openSettings("providers")}>Configure BYOK Providers</button>
+              )}
+            </div>
+          </section>
+        )}
 
         {storageRecovery && <section className="storage-recovery" role={storageRecovery.kind === "unavailable" ? "alert" : "status"}>
           <div><strong>{storageRecovery.kind === "recoverable" ? "Workspace recovery available" : storageRecovery.kind === "unavailable" ? "Browser storage unavailable" : storageRecovery.kind === "unsupported" ? "Workspace version not supported" : "Saved workspace needs recovery"}</strong><p>{storageRecovery.kind === "recoverable" ? storageRecovery.issues.join(" ") : "issue" in storageRecovery ? storageRecovery.issue : "The current workspace data is ready."} Any changes made before a recovery choice are kept in memory only. {storageRecoveryRaw !== null && !originalRecordDownloadStarted ? "Download the original record before choosing recovery, restore, or a fresh workspace." : originalRecordDownloadStarted ? "The original record download was initiated; choose whether to continue." : ""}</p></div>
@@ -1596,18 +1696,19 @@ export function Workspace() {
         {view === "settings" ? <section className="settings-view">
           <div className="view-heading"><div><span className="eyebrow">WORKSPACE CONFIGURATION</span><h1>Settings</h1><p>Appearance, model access, and local workspace data.</p></div></div>
           <nav className="settings-section-nav" role="tablist" aria-label="Settings sections" onKeyDown={(event) => {
-            const currentIndex = settingsCategories.findIndex(({ id }) => id === settingsCategory);
-            const nextIndex = event.key === "ArrowRight" ? (currentIndex + 1) % settingsCategories.length
-              : event.key === "ArrowLeft" ? (currentIndex - 1 + settingsCategories.length) % settingsCategories.length
-                : event.key === "Home" ? 0 : event.key === "End" ? settingsCategories.length - 1 : -1;
+            const categories = isAdmin ? [...settingsCategories, { id: "admin" as const, label: "Admin" }] : settingsCategories;
+            const currentIndex = categories.findIndex(({ id }) => id === settingsCategory);
+            const nextIndex = event.key === "ArrowRight" ? (currentIndex + 1) % categories.length
+              : event.key === "ArrowLeft" ? (currentIndex - 1 + categories.length) % categories.length
+                : event.key === "Home" ? 0 : event.key === "End" ? categories.length - 1 : -1;
             if (nextIndex >= 0) {
               event.preventDefault();
-              const next = settingsCategories[nextIndex].id;
+              const next = categories[nextIndex].id;
               setSettingsCategory(next);
               window.requestAnimationFrame(() => document.getElementById(`settings-tab-${next}`)?.focus());
             }
           }}>
-            {settingsCategories.map(({ id, label }) => <button key={id} id={`settings-tab-${id}`} type="button" role="tab" tabIndex={settingsCategory === id ? 0 : -1} aria-selected={settingsCategory === id} aria-controls="settings-category-panel" onClick={() => setSettingsCategory(id)}>{label}</button>)}
+            {(isAdmin ? [...settingsCategories, { id: "admin" as const, label: "Admin" }] : settingsCategories).map(({ id, label }) => <button key={id} id={`settings-tab-${id}`} type="button" role="tab" tabIndex={settingsCategory === id ? 0 : -1} aria-selected={settingsCategory === id} aria-controls="settings-category-panel" onClick={() => setSettingsCategory(id)}>{label}</button>)}
           </nav>
           <div className="settings-category-content" id="settings-category-panel" role="tabpanel" aria-labelledby={`settings-tab-${settingsCategory}`}>
           {settingsCategory === "appearance" && <article className="settings-card appearance-card" id="settings-appearance">
@@ -1728,6 +1829,10 @@ export function Workspace() {
           {settingsCategory === "account" && <>
           <div id="settings-account" className="settings-section-heading"><span className="eyebrow">OPTIONAL ACCOUNT</span><h2>Account</h2></div>
           {renderAccountSettings()}
+          </>}
+          {settingsCategory === "admin" && isAdmin && <>
+          <div id="settings-admin" className="settings-section-heading"><span className="eyebrow">ADMINISTRATION</span><h2>AI Controls</h2></div>
+          <AdminPanel />
           </>}
           </div>
         </section> : null}

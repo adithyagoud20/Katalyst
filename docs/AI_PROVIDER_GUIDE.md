@@ -16,6 +16,17 @@ Gemini model results are not hardcoded. Google documents `GET https://generative
 
 Only models that advertise `generateContent` and a usable output limit are eligible. Preview/latest/experimental IDs and model names that identify embedding, image, audio, video, live, transcription, speech, or other non-chat tasks are excluded. The recommended set is applied only to live catalog entries, so a documented name is never added to the picker when the selected key does not return it. Google currently recommends Gemini 3.8 Flash for new projects; the stable Gemini 2.5 Pro endpoint remains listed only for projects with existing access. Check the [current model list](https://ai.google.dev/gemini-api/docs/models) and [deprecation guide](https://ai.google.dev/gemini-api/docs/deprecations) when choosing models.
 
+## Shared AI Gateway and Quota Policies (M15)
+
+In M15, Cloudflare Workers AI operates as KATALYST's default managed provider. Learners do not need an API key to ask Kat questions.
+
+### Quota and Credit Architecture
+- **AI Credits**: Public usage unit is AI credits rather than raw tokens. Base credit weight is configurable per model in `ai_model_config`.
+- **Monthly User Allowance**: Authenticated learners receive a monthly quota (default 1,000 credits). Quota periods follow the UTC calendar month (first day of month 00:00 UTC to first day of next month 00:00 UTC) and reset cleanly without rollover.
+- **Guest Trial**: Unregistered learners receive a restricted 50-credit trial. When exhausted, the interface prompts the learner to sign in with Google to receive monthly credits. Trials are tracked server-side and protected by salted IP hashing to deter storage-clearing abuse.
+- **BYOK Isolation**: When a user selects a Bring-Your-Own-Key provider (Gemini, OpenAI, OpenRouter, or local Ollama), or enters a personal session Cloudflare key, requests bypass the credit gateway and consume zero shared KATALYST credits. There is no automatic fallback between shared and BYOK tiers.
+- **Emergency Kill Switch & Admin Controls**: Administrators can pause shared AI inference globally, adjust credit weights, change the designated shared model, and monitor live consumption in Settings → Admin.
+
 ## Cloudflare Workers AI default hosted provider
 
 Cloudflare is the initial hosted provider when no valid `AI_PROVIDER` is set. A valid provider already saved in this browser remains selected, so the default does not overwrite a learner's explicit choice. Cloudflare is an ordinary provider selection: missing or invalid configuration is surfaced and KATALYST never falls back to another provider.

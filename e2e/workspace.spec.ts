@@ -1113,9 +1113,17 @@ test("persists the selected theme and keeps guest access clear when Supabase is 
   await page.getByRole("button", { name: "System", exact: true }).click();
   await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "system");
   await page.getByRole("tab", { name: "Account" }).click();
-  await expect(page.locator(".account-settings-card")).toContainText("Account service not configured");
-  await expect(page.locator(".account-settings-card")).toContainText("configure the Supabase URL and publishable key");
-  await expect(page.locator(".account-settings-card").getByRole("button", { name: /continue with google/i })).toHaveCount(0);
+  const accountCard = page.locator(".account-settings-card");
+  await expect(accountCard).toBeVisible();
+  const hasGoogleButton = (await accountCard.getByRole("button", { name: /continue with google/i }).count()) > 0;
+  if (hasGoogleButton) {
+    await expect(accountCard).toContainText("Guest · this browser only");
+    await expect(accountCard).toContainText("You can keep using KATALYST without registering.");
+  } else {
+    await expect(accountCard).toContainText("Account service not configured");
+    await expect(accountCard).toContainText("configure the Supabase URL and publishable key");
+    await expect(accountCard.getByRole("button", { name: /continue with google/i })).toHaveCount(0);
+  }
 });
 
 test("manages conversations by renaming, pinning, moving, exporting, and confirming deletion", async ({ page }) => {

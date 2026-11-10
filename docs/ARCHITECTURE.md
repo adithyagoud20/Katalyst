@@ -80,6 +80,29 @@ Cloudflare sends OpenAI-compatible `POST https://api.cloudflare.com/client/v4/ac
 
 The Ollama address defaults to `http://localhost:11434`; Settings accepts only `localhost`, `127.0.0.1`, or `[::1]` on port 11434, with no credentials, path, query, or fragment. Remote custom endpoints, LAN addresses, redirects, and requests to Ollama from non-loopback KATALYST hosts are rejected. The default `dev` and `start` scripts bind the KATALYST web server to `127.0.0.1`. KATALYST does not set or expose `OLLAMA_HOST`, download models, or provide model management actions.
 
+## Shared AI Gateway and Credit Accounting (M15)
+
+KATALYST routes all shared Cloudflare Workers AI requests through a central authoritative server-side gateway (`src/lib/ai-gateway/gateway.ts`). Users do not need an API key to access AI features with Kat. Administrators configure the designated shared model, model credit weights, monthly user allowances, guest trials, and global safety thresholds.
+
+Requests to shared AI undergo an 11-step pipeline:
+1. **Identity & Session Validation**: Verifies either a Supabase cookie session or a server-minted HMAC-SHA256 signed guest cookie (`katalyst_guest_session`).
+2. **Authorization & Emergency Controls**: Validates that shared AI is enabled and the global emergency kill switch is not active.
+3. **Admin Model Lock**: Resolves the administrator's designated shared model from `ai_system_config` and checks `ai_model_config` for model enablement and credit weights.
+4. **Rate Limiting**: Enforces sliding-window request limits (default 15 req/min for authenticated users, 6 req/min for guests).
+5. **Input/Output Bounds**: Validates input character limits (44,000 characters) and request byte payload caps (192 KB).
+6. **Atomic Credit Reservation**: Atomically reserves estimated credits in PostgreSQL via row-level locks (`SELECT ... FOR UPDATE`), preventing concurrent overspending.
+7. **Cloudflare Workers AI Inference**: Invokes the Cloudflare API using server-only credentials (`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`).
+8. **Credit Settlement**: Adjusts user or guest balance based on actual provider-reported token usage or conservative character-based estimations (~3.8 characters per token) when token telemetry is omitted by the upstream provider.
+9. **Permanent Accounting**: Records the settled transaction in `public.ai_usage_ledger` with reservation linkage, outcome, and estimation flags.
+10. **Failure & Cancellation Recovery**: If inference aborts, times out, or fails upstream, the reserved credits are released immediately so learners are never unfairly docked.
+11. **Telemetry & Client Headers**: Returns the generated response alongside updated credit balance and quota status.
+
+Authenticated learners receive 1,000 credits per UTC calendar month (first day of month 00:00 UTC to first day of next month 00:00 UTC) without rollover. Unregistered guests receive a 50-credit restricted trial. To mitigate trial-reset abuse from clearing browser storage, guest sessions are cryptographically signed and coupled with salted one-way IP hashing. When quotas are exhausted, structured error payloads (`GUEST_TRIAL_EXHAUSTED`, `MONTHLY_QUOTA_EXHAUSTED`) guide the user to sign in with Google or select a BYOK provider.
+
+BYOK providers (Gemini, OpenAI, OpenRouter, and local Ollama) bypass shared credit reservation and settlement entirely. BYOK usage consumes zero KATALYST credits and never automatically triggers Cloudflare inference.
+
+Brevo transactional messaging (`src/lib/email/brevo.ts`) operates server-side for welcome notices, low-balance warnings, and quota exhaustion alerts. Brevo calls are non-blocking and fault-tolerant; external email delivery failures never disrupt core authentication or inference requests.
+
 ## Credential handling and persistence
 
 `.env.local` provides developer/server credentials through `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `OPENROUTER_API_KEY`. `AI_PROVIDER` is the initial provider and defaults to Cloudflare when absent/invalid; an existing saved browser provider choice takes precedence. `AI_MODEL` can select an OpenAI built-in model. Session BYOK values and the session Cloudflare account ID are held only in page memory; the token is sent in `x-katalyst-provider-key`, while the account ID uses `x-katalyst-cloudflare-account-id`. They are never written to localStorage, IndexedDB, chat records, URLs, or server-side persistent storage. The server receives the secret transiently to call the selected provider; dynamic cache keys contain only a SHA-256 digest. Session-key requests require HTTPS except on loopback for local development.

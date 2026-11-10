@@ -57,6 +57,7 @@ export function KatTutor({
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [quotaError, setQuotaError] = useState<{ code: string; message: string; requiresSignIn?: boolean; resetDate?: string } | null>(null);
   const conversationRef = useRef<HTMLDivElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
   const followConversationRef = useRef(true);
@@ -88,6 +89,7 @@ export function KatTutor({
     const lessonContext = composeTutorReference(mode, context, workspaceActivity, skillComposition.context);
     setInput("");
     setError("");
+    setQuotaError(null);
     setPending(true);
     const activityId = trackAIRequestStart(provider, model);
     try {
@@ -101,8 +103,26 @@ export function KatTutor({
         },
         body: JSON.stringify({ provider, model, assistantSurface: "kat", messages: nextMessages, context: lessonContext }),
       });
-      const result = await response.json() as { text?: string; error?: string; usage?: { inputTokens?: number; outputTokens?: number } };
-      if (!response.ok) throw new Error(result.error ?? "Kat could not answer this request.");
+      const result = await response.json() as {
+        text?: string;
+        error?: string;
+        code?: string;
+        requiresSignIn?: boolean;
+        resetDate?: string;
+        creditsRemaining?: number;
+        usage?: { inputTokens?: number; outputTokens?: number };
+      };
+      if (!response.ok) {
+        if (result.code === "GUEST_TRIAL_EXHAUSTED" || result.code === "MONTHLY_QUOTA_EXHAUSTED" || result.code === "KILL_SWITCH_ACTIVE") {
+          setQuotaError({
+            code: result.code,
+            message: result.error ?? "AI credit quota reached.",
+            requiresSignIn: result.requiresSignIn,
+            resetDate: result.resetDate,
+          });
+        }
+        throw new Error(result.error ?? "Kat could not answer this request.");
+      }
       if (!result.text?.trim()) throw new Error("The provider returned an empty response. Try again.");
       trackAIRequestFinish(activityId, "complete", result.usage);
       setMessages([...nextMessages.map((message, index) => index === nextMessages.length - 1
@@ -156,7 +176,18 @@ export function KatTutor({
       {!messages.length ? <div className="tutor-empty"><BrandMark className="mini-brand" /><p>{context ? "Choose an action above or ask a question. Kat uses this lesson only when it helps." : "What are you working through? Kat can explain a concept, ask guiding questions, or help you practice."}</p></div> : messages.map((message, index) => <article key={`${index}-${message.role}`} className={`tutor-message ${message.role}`}><span className="tutor-message-label">{message.role === "assistant" ? "Kat" : "You"}</span>{message.role === "assistant" ? <AssistantMarkdown content={message.content} /> : <p>{message.content}</p>}{message.role === "assistant" && message.responseProvider && message.responseModel && <div className="tutor-response-route" aria-label={`Response from ${providerCatalog[message.responseProvider].name}, model ${message.responseModel}`}>Via {providerCatalog[message.responseProvider].name} · {message.responseModel}</div>}{message.role === "user" && message.appliedSkills?.length ? <div className="tutor-applied-skills" aria-label="Skills applied to this Kat request">Skills used: {message.appliedSkills.map((skill) => skill.name).join(", ")}</div> : null}{message.role === "user" && message.omittedSkills?.length ? <div className="tutor-omitted-skills">Not included: {message.omittedSkills.map((skill) => `${skill.name} (${skill.reason === "prompt-limit" ? "prompt limit" : "duplicate instructions"})`).join(", ")}</div> : null}</article>)}
       {pending && <div className="tutor-pending" role="status"><span className="pending-dot" /> Kat is thinking…</div>}
     </div>
-    {error && <div className="send-error tutor-error" role="alert"><strong>Kat could not answer</strong><span>{error}</span><button type="button" onClick={onOpenSettings}>Open provider settings</button></div>}
+    {quotaError && <div className="quota-exhausted-banner" role="alert">
+      <strong>{quotaError.code === "GUEST_TRIAL_EXHAUSTED" ? "Guest AI Trial Exhausted" : quotaError.code === "KILL_SWITCH_ACTIVE" ? "AI Maintenance Active" : "Monthly Allowance Exhausted"}</strong>
+      <p>{quotaError.message}</p>
+      <div className="banner-actions">
+        {quotaError.requiresSignIn ? (
+          <button type="button" className="primary-button" onClick={onOpenSettings}>Sign In with Google</button>
+        ) : (
+          <button type="button" className="secondary-button" onClick={onOpenSettings}>Configure BYOK Providers</button>
+        )}
+      </div>
+    </div>}
+    {error && !quotaError && <div className="send-error tutor-error" role="alert"><strong>Kat could not answer</strong><span>{error}</span><button type="button" onClick={onOpenSettings}>Open provider settings</button></div>}
     <form className="tutor-composer" onSubmit={send}><textarea ref={composerInputRef} aria-label="Ask Kat a question" value={input} maxLength={8_000} rows={2} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder={configured ? "Ask about the lesson, code, or output…" : "Connect a provider to ask Kat…"} disabled={pending} /><button className="send-button" aria-label="Send question to Kat" disabled={!input.trim() || pending || !configured || !model}><ArrowUp size={17} /></button></form>
     <p className="tutor-footnote">Kat has no web-browsing or code-execution tools and does not claim to run code. Replies are model-generated; check technical details against trusted references. Conversation stays in page memory.</p>
   </section>;

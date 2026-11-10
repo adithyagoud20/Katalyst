@@ -104,7 +104,14 @@
 
 **Consequences:** Provider identity is not confused with KATALYST or the Kat persona, and prior tutor turns remain attributed to their original route. Model output remains unchanged in page state; presentation and provenance do not claim that a model's response was independently verified. Lesson example output is an authored reference, not automatic execution or grading. The new curriculum field does not alter `katalyst.learning.v1` or workspace backups.
 
-## Add optional accounts with Supabase and preserve guest-first storage (M14)
+## Central shared AI gateway, monthly credits, and Brevo integration (M15)
+
+**Context:** KATALYST requires a default shared AI experience where learners can ask Kat questions without bringing an API key, while protecting infrastructure costs, preventing abuse, supporting BYOK providers, and enabling administrative controls.
+
+**Decision:** Route all shared Cloudflare Workers AI inference through a central authoritative gateway with atomic credit reservations, row-level locks, monthly calendar quotas, and server-issued HMAC-signed guest sessions. Unregistered guests receive a 50-credit trial with salted IP hash binding to resist storage-clearing resets. Authenticated users receive a 1,000-credit monthly quota with strict UTC month boundaries and no rollover. BYOK requests (Gemini, OpenAI, OpenRouter, and Ollama) bypass credit deduction entirely with zero automatic fallback. Implement server-side Brevo transactional email messaging for welcome and quota alerts, ensuring email failures are non-blocking and never interrupt user flows.
+
+**Consequences:** Users start learning immediately without configuring credentials. Shared inference costs and throughput are capped predictably. Administrators gain visibility, model selection control, and an emergency kill switch. BYOK users maintain privacy and unlimited usage independent of KATALYST credits. Email delivery is decoupled from authentication and inference stability.
+
 
 **Context:** M14 adds cross-device account storage while the application already has strict local workspace, learning-progress, and preference records that must remain backward-compatible and recoverable.
 
