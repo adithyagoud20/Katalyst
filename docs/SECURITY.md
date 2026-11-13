@@ -4,6 +4,8 @@
 
 Developer credentials belong in ignored local `.env.local`: `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, and `OPENROUTER_API_KEY`. They are read by server-side adapters and are not returned from `/api/status` or `/api/models`, written to logs, or exposed through `NEXT_PUBLIC_` variables. Ollama has no cloud credential; its local address is separate workspace configuration.
 
+In production deployments, `.env.local` is not deployed. Production secrets (`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `SUPABASE_SERVICE_ROLE_KEY`, `GUEST_SESSION_SECRET`, `KATALYST_ADMIN_EMAILS`) must be configured securely in the deployment platform's server environment dashboard. See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed platform-specific configuration instructions and verification checklists.
+
 Settings supports user-entered session keys for each cloud provider. The learner selects **Save for this tab** before a value becomes active; **Clear session key** removes the active value and field draft. Active and unsaved values stay in React memory only; reload or close the tab clears them. The browser sends an active key in the `x-katalyst-provider-key` request header to the KATALYST server for model discovery and chat. The server necessarily receives it transiently to make the provider request. It is not put in a URL, localStorage, IndexedDB, chat records, analytics, or persistent server storage. Session keys are accepted only over HTTPS, except localhost/loopback for development. A saved session key takes precedence over the matching environment key on requests that include it. No credential value is included in the returned provider/model metadata.
 
 Cloud model-discovery cache entries store only a SHA-256 digest in their cache key and normalized model metadata; they do not keep the raw session key. Results expire after five minutes, and callers can request refresh. Ollama model results are fetched fresh and are not cached. Environment credentials remain in server process configuration.
@@ -52,6 +54,23 @@ Ollama is a local-only exception. Its address is restricted to `localhost`, `127
 
 OpenAI requests set `store: false`. Gemini and OpenRouter requests use their official APIs and server-side authentication. Cloudflare catalog discovery validates the account catalog but does not prove generation access. Settings provides a separate manual Cloudflare **Test inference** action that sends a minimal prompt to the selected catalog model and may consume account quota. It is never run automatically. Ollama uses its local `GET /api/tags` and non-streaming `POST /api/chat` endpoints; KATALYST does not manage or download models. These request options do not replace reviewing provider-specific data processing, retention, billing, and API terms. A model catalog entry is not proof of account access.
 
+## Code execution sandboxing and security boundary (M17.3)
+
+KATALYST provides interactive programming and simulation environments through a provider-neutral execution subsystem (`src/lib/execution/`). Code execution adheres to strict isolation boundaries:
+
+1. **Client-Side WebAssembly Isolation (Wasmer & Pyodide)**:
+   - C/C++ compilation and execution run entirely inside the client's browser using `@wasmer/sdk/browser` (Clang/LLVM WebAssembly binary).
+   - Python 3.12 execution runs inside the client's browser via Pyodide WebAssembly micro-runtime.
+   - **Zero Data Leakage**: Learner source code, inputs, and execution outputs never leave the browser sandbox or touch KATALYST backend servers.
+   - **Process Boundary**: Execution is strictly bounded by browser tab memory limits and the WebAssembly sandbox. It cannot access the learner's local filesystem or host operating system.
+   - **Network Isolation**: Client-side WebAssembly runtimes cannot open raw TCP/UDP sockets or perform cross-origin network operations.
+
+2. **Server-Side Sandbox Boundary (Remote MicroVMs)**:
+   - When remote runners (such as Judge0 CE or Piston) are configured for heavy environments like OpenJDK Java, the Next.js server acts as a strictly validating proxy.
+   - Remote credentials (`JUDGE0_API_KEY`, `PISTON_API_URL`) remain server-side and are never exposed to browser bundles.
+   - Ephemeral container sandboxes enforce Linux cgroups, unprivileged execution users (`nobody`), read-only root filesystems, and strict timeouts (default 10 seconds, 128MB RAM limit).
+   - Code sent to Kat AI tutor remains untrusted context; Kat does not execute code, and tutor responses are never executed automatically.
+
 ## Assistant response rendering
 
 Model output is untrusted content. Assistant Markdown is parsed into React elements with `react-markdown`; KATALYST does not enable raw HTML parsing or `dangerouslySetInnerHTML`. Raw HTML is skipped, only HTTP(S), `mailto:`, and in-page fragment links are rendered, external links use `noopener noreferrer`, and Markdown images are omitted so a response cannot cause an image fetch. Highlighted code is displayed as text; its copy button only writes that code to the clipboard and never runs it. These rules apply equally to OpenAI, Gemini, OpenRouter, and Ollama output. User messages retain the existing plain-text renderer.
@@ -99,5 +118,21 @@ Kat sends a learner's message and, when launched from a lesson, lesson text/obje
 The C playground compiles learner source in the browser with the pinned Wasmer JavaScript SDK and Clang registry package. The app fetches the compiler package on first use (110,713,421 bytes, about 106 MiB) and caches it in the browser profile; this is a third-party package download, not an app upload. Compiled C is run in a Wasmer WebAssembly sandbox with sandbox networking disabled. Editing, compiling, and running stay in the browser. If the learner explicitly asks Kat to explain or review code, the current bounded source, recent diagnostics, and output are sent to the selected provider as untrusted reference context. KATALYST does not execute imported skill files or native host executables. Cross-origin-isolation headers (`COOP: same-origin`, `COEP: require-corp`) are set on all routes because the SDK requires `SharedArrayBuffer`; external embedded resources may be blocked by that policy.
 
 The UI limits source to 12,000 characters, stdin to 2,000 characters, captured output to 64,000 bytes, compilation to 15 seconds, and each guest run to 8 seconds. Users can stop an active run. These controls bound expected resource use but are not a security guarantee against vulnerabilities in the browser, WebAssembly runtime, compiler package, or generated program. The playground is a learning environment and should not be treated as a hardened multi-tenant service. Draft source and stdin are stored locally under `katalyst.c.playground.v1`; they are not included in workspace backups. The initial compiler download requires internet access and deployment infrastructure must preserve both isolation headers.
+
+### Compiler Sandboxing and Remote Execution Boundaries (M16)
+
+KATALYST establishes strict security boundaries for multi-language and simulation execution:
+1. **Client-Side First**: C11, C++, Python, JavaScript, and HTML/CSS run locally in browser WebAssembly sandboxes (`@wasmer/sdk`, Pyodide) or sandboxed iframes. No user code is executed on the Next.js server.
+2. **Cloudflare Workers AI Boundary**: Cloudflare Workers AI is used strictly for AI inference, not for arbitrary general-purpose compiler execution. Workers AI has no POSIX runtime or isolated Linux execution environments.
+3. **Remote Sandbox Requirements**: When remote runners (e.g., Piston or Judge0 microVMs) are integrated for heavy runtimes like Java OpenJDK:
+   - Remote runners must operate in dedicated, isolated container/microVM environments.
+   - All network egress must be disabled (`network: none`).
+   - Strict resource limits must be enforced: CPU time (<= 8s), compile time (<= 15s), memory (<= 128 MB), output size (<= 64 KB).
+   - Remote sandboxes must have zero access to application databases, secrets, or internal networks.
+   - Filesystems must be temporary and wiped immediately after execution.
+   - Requests must be rate-limited and credit-metered through the AI Gateway.
+   - Do not deploy an unsafe general-purpose execution service merely to achieve server-side compilation.
+
+See [COMPILER_ARCHITECTURE.md](COMPILER_ARCHITECTURE.md) for full architectural evaluations and risk analysis.
 
 Do not open a public issue containing an exploit or secret. Contact the maintainers privately through the repository's security reporting channel once a remote repository is established. Remove real credentials and user data from any report.

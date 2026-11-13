@@ -3,7 +3,21 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { cProgrammingPath, flattenLessons, getPublishedLearningCourses, learningCatalog, validateLearningCatalog } from "../src/lib/learning-curriculum";
+import {
+  cProgrammingPath,
+  flattenLessons,
+  getPublishedLearningCourses,
+  learningCatalog,
+  pythonProgrammingPath,
+  javascriptProgrammingPath,
+  digitalCircuitsPath,
+  resolveLessonExecution,
+  resolveLessonHints,
+  resolveLessonType,
+  safeValidateCourse,
+  safeValidateLesson,
+  validateLearningCatalog,
+} from "../src/lib/learning-curriculum";
 import { extractCCode } from "../src/lib/c-playground";
 
 const hasSystemCCompiler = spawnSync("cc", ["--version"], { encoding: "utf8" }).status === 0;
@@ -19,7 +33,7 @@ describe("authored learning catalog", () => {
       publicationStatus: "published",
     });
     expect(cProgrammingPath.learningOutcomes.length).toBeGreaterThan(0);
-    expect(flattenLessons(cProgrammingPath)).toHaveLength(13);
+    expect(flattenLessons(cProgrammingPath)).toHaveLength(16);
     for (const { lesson } of flattenLessons(cProgrammingPath)) {
       expect(lesson.content).toContain("~~~c");
       expect(lesson.objectiveIds).toContain(lesson.exercise.objectiveId);
@@ -63,13 +77,14 @@ describe("authored learning catalog", () => {
     expect(ids).toEqual([
       "source-to-output", "variables-and-types", "input-output", "operators", "if-else", "for-loop",
       "functions", "arrays", "strings", "pointers", "structures-unions", "file-handling", "practical-programming",
+      "bitwise-registers", "dynamic-memory", "function-pointers",
     ]);
   });
 
   it("uses explicit, consecutive module and lesson ordering with earlier prerequisites", () => {
     const entries = flattenLessons(cProgrammingPath);
-    expect(cProgrammingPath.modules.map((module) => module.order)).toEqual([1, 2, 3, 4, 5]);
-    expect(entries.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 13 }, (_, index) => index + 1));
+    expect(cProgrammingPath.modules.map((module) => module.order)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(entries.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 16 }, (_, index) => index + 1));
     for (const [index, { lesson }] of entries.entries()) {
       for (const prerequisiteId of lesson.prerequisiteLessonIds) {
         expect(entries.findIndex(({ lesson: candidate }) => candidate.id === prerequisiteId)).toBeLessThan(index);
@@ -92,7 +107,12 @@ describe("authored learning catalog", () => {
     };
     const expanded = { subjects: [...learningCatalog.subjects, additionalSubject], courses: [...learningCatalog.courses, draftCourse] };
     expect(validateLearningCatalog(expanded).success).toBe(true);
-    expect(getPublishedLearningCourses(expanded).map((course) => course.id)).toEqual([cProgrammingPath.id]);
+    expect(getPublishedLearningCourses(expanded).map((course) => course.id)).toEqual([
+      cProgrammingPath.id,
+      pythonProgrammingPath.id,
+      javascriptProgrammingPath.id,
+      digitalCircuitsPath.id,
+    ]);
   });
 
   it("rejects duplicate IDs, invalid references, broken order, and malformed code fences", () => {
@@ -117,5 +137,211 @@ describe("authored learning catalog", () => {
     const unsafe = JSON.parse(JSON.stringify(learningCatalog)) as typeof learningCatalog;
     unsafe.courses[0].modules[4].lessons[1].exampleRun!.expectedFiles = [{ path: "../../outside.txt", content: "not a real file" }];
     expect(validateLearningCatalog(unsafe).success).toBe(false);
+  });
+
+  it("validates courses and lessons using safeValidateCourse and safeValidateLesson", () => {
+    const courseValidation = safeValidateCourse(cProgrammingPath);
+    expect(courseValidation.success).toBe(true);
+    if (courseValidation.success) {
+      expect(courseValidation.data.version).toBe("1.0.0");
+    }
+
+    for (const { lesson } of flattenLessons(cProgrammingPath)) {
+      const lessonValidation = safeValidateLesson(lesson);
+      expect(lessonValidation.success).toBe(true);
+      expect(resolveLessonType(lesson)).toBe("guided-coding");
+      expect(resolveLessonExecution(cProgrammingPath, lesson)).toEqual({
+        language: "c",
+        target: "browser-wasm",
+      });
+      expect(resolveLessonHints(lesson.exercise).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("supports all lesson types, theory sections, code examples, demos, and progressive hints", () => {
+    const richLesson = {
+      id: "rich-demo-lesson",
+      order: 14,
+      title: "Rich Modular Lesson",
+      summary: "Demonstrates theory sections, code examples, interactive demo, and resources.",
+      type: "interactive-simulation" as const,
+      objectiveIds: ["source-to-output"],
+      prerequisiteLessonIds: ["source-to-output"],
+      estimatedDurationMinutes: 15,
+      content: "This is a comprehensive overview of rich modular lessons demonstrating diverse pedagogical content and features.",
+      theorySections: [
+        { id: "sec-1", title: "Theory Part 1", content: "Detailed explanation." },
+      ],
+      codeExamples: [
+        { title: "Example 1", language: "c" as const, code: "int x = 42;", description: "Small sample" },
+      ],
+      interactiveDemo: {
+        kind: "memory-diagram" as const,
+        title: "Memory Visualizer",
+        description: "Visualizes stack growth.",
+        config: { showAddresses: true },
+      },
+      resources: [
+        { title: "C11 Draft", url: "https://example.com/c11", description: "Standard draft", type: "specification" as const },
+      ],
+      execution: {
+        language: "c" as const,
+        target: "browser-wasm" as const,
+      },
+      exercise: {
+        id: "rich-ex",
+        title: "Practice Challenge",
+        prompt: "Write a small snippet.",
+        hints: ["First hint", "Second hint"],
+        solution: "int x = 42;",
+        objectiveId: "source-to-output",
+        difficulty: "Developing" as const,
+        expectedOutcome: "Correct syntax.",
+      },
+      checkpoint: {
+        prompt: "Self check?",
+        answer: "Self answer.",
+      },
+    };
+
+    const validated = safeValidateLesson(richLesson);
+    expect(validated.success).toBe(true);
+    expect(resolveLessonType(richLesson)).toBe("interactive-simulation");
+    expect(resolveLessonHints(richLesson.exercise)).toEqual(["First hint", "Second hint"]);
+    expect(resolveLessonExecution(cProgrammingPath, richLesson)).toEqual({
+      language: "c",
+      target: "browser-wasm",
+    });
+  });
+
+  it("fails validation on invalid lesson types, negative duration, or corrupt schemas", () => {
+    const baseLesson = flattenLessons(cProgrammingPath)[0].lesson;
+
+    const invalidType = safeValidateLesson({ ...baseLesson, type: "unsupported-mode" });
+    expect(invalidType.success).toBe(false);
+
+    const negativeDuration = safeValidateLesson({ ...baseLesson, estimatedDurationMinutes: -5 });
+    expect(negativeDuration.success).toBe(false);
+
+    const invalidDifficulty = safeValidateLesson({
+      ...baseLesson,
+      exercise: { ...baseLesson.exercise, difficulty: "SuperHard" },
+    });
+    expect(invalidDifficulty.success).toBe(false);
+
+    const invalidLanguage = safeValidateLesson({
+      ...baseLesson,
+      execution: { language: "brainfuck" as unknown },
+    });
+    expect(invalidLanguage.success).toBe(false);
+
+    const invalidCourse = safeValidateCourse({ ...cProgrammingPath, level: "Master" });
+    expect(invalidCourse.success).toBe(false);
+  });
+});
+
+describe("Python Programming Foundations course", () => {
+  it("registers Python in the catalog and validates the full course schema", () => {
+    expect(pythonProgrammingPath).toMatchObject({
+      id: "python-programming-foundations",
+      subjectId: "python-programming",
+      title: "Python Programming Foundations",
+      level: "Beginner",
+      version: "1.0.0",
+      publicationStatus: "published",
+    });
+    expect(learningCatalog.subjects.some((s) => s.id === "python-programming")).toBe(true);
+    expect(learningCatalog.courses.some((c) => c.id === "python-programming-foundations")).toBe(true);
+
+    const validation = safeValidateCourse(pythonProgrammingPath);
+    expect(validation.success).toBe(true);
+    if (validation.success) {
+      expect(validation.data.modules).toHaveLength(7);
+    }
+  });
+
+  it("validates all 19 Python lessons, module ordering, and prerequisite DAG constraints", () => {
+    const pythonLessons = flattenLessons(pythonProgrammingPath);
+    expect(pythonLessons).toHaveLength(19);
+    expect(pythonProgrammingPath.modules.map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(pythonLessons.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 19 }, (_, i) => i + 1));
+
+    for (const [index, { lesson }] of pythonLessons.entries()) {
+      const lessonValidation = safeValidateLesson(lesson);
+      expect(lessonValidation.success, `${lesson.id} failed validation`).toBe(true);
+      expect(lesson.content.length).toBeGreaterThanOrEqual(80);
+      expect(lesson.exercise.hints?.length).toBeGreaterThanOrEqual(1);
+
+      // Verify prerequisite DAG: all prerequisites must be earlier lessons
+      for (const prereqId of lesson.prerequisiteLessonIds) {
+        const prereqIdx = pythonLessons.findIndex(({ lesson: candidate }) => candidate.id === prereqId);
+        expect(prereqIdx, `${lesson.id} prerequisite ${prereqId} must precede it`).toBeLessThan(index);
+      }
+    }
+  });
+
+  it("resolves diverse lesson types across Python foundations", () => {
+    const lessons = flattenLessons(pythonProgrammingPath).map(({ lesson }) => ({
+      id: lesson.id,
+      type: resolveLessonType(lesson),
+    }));
+
+    expect(lessons.find((l) => l.id === "py-source-to-interpreter")?.type).toBe("theory");
+    expect(lessons.find((l) => l.id === "py-variables-and-types")?.type).toBe("guided-coding");
+    expect(lessons.find((l) => l.id === "py-formatted-strings")?.type).toBe("practical-exercise");
+    expect(lessons.find((l) => l.id === "py-lists-and-tuples")?.type).toBe("interactive-simulation");
+    expect(lessons.find((l) => l.id === "py-engineering-capstone")?.type).toBe("assessment");
+  });
+
+  describe("JavaScript & Algorithmic Systems course", () => {
+    it("registers JavaScript course and validates schema and modules", () => {
+      const validation = safeValidateCourse(javascriptProgrammingPath);
+      expect(validation.success).toBe(true);
+      if (validation.success) {
+        expect(validation.data.modules).toHaveLength(4);
+      }
+      const lessons = flattenLessons(javascriptProgrammingPath);
+      expect(lessons).toHaveLength(10);
+      expect(lessons.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 10 }, (_, i) => i + 1));
+
+      for (const [index, { lesson }] of lessons.entries()) {
+        const lessonValidation = safeValidateLesson(lesson);
+        expect(lessonValidation.success, `${lesson.id} failed validation`).toBe(true);
+        expect(lesson.content.length).toBeGreaterThanOrEqual(80);
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(2);
+
+        for (const prereqId of lesson.prerequisiteLessonIds) {
+          const prereqIdx = lessons.findIndex(({ lesson: candidate }) => candidate.id === prereqId);
+          expect(prereqIdx, `${lesson.id} prerequisite ${prereqId} must precede it`).toBeLessThan(index);
+        }
+      }
+    });
+  });
+
+  describe("Digital Logic & Circuit Foundations course", () => {
+    it("registers Circuits course and validates simulation lessons and interactiveDemo", () => {
+      const validation = safeValidateCourse(digitalCircuitsPath);
+      expect(validation.success).toBe(true);
+      if (validation.success) {
+        expect(validation.data.modules).toHaveLength(3);
+      }
+      const lessons = flattenLessons(digitalCircuitsPath);
+      expect(lessons).toHaveLength(8);
+      expect(lessons.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 8 }, (_, i) => i + 1));
+
+      for (const [index, { lesson }] of lessons.entries()) {
+        const lessonValidation = safeValidateLesson(lesson);
+        expect(lessonValidation.success, `${lesson.id} failed validation`).toBe(true);
+        expect(lesson.type).toBe("interactive-simulation");
+        expect(lesson.interactiveDemo).toBeDefined();
+        expect(lesson.interactiveDemo?.kind).toBe("circuit");
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(2);
+
+        for (const prereqId of lesson.prerequisiteLessonIds) {
+          const prereqIdx = lessons.findIndex(({ lesson: candidate }) => candidate.id === prereqId);
+          expect(prereqIdx, `${lesson.id} prerequisite ${prereqId} must precede it`).toBeLessThan(index);
+        }
+      }
+    });
   });
 });

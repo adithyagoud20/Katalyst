@@ -32,7 +32,8 @@ export function signGuestSession(guestId: string, createdAt: number, expiresAt: 
 export function verifyGuestSession(cookieValue: string | null | undefined): GuestSessionPayload | null {
   if (!cookieValue) return null;
   try {
-    const raw = Buffer.from(cookieValue, "base64url").toString("utf-8");
+    const rawVal = decodeURIComponent(cookieValue.trim()).replace(/^"|"$/g, "");
+    const raw = Buffer.from(rawVal, "base64url").toString("utf-8");
     const parsed = JSON.parse(raw) as GuestSessionPayload;
     if (!parsed.guestId || !parsed.createdAt || !parsed.expiresAt || !parsed.signature) return null;
     if (parsed.expiresAt < Date.now()) return null;
@@ -114,47 +115,87 @@ export async function getOrCreateGuestIdentity(
     };
   }
 
-  // Database-backed trial registration / fetch via RPC
-  const { data, error } = await admin.rpc("get_or_create_guest_session", {
-    p_guest_id: targetGuestId,
-    p_ip_hash: ipHash,
-    p_expires_at: expiresAtIso,
-  });
+  // Database-backed trial registration:
+  // First attempt RPC get_or_create_guest_session
+  let sessionRow: {
+    trial_credits_allocated: number;
+    trial_credits_used: number;
+    trial_credits_reserved: number;
+    expires_at: string;
+  } | null = null;
 
-  if (error || !data || data.length === 0) {
-    // If RPC failed, query directly
-    const { data: direct } = await admin
-      .from("ai_guest_sessions")
-      .select("trial_credits_allocated,trial_credits_used,trial_credits_reserved,expires_at")
-      .eq("guest_id", targetGuestId)
-      .maybeSingle();
+  try {
+    const { data: rpcData, error: rpcError } = await admin.rpc("get_or_create_guest_session", {
+      p_guest_id: targetGuestId,
+      p_ip_hash: ipHash,
+      p_expires_at: expiresAtIso,
+    });
 
-    const allocated = direct?.trial_credits_allocated ?? 50;
-    const used = Number(direct?.trial_credits_used ?? 0);
-    const reserved = Number(direct?.trial_credits_reserved ?? 0);
-    const remaining = Math.max(0, allocated - used - reserved);
-
-    return {
-      guestId: targetGuestId,
-      cookieToken,
-      status: {
-        isGuest: true,
-        guestId: targetGuestId,
-        trialCreditsAllocated: allocated,
-        trialCreditsUsed: used,
-        trialCreditsReserved: reserved,
-        trialCreditsRemaining: remaining,
-        isExhausted: remaining <= 0,
-        expiresAt: direct?.expires_at ?? expiresAtIso,
-      },
-    };
+    if (!rpcError && rpcData && rpcData.length > 0) {
+      const row = rpcData[0];
+      sessionRow = {
+        trial_credits_allocated: Number(row.trial_credits_allocated ?? 50),
+        trial_credits_used: Number(row.trial_credits_used ?? 0),
+        trial_credits_reserved: Number(row.trial_credits_reserved ?? 0),
+        expires_at: expiresAtIso,
+      };
+    }
+  } catch {
+    // Proceed to resilient direct persistence fallback
   }
 
-  const row = data[0];
-  const allocated = Number(row.trial_credits_allocated ?? 50);
-  const used = Number(row.trial_credits_used ?? 0);
-  const reserved = Number(row.trial_credits_reserved ?? 0);
-  const remaining = Number(row.trial_credits_available ?? Math.max(0, allocated - used - reserved));
+  // If RPC failed or returned no row, perform resilient direct upsert
+  if (!sessionRow) {
+    const { data: upsertData, error: upsertError } = await admin
+      .from("ai_guest_sessions")
+      .upsert(
+        {
+          guest_id: targetGuestId,
+          ip_hash: ipHash,
+          trial_credits_allocated: 50,
+          trial_credits_used: 0,
+          trial_credits_reserved: 0,
+          expires_at: expiresAtIso,
+        },
+        { onConflict: "guest_id", ignoreDuplicates: true }
+      )
+      .select("trial_credits_allocated,trial_credits_used,trial_credits_reserved,expires_at")
+      .maybeSingle();
+
+    if (!upsertError && upsertData) {
+      sessionRow = {
+        trial_credits_allocated: Number(upsertData.trial_credits_allocated ?? 50),
+        trial_credits_used: Number(upsertData.trial_credits_used ?? 0),
+        trial_credits_reserved: Number(upsertData.trial_credits_reserved ?? 0),
+        expires_at: upsertData.expires_at || expiresAtIso,
+      };
+    } else {
+      // Query existing if ignoreDuplicates did not return data
+      const { data: directData } = await admin
+        .from("ai_guest_sessions")
+        .select("trial_credits_allocated,trial_credits_used,trial_credits_reserved,expires_at")
+        .eq("guest_id", targetGuestId)
+        .maybeSingle();
+
+      if (directData) {
+        sessionRow = {
+          trial_credits_allocated: Number(directData.trial_credits_allocated ?? 50),
+          trial_credits_used: Number(directData.trial_credits_used ?? 0),
+          trial_credits_reserved: Number(directData.trial_credits_reserved ?? 0),
+          expires_at: directData.expires_at || expiresAtIso,
+        };
+      }
+    }
+  }
+
+  if (!sessionRow) {
+    throw new Error("Unable to establish or persist guest trial session in database.");
+  }
+
+  const allocated = sessionRow.trial_credits_allocated;
+  const used = sessionRow.trial_credits_used;
+  const reserved = sessionRow.trial_credits_reserved;
+  const remaining = Math.max(0, allocated - used - reserved);
 
   return {
     guestId: targetGuestId,
@@ -165,9 +206,9 @@ export async function getOrCreateGuestIdentity(
       trialCreditsAllocated: allocated,
       trialCreditsUsed: used,
       trialCreditsReserved: reserved,
-      trialCreditsRemaining: Math.max(0, remaining),
+      trialCreditsRemaining: remaining,
       isExhausted: remaining <= 0,
-      expiresAt: expiresAtIso,
+      expiresAt: sessionRow.expires_at,
     },
   };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cProgrammingPath } from "@/lib/learning-curriculum";
+import { cProgrammingPath, pythonProgrammingPath } from "@/lib/learning-curriculum";
 import { enrollInPath, emptyLearningProgress, completeLesson } from "@/lib/learning-progress";
 import { DEFAULT_USER_PREFERENCES } from "@/lib/user-preferences";
 import { getDefaultModel } from "@/lib/providers/catalog";
@@ -65,5 +65,25 @@ describe("account snapshot validation and guest migration", () => {
     const result = writeAccountSnapshotToStorage(storage as unknown as Storage, snapshot());
     expect([...records.keys()]).toEqual(["katalyst.workspace.v1", "katalyst.learning.v1", "katalyst.preferences.v1"]);
     expect(JSON.stringify(result)).not.toMatch(/api.?key|session.?key|authorization/i);
+  });
+
+  it("merges account snapshots containing Python course and dual enrollments", () => {
+    const accountProgress = enrollInPath(emptyLearningProgress(), pythonProgrammingPath.id, 100);
+    let guestProgress = enrollInPath(emptyLearningProgress(), pythonProgrammingPath.id, 200);
+    guestProgress = completeLesson(guestProgress, pythonProgrammingPath.id, "py-source-to-interpreter", 300);
+    guestProgress = enrollInPath(guestProgress, cProgrammingPath.id, 250);
+    guestProgress = completeLesson(guestProgress, cProgrammingPath.id, "source-to-output", 350);
+
+    const guest = snapshot(workspace("guest", "guest-chat"), guestProgress);
+    const account = snapshot(workspace("account", "account-chat"), accountProgress);
+
+    const merged = mergeAccountSnapshots(account, guest, "guest");
+    expect(merged.learningProgress.enrollments).toHaveLength(2);
+    expect(merged.learningProgress.enrollments.find((e) => e.pathId === pythonProgrammingPath.id)?.completedLessons).toEqual([
+      { lessonId: "py-source-to-interpreter", completedAt: 300 }
+    ]);
+    expect(merged.learningProgress.enrollments.find((e) => e.pathId === cProgrammingPath.id)?.completedLessons).toEqual([
+      { lessonId: "source-to-output", completedAt: 350 }
+    ]);
   });
 });

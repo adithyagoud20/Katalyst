@@ -5,10 +5,20 @@ export const LEARNING_PROGRESS_KEY = "katalyst.learning.v1";
 export const MAX_LEARNING_PROGRESS_BYTES = 256_000;
 const MAX_ACTIVITY = 100;
 
+export type ExerciseProgressStatus = "not-started" | "attempted" | "completed" | "needs-review";
+
+export type ExerciseProgressRecord = {
+  exerciseId: string;
+  status: ExerciseProgressStatus;
+  updatedAt: number;
+};
+
 export type LearningActivity = {
-  kind: "enrolled" | "lesson-opened" | "lesson-completed";
+  kind: "enrolled" | "lesson-opened" | "lesson-completed" | "exercise-status-updated";
   at: number;
   lessonId?: string;
+  exerciseId?: string;
+  status?: ExerciseProgressStatus;
 };
 
 export type LearningEnrollment = {
@@ -16,6 +26,8 @@ export type LearningEnrollment = {
   enrolledAt: number;
   lastOpenedLessonId: string | null;
   completedLessons: Array<{ lessonId: string; completedAt: number }>;
+  exerciseProgress?: ExerciseProgressRecord[];
+  verifiedExerciseIds?: string[];
   activity: LearningActivity[];
 };
 
@@ -27,10 +39,20 @@ export type LearningProgressRead =
   | { kind: "corrupt"; issue: string }
   | { kind: "unsupported"; issue: string };
 
+export const exerciseProgressStatusSchema = z.enum(["not-started", "attempted", "completed", "needs-review"]);
+
+const exerciseProgressSchema = z.object({
+  exerciseId: z.string().min(1).max(120),
+  status: exerciseProgressStatusSchema,
+  updatedAt: z.number().int().nonnegative(),
+}).strict();
+
 const activitySchema = z.object({
-  kind: z.enum(["enrolled", "lesson-opened", "lesson-completed"]),
+  kind: z.enum(["enrolled", "lesson-opened", "lesson-completed", "exercise-status-updated"]),
   at: z.number().int().nonnegative(),
   lessonId: z.string().min(1).max(120).optional(),
+  exerciseId: z.string().min(1).max(120).optional(),
+  status: exerciseProgressStatusSchema.optional(),
 }).strict();
 
 const enrollmentSchema = z.object({
@@ -38,6 +60,8 @@ const enrollmentSchema = z.object({
   enrolledAt: z.number().int().nonnegative(),
   lastOpenedLessonId: z.string().min(1).max(120).nullable(),
   completedLessons: z.array(z.object({ lessonId: z.string().min(1).max(120), completedAt: z.number().int().nonnegative() }).strict()).max(500),
+  exerciseProgress: z.array(exerciseProgressSchema).max(500).optional(),
+  verifiedExerciseIds: z.array(z.string().min(1).max(120)).max(500).optional().default([]),
   activity: z.array(activitySchema).max(MAX_ACTIVITY),
 }).strict();
 
@@ -58,14 +82,29 @@ function validForCurriculum(progress: LearningProgress): boolean {
     enrollmentIds.add(enrollment.pathId);
     const path = learningPaths.find((item) => item.id === enrollment.pathId);
     if (!path) return false;
-    const lessonIds = new Set(flattenLessons(path).map(({ lesson }) => lesson.id));
+    const lessons = flattenLessons(path);
+    const lessonIds = new Set(lessons.map(({ lesson }) => lesson.id));
+    const exerciseIds = new Set(lessons.map(({ lesson }) => lesson.exercise.id));
     if (enrollment.lastOpenedLessonId && !lessonIds.has(enrollment.lastOpenedLessonId)) return false;
     const completed = new Set<string>();
     for (const lesson of enrollment.completedLessons) {
       if (!lessonIds.has(lesson.lessonId) || completed.has(lesson.lessonId)) return false;
       completed.add(lesson.lessonId);
     }
+    if (enrollment.exerciseProgress) {
+      const seenExercises = new Set<string>();
+      for (const ex of enrollment.exerciseProgress) {
+        if (!exerciseIds.has(ex.exerciseId) || seenExercises.has(ex.exerciseId)) return false;
+        seenExercises.add(ex.exerciseId);
+      }
+    }
+    if (enrollment.verifiedExerciseIds) {
+      for (const exId of enrollment.verifiedExerciseIds) {
+        if (!exerciseIds.has(exId)) return false;
+      }
+    }
     if (enrollment.activity.some((item) => item.lessonId && !lessonIds.has(item.lessonId))) return false;
+    if (enrollment.activity.some((item) => item.exerciseId && !exerciseIds.has(item.exerciseId))) return false;
   }
   return true;
 }
@@ -138,6 +177,75 @@ export function completeLesson(progress: LearningProgress, pathId: string, lesso
     enrollments: progress.enrollments.map((item) => item.pathId === pathId
       ? appendActivity({ ...item, completedLessons: [...item.completedLessons, { lessonId, completedAt: at }] }, { kind: "lesson-completed", lessonId, at })
       : item),
+  };
+}
+
+export function getExerciseProgress(
+  progress: LearningProgress,
+  pathId: string,
+  exerciseId: string,
+): ExerciseProgressStatus {
+  const enrollment = progress.enrollments.find((item) => item.pathId === pathId);
+  if (!enrollment) return "not-started";
+
+  const record = enrollment.exerciseProgress?.find((item) => item.exerciseId === exerciseId);
+  if (record) return record.status;
+
+  const path = learningPaths.find((item) => item.id === pathId);
+  if (path) {
+    const lessonEntry = flattenLessons(path).find(({ lesson }) => lesson.exercise.id === exerciseId);
+    if (lessonEntry && enrollment.completedLessons.some((l) => l.lessonId === lessonEntry.lesson.id)) {
+      return "completed";
+    }
+  }
+
+  return "not-started";
+}
+
+export function updateExerciseProgress(
+  progress: LearningProgress,
+  pathId: string,
+  exerciseId: string,
+  status: ExerciseProgressStatus,
+  at = Date.now(),
+): LearningProgress {
+  const path = learningPaths.find((item) => item.id === pathId);
+  const enrollment = progress.enrollments.find((item) => item.pathId === pathId);
+  if (!path || !enrollment) return progress;
+
+  const exerciseExists = flattenLessons(path).some(({ lesson }) => lesson.exercise.id === exerciseId);
+  if (!exerciseExists) return progress;
+
+  const currentRecords = enrollment.exerciseProgress ?? [];
+  const existingIndex = currentRecords.findIndex((r) => r.exerciseId === exerciseId);
+
+  let nextRecords: ExerciseProgressRecord[];
+  if (existingIndex >= 0) {
+    nextRecords = currentRecords.map((r, i) =>
+      i === existingIndex ? { ...r, status, updatedAt: at } : r,
+    );
+  } else {
+    nextRecords = [...currentRecords, { exerciseId, status, updatedAt: at }];
+  }
+
+  const currentVerified = enrollment.verifiedExerciseIds ?? [];
+  let nextVerified = currentVerified;
+  if (status === "completed" && !currentVerified.includes(exerciseId)) {
+    nextVerified = [...currentVerified, exerciseId];
+  } else if (status !== "completed" && currentVerified.includes(exerciseId)) {
+    nextVerified = currentVerified.filter((id) => id !== exerciseId);
+  }
+
+  return {
+    ...progress,
+    enrollments: progress.enrollments.map((item) =>
+      item.pathId === pathId
+        ? appendActivity(
+            { ...item, exerciseProgress: nextRecords, verifiedExerciseIds: nextVerified },
+            { kind: "exercise-status-updated", exerciseId, status, at },
+          )
+        : item,
+    ),
   };
 }
 
@@ -214,9 +322,34 @@ export function getLearningDashboardSummary(progress: LearningProgress, now = Da
     };
   });
 
-  return {
+  const exercisesCompleted = progress.enrollments.reduce((total, enrollment) => {
+    const path = getPathById(enrollment.pathId);
+    if (!path) return total;
+    const lessons = flattenLessons(path);
+    const completedLessonIds = new Set(enrollment.completedLessons.map((l) => l.lessonId));
+    const explicitStatusMap = new Map(
+      (enrollment.exerciseProgress ?? []).map((e) => [e.exerciseId, e.status]),
+    );
+    const verifiedIds = new Set(enrollment.verifiedExerciseIds ?? []);
+
+    let count = 0;
+    for (const { lesson } of lessons) {
+      const explicit = explicitStatusMap.get(lesson.exercise.id);
+      if (verifiedIds.has(lesson.exercise.id)) {
+        count += 1;
+      } else if (explicit === "completed") {
+        count += 1;
+      } else if (!explicit && completedLessonIds.has(lesson.id)) {
+        count += 1;
+      }
+    }
+    return total + count;
+  }, 0);
+
+  const dashboardSummary = {
     lessonsCompleted,
     totalLessons,
+    exercisesCompleted,
     pathsStarted,
     pathsCompleted,
     totalPaths: learningPaths.length,
@@ -225,4 +358,73 @@ export function getLearningDashboardSummary(progress: LearningProgress, now = Da
     recentActivity: activity.slice(0, 8),
     recentLessons: activity.filter((item) => item.lessonTitle).slice(0, 5),
   };
+
+  return {
+    ...dashboardSummary,
+    mastery: computeMasteryFromCounts(lessonsCompleted, exercisesCompleted),
+  };
+}
+
+export interface EngineeringMastery {
+  totalXp: number;
+  exerciseXp: number;
+  lessonXp: number;
+  rank: string;
+  nextRank: string | null;
+  nextRankXp: number | null;
+  progressToNextRank: number;
+  verifiedExercisesCount: number;
+  completedLessonsCount: number;
+}
+
+export const ENGINEERING_RANKS = [
+  { minXp: 0, title: "Cadet Engineer" },
+  { minXp: 200, title: "Junior Systems Engineer" },
+  { minXp: 500, title: "Systems Engineer" },
+  { minXp: 1000, title: "Senior Systems Engineer" },
+  { minXp: 2000, title: "Staff Systems Architect" },
+] as const;
+
+function computeMasteryFromCounts(lessonsCompleted: number, exercisesCompleted: number): EngineeringMastery {
+  const lessonXp = lessonsCompleted * 25;
+  const exerciseXp = exercisesCompleted * 50;
+  const totalXp = lessonXp + exerciseXp;
+
+  let currentRankIndex = 0;
+  for (let i = ENGINEERING_RANKS.length - 1; i >= 0; i--) {
+    if (totalXp >= ENGINEERING_RANKS[i].minXp) {
+      currentRankIndex = i;
+      break;
+    }
+  }
+
+  const currentRank = ENGINEERING_RANKS[currentRankIndex].title;
+  const nextRankObj = ENGINEERING_RANKS[currentRankIndex + 1];
+  const nextRank = nextRankObj ? nextRankObj.title : null;
+  const nextRankXp = nextRankObj ? nextRankObj.minXp : null;
+
+  let progressToNextRank = 100;
+  if (nextRankObj) {
+    const currentBase = ENGINEERING_RANKS[currentRankIndex].minXp;
+    const range = nextRankObj.minXp - currentBase;
+    const earned = totalXp - currentBase;
+    progressToNextRank = Math.min(100, Math.max(0, Math.round((earned / range) * 100)));
+  }
+
+  return {
+    totalXp,
+    exerciseXp,
+    lessonXp,
+    rank: currentRank,
+    nextRank,
+    nextRankXp,
+    progressToNextRank,
+    verifiedExercisesCount: exercisesCompleted,
+    completedLessonsCount: lessonsCompleted,
+  };
+}
+
+export function getEngineeringMastery(progress: LearningProgress): EngineeringMastery {
+  const summary = getLearningDashboardSummary(progress);
+  return summary.mastery;
 }

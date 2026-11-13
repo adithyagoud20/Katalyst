@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cProgrammingPath, flattenLessons } from "../src/lib/learning-curriculum";
+import { cProgrammingPath, flattenLessons, pythonProgrammingPath } from "../src/lib/learning-curriculum";
 import { boundTutorHistory, composeTutorReference, TUTOR_CONTEXT_LIMIT, TUTOR_HISTORY_LIMIT, tutorModes, type TutorMessage } from "../src/lib/tutor-request";
 import { composeTutorSkillContext } from "../src/lib/tutor-request";
 import { parseSkillMarkdown, starterSkills } from "../src/lib/skills";
@@ -97,5 +97,102 @@ describe("Kat request composition", () => {
     expect(parsed.workspaceActivity.currentEditorCode.length).toBeGreaterThan(0);
     expect(parsed.workspaceActivity.latestCompilerDiagnostics.length).toBeGreaterThan(0);
     expect(parsed.workspaceActivity.latestProgramOutput.length).toBeGreaterThan(0);
+  });
+
+  it("enriches Kat context with modular curriculum metadata and enforces code execution prompt boundary", () => {
+    const entry = flattenLessons(cProgrammingPath)[0];
+    const richLesson = {
+      ...entry.lesson,
+      type: "practical-exercise" as const,
+      theorySections: [
+        { id: "sec-1", title: "Memory Layout Theory", content: "Stack and heap explanation." },
+      ],
+      codeExamples: [
+        { title: "Stack Demo", language: "c" as const, code: "int a = 10;", description: "Stack variable" },
+      ],
+      interactiveDemo: {
+        kind: "memory-diagram" as const,
+        title: "Stack Visualizer",
+        description: "Visualizes frames.",
+      },
+      resources: [
+        { title: "C Spec", url: "https://example.com/c", description: "Reference", type: "reference" as const },
+      ],
+      exercise: {
+        ...entry.lesson.exercise,
+        difficulty: "Developing" as const,
+        hints: ["Hint Alpha", "Hint Beta"],
+        starterCode: "int main(void) { return 0; }",
+      },
+    };
+
+    const context = composeTutorReference("Socratic tutor", {
+      path: cProgrammingPath,
+      module: entry.module,
+      lesson: richLesson,
+      exerciseStatus: "attempted",
+    });
+
+    const parsed = JSON.parse(context) as {
+      purpose: string;
+      lessonType: string;
+      theorySections: Array<{ title: string; content: string }>;
+      currentExercise: {
+        difficulty: string;
+        status?: string;
+        hints: string[];
+        starterCode?: string;
+      };
+      codeExamples: Array<{ title: string }>;
+      resources: Array<{ title: string }>;
+      interactiveDemo: { kind: string; title?: string };
+    };
+
+    // Mandatory prompt rule
+    expect(parsed.purpose).toContain("Do not execute code or claim that you ran it unless the execution system actually returned a result.");
+
+    // Curriculum metadata enrichment
+    expect(parsed.lessonType).toBe("practical-exercise");
+    expect(parsed.theorySections).toHaveLength(1);
+    expect(parsed.theorySections[0].title).toBe("Memory Layout Theory");
+    expect(parsed.currentExercise.difficulty).toBe("Developing");
+    expect(parsed.currentExercise.status).toBe("attempted");
+    expect(parsed.currentExercise.hints).toEqual(["Hint Alpha", "Hint Beta"]);
+    expect(parsed.currentExercise.starterCode).toBe("int main(void) { return 0; }");
+    expect(parsed.codeExamples[0].title).toBe("Stack Demo");
+    expect(parsed.resources[0].title).toBe("C Spec");
+    expect(parsed.interactiveDemo.kind).toBe("memory-diagram");
+
+    expect(context.length).toBeLessThanOrEqual(TUTOR_CONTEXT_LIMIT);
+  });
+
+  it("enriches Kat context with Python curriculum metadata and preserves prompt boundaries", () => {
+    const entry = flattenLessons(pythonProgrammingPath)[0];
+    const context = composeTutorReference("Socratic tutor", {
+      path: pythonProgrammingPath,
+      module: entry.module,
+      lesson: entry.lesson,
+      exerciseStatus: "attempted",
+    });
+    const parsed = JSON.parse(context) as {
+      purpose: string;
+      subject: string;
+      lesson: string;
+      lessonType: string;
+      theorySections: Array<{ title: string; content: string }>;
+      currentExercise: { title: string; difficulty: string; status?: string; hints: string[] };
+      codeExamples: Array<{ title: string; language?: string }>;
+    };
+
+    expect(parsed.purpose).toContain("Do not execute code or claim that you ran it unless the execution system actually returned a result.");
+    expect(parsed.subject).toBe("Python Programming Foundations");
+    expect(parsed.lesson).toBe("From script to interpreter");
+    expect(parsed.lessonType).toBe("theory");
+    expect(parsed.theorySections.length).toBeGreaterThan(0);
+    expect(parsed.currentExercise.title).toBe("Print a formatted engineering welcome message");
+    expect(parsed.currentExercise.status).toBe("attempted");
+    expect(parsed.currentExercise.hints.length).toBeGreaterThan(0);
+    expect(parsed.codeExamples[0].language).toBe("python");
+    expect(context.length).toBeLessThanOrEqual(TUTOR_CONTEXT_LIMIT);
   });
 });

@@ -57,7 +57,14 @@ Cloudflare and Gemini discovery each follow at most ten API pages and reject cat
 
 ## Configure credentials
 
-### Developer environment keys
+### Production deployment setup
+
+> [!IMPORTANT]
+> The local `.env.local` file is exclusively for local development and is ignored by Git. It does not configure production. For production deployments (e.g. Vercel, Railway, Fly.io, or Docker), administrators must configure `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` directly in the host platform's environment variable dashboard.
+>
+> See the complete [Production Deployment Guide](DEPLOYMENT.md) for step-by-step instructions across major cloud hosting providers.
+
+### Developer environment keys (Local development only)
 
 For local development, copy `.env.example` to `.env.local`, configure any of the keys below, and restart the server:
 

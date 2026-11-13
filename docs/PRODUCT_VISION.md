@@ -36,11 +36,19 @@ The first course is a beginner foundation, not a complete C reference. It covers
 
 Projects, generic conversations, and the skill library remain available in the secondary Workspace tools area. The current provider integrations and backup workflows remain supported while the product grows around learning.
 
-## Guest workspace and personal activity (M8)
+## Guest workspace, accounts, and cloud persistence
 
-KATALYST remains usable without registration. A guest can study, compile and run C in the browser, use a configured provider, and keep workspace and learning activity locally. The appearance controls offer Light, Dark, and System themes with a comfortable/compact reading density. Conversation management includes rename, pin, move, confirmed delete, and a local transcript download. The Progress dashboard summarizes actual lesson activity, saved projects/conversations, and recorded AI requests. AI token totals appear only when a provider reports usage; the app does not estimate cost. These local dashboards begin recording from this release and do not invent prior history.
+KATALYST remains fully usable without registration. Guests can study, compile and run C in the browser, use the shared Cloudflare AI trial or BYOK providers, and retain workspace and learning activity locally. Optional Google sign-in through Supabase Auth allows students to migrate or merge their local guest workspace, learning progress, appearance preferences, and Kat tutor conversations into a cloud account snapshot protected by Row Level Security. Device guest copies remain separate and are restored on sign-out or deletion.
 
-The current account entry is an explicit future-service notice. Authentication, account profiles, guest migration, cross-device progress, workspace synchronization, hosted backups, and public share links require a future backend and remain unavailable. Guests are told that data stays in the current browser and may not transfer automatically.
+## Learning workspace redesign, multi-language execution & curriculum expansion (M17.3)
+
+M17.3 elevates KATALYST into a polished, high-contrast, multi-language engineering education platform:
+- **Default 2-Panel Workspace**: Theory content (50%) and interactive Code Sandbox (50%) are front and center. Kat AI tutor is closed by default to eliminate cognitive clutter and preserve focus, opening on demand via "Ask Kat" into an accessible 3-panel layout (Theory 35%, Code 35%, Kat 30%) with draggable splitters.
+- **Multi-Language Execution Subsystem**: Reusable execution architecture (`src/lib/execution/`) powering both browser-based C11 compilation (Wasmer WebAssembly) and Python 3.12 execution (Pyodide WebAssembly micro-runtime), with zero server bills and complete client-side data isolation.
+- **CodeMirror 6 Integration**: High-performance, accessible code editor with dark graphite surfaces (`#1a1d21`), line numbering, syntax highlighting, and touch-first responsiveness across mobile and desktop.
+- **Modernized Visual Design**: High-contrast typography, neutral ivory and charcoal background tones, refined teal/cyan accents (`#0d9488` / `#14b8a6`), and a compact 220px/58px collapsible left rail.
+- **Expanded Course Catalog**: Complete C Programming Foundations (13 lessons with memory notes, pitfalls, and progressive hints) and Python Programming Foundations (16 lessons across 6 modules covering syntax, dynamic types, data structures, functional paradigms, OOP, and exceptions).
+- **Redesigned Home & Discovery**: Structured landing experience with quick-resume cards, 3-step engineering workflow ("Learn concept -> Code in sandbox -> Ask Kat"), and symmetric course exploration.
 
 ## Current boundaries
 

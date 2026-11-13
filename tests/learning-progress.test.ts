@@ -1,22 +1,25 @@
 import { describe, expect, it } from "vitest";
-import { cProgrammingPath } from "../src/lib/learning-curriculum";
+import { cProgrammingPath, pythonProgrammingPath } from "../src/lib/learning-curriculum";
 import {
   completeLesson,
   emptyLearningProgress,
   enrollInPath,
+  getEngineeringMastery,
+  getExerciseProgress,
   getPathProgress,
   getLearningDashboardSummary,
   LEARNING_PROGRESS_KEY,
   MAX_LEARNING_PROGRESS_BYTES,
   readLearningProgress,
   recordLessonOpened,
+  updateExerciseProgress,
   writeLearningProgress,
 } from "../src/lib/learning-progress";
 
 describe("learning curriculum and local progress", () => {
   it("starts with no fabricated enrollment or completion", () => {
     expect(emptyLearningProgress()).toEqual({ version: 1, enrollments: [] });
-    expect(getPathProgress(emptyLearningProgress(), cProgrammingPath)).toMatchObject({ totalLessons: 13, completedCount: 0, completionPercent: 0 });
+    expect(getPathProgress(emptyLearningProgress(), cProgrammingPath)).toMatchObject({ totalLessons: 16, completedCount: 0, completionPercent: 0 });
   });
 
   it("records enrollment, lesson navigation, and explicit completion independently from chats", () => {
@@ -24,7 +27,7 @@ describe("learning curriculum and local progress", () => {
     progress = recordLessonOpened(progress, cProgrammingPath.id, "source-to-output", 200);
     progress = completeLesson(progress, cProgrammingPath.id, "source-to-output", 300);
     expect(progress.enrollments[0]).toMatchObject({ enrolledAt: 100, lastOpenedLessonId: "source-to-output", completedLessons: [{ lessonId: "source-to-output", completedAt: 300 }] });
-    expect(getPathProgress(progress, cProgrammingPath).completionPercent).toBe(8);
+    expect(getPathProgress(progress, cProgrammingPath).completionPercent).toBe(6);
     expect(completeLesson(progress, cProgrammingPath.id, "source-to-output", 400)).toEqual(progress);
   });
 
@@ -60,7 +63,7 @@ describe("learning curriculum and local progress", () => {
     expect(read.kind).toBe("valid");
     if (read.kind !== "valid") return;
     expect(read.progress.enrollments[0].completedLessons.map((item) => item.lessonId)).toEqual(["source-to-output", "arrays"]);
-    expect(getPathProgress(read.progress, cProgrammingPath)).toMatchObject({ totalLessons: 13, completedCount: 2, completionPercent: 15 });
+    expect(getPathProgress(read.progress, cProgrammingPath)).toMatchObject({ totalLessons: 16, completedCount: 2, completionPercent: 13 });
   });
 
   it("writes a bounded versioned record under a separate key", () => {
@@ -82,7 +85,7 @@ describe("learning curriculum and local progress", () => {
     progress = completeLesson(progress, cProgrammingPath.id, "source-to-output", now);
     const summary = getLearningDashboardSummary(progress, now);
 
-    expect(summary).toMatchObject({ lessonsCompleted: 1, totalLessons: 13, pathsStarted: 1, totalPaths: 1, pathsCompleted: 0, streak: 3 });
+    expect(summary).toMatchObject({ lessonsCompleted: 1, totalLessons: 53, pathsStarted: 1, totalPaths: 4, pathsCompleted: 0, streak: 3 });
     expect(summary.recentLessons[0]).toMatchObject({ lessonId: "source-to-output", lessonTitle: "From source code to output", kind: "lesson-completed" });
     expect(summary.days.slice(-3).map((day) => day.count)).toEqual([2, 1, 1]);
   });
@@ -92,5 +95,157 @@ describe("learning curriculum and local progress", () => {
     expect(getLearningDashboardSummary(emptyLearningProgress(), now)).toMatchObject({ lessonsCompleted: 0, pathsStarted: 0, pathsCompleted: 0, streak: 0, recentActivity: [] });
     const prior = enrollInPath(emptyLearningProgress(), cProgrammingPath.id, new Date(2026, 10, 6, 12).getTime());
     expect(getLearningDashboardSummary(prior, now).streak).toBe(0);
+  });
+
+  it("manages exercise progress statuses and infers completion when the lesson is complete", () => {
+    let progress = enrollInPath(emptyLearningProgress(), cProgrammingPath.id, 100);
+    const exerciseId = "trace-hello";
+
+    // Default status is not-started
+    expect(getExerciseProgress(progress, cProgrammingPath.id, exerciseId)).toBe("not-started");
+
+    // Explicit update to attempted
+    progress = updateExerciseProgress(progress, cProgrammingPath.id, exerciseId, "attempted", 150);
+    expect(getExerciseProgress(progress, cProgrammingPath.id, exerciseId)).toBe("attempted");
+    expect(progress.enrollments[0].activity.at(-1)).toMatchObject({
+      kind: "exercise-status-updated",
+      exerciseId,
+      status: "attempted",
+      at: 150,
+    });
+
+    // Explicit update to completed
+    progress = updateExerciseProgress(progress, cProgrammingPath.id, exerciseId, "completed", 200);
+    expect(getExerciseProgress(progress, cProgrammingPath.id, exerciseId)).toBe("completed");
+
+    // Explicit update to needs-review
+    progress = updateExerciseProgress(progress, cProgrammingPath.id, exerciseId, "needs-review", 250);
+    expect(getExerciseProgress(progress, cProgrammingPath.id, exerciseId)).toBe("needs-review");
+
+    // Another exercise with no explicit record, but its lesson is completed
+    const secondExerciseId = "choose-a-type";
+    expect(getExerciseProgress(progress, cProgrammingPath.id, secondExerciseId)).toBe("not-started");
+    progress = completeLesson(progress, cProgrammingPath.id, "variables-and-types", 300);
+    expect(getExerciseProgress(progress, cProgrammingPath.id, secondExerciseId)).toBe("completed");
+
+    // Dashboard summary reports completed exercises
+    const summary = getLearningDashboardSummary(progress);
+    expect(summary.exercisesCompleted).toBe(1); // secondExerciseId inferred completed
+  });
+
+  it("safely reads and validates progress records with or without exerciseProgress", () => {
+    const withExercises = JSON.stringify({
+      version: 1,
+      enrollments: [{
+        pathId: "c-programming-foundations",
+        enrolledAt: 10,
+        lastOpenedLessonId: "source-to-output",
+        completedLessons: [],
+        exerciseProgress: [
+          { exerciseId: "trace-hello", status: "completed", updatedAt: 25 },
+        ],
+        activity: [{ kind: "enrolled", at: 10 }],
+      }],
+    });
+    const result = readLearningProgress(withExercises);
+    expect(result.kind).toBe("valid");
+    if (result.kind === "valid") {
+      expect(result.progress.enrollments[0].exerciseProgress?.[0].status).toBe("completed");
+    }
+  });
+
+  it("manages Python course progress, exercises, and dual-enrollment with C course", () => {
+    let progress = enrollInPath(emptyLearningProgress(), pythonProgrammingPath.id, 100);
+    progress = recordLessonOpened(progress, pythonProgrammingPath.id, "py-source-to-interpreter", 150);
+    progress = updateExerciseProgress(progress, pythonProgrammingPath.id, "ex-py-first-script", "attempted", 200);
+    expect(getExerciseProgress(progress, pythonProgrammingPath.id, "ex-py-first-script")).toBe("attempted");
+
+    progress = updateExerciseProgress(progress, pythonProgrammingPath.id, "ex-py-first-script", "completed", 250);
+    expect(getExerciseProgress(progress, pythonProgrammingPath.id, "ex-py-first-script")).toBe("completed");
+
+    // Inferred completion when lesson is completed and exercise has no prior record
+    const secondExerciseId = "ex-py-sensor-variables";
+    expect(getExerciseProgress(progress, pythonProgrammingPath.id, secondExerciseId)).toBe("not-started");
+    progress = completeLesson(progress, pythonProgrammingPath.id, "py-variables-and-types", 300);
+    expect(getPathProgress(progress, pythonProgrammingPath).completedCount).toBe(1);
+    expect(getExerciseProgress(progress, pythonProgrammingPath.id, secondExerciseId)).toBe("completed");
+
+    // Dual enrollment with C course
+    progress = enrollInPath(progress, cProgrammingPath.id, 400);
+    progress = completeLesson(progress, cProgrammingPath.id, "source-to-output", 500);
+
+    expect(getPathProgress(progress, pythonProgrammingPath).completedCount).toBe(1);
+    expect(getPathProgress(progress, cProgrammingPath).completedCount).toBe(1);
+
+    // Serialize and read
+    const serialized = JSON.stringify(progress);
+    const read = readLearningProgress(serialized);
+    expect(read.kind).toBe("valid");
+    if (read.kind === "valid") {
+      expect(read.progress.enrollments).toHaveLength(2);
+      expect(getPathProgress(read.progress, pythonProgrammingPath).completedCount).toBe(1);
+      expect(getPathProgress(read.progress, cProgrammingPath).completedCount).toBe(1);
+    }
+  });
+
+  it("calculates engineering mastery, XP, and rank progression", () => {
+    let progress = emptyLearningProgress();
+    expect(getEngineeringMastery(progress)).toMatchObject({
+      totalXp: 0,
+      lessonXp: 0,
+      exerciseXp: 0,
+      rank: "Cadet Engineer",
+      nextRank: "Junior Systems Engineer",
+      nextRankXp: 200,
+      progressToNextRank: 0,
+    });
+
+    // Complete 1 lesson (+25 XP) and 1 exercise (+50 XP) -> 75 XP
+    progress = enrollInPath(progress, cProgrammingPath.id, 100);
+    progress = completeLesson(progress, cProgrammingPath.id, "source-to-output", 200);
+    progress = updateExerciseProgress(progress, cProgrammingPath.id, "trace-hello", "completed", 300);
+
+    const mastery = getEngineeringMastery(progress);
+    expect(mastery.completedLessonsCount).toBe(1);
+    expect(mastery.verifiedExercisesCount).toBe(1);
+    expect(mastery.totalXp).toBe(75);
+    expect(mastery.rank).toBe("Cadet Engineer");
+    expect(mastery.progressToNextRank).toBe(Math.round((75 / 200) * 100)); // 38%
+  });
+
+  it("migrates legacy progress records without verifiedExerciseIds and accurately computes XP", () => {
+    const legacyJson = JSON.stringify({
+      version: 1,
+      enrollments: [
+        {
+          pathId: cProgrammingPath.id,
+          enrolledAt: 1000,
+          lastOpenedLessonId: "source-to-output",
+          completedLessons: [
+            { lessonId: "source-to-output", completedAt: 1100 },
+            { lessonId: "variables-and-types", completedAt: 1200 },
+          ],
+          activity: [
+            { kind: "enrolled", at: 1000 },
+            { kind: "lesson-opened", lessonId: "source-to-output", at: 1050 },
+            { kind: "lesson-completed", lessonId: "source-to-output", at: 1100 },
+            { kind: "lesson-opened", lessonId: "variables-and-types", at: 1150 },
+            { kind: "lesson-completed", lessonId: "variables-and-types", at: 1200 },
+          ],
+        },
+      ],
+    });
+
+    const read = readLearningProgress(legacyJson);
+    expect(read.kind).toBe("valid");
+    if (read.kind === "valid") {
+      const enrollment = read.progress.enrollments[0];
+      expect(enrollment.verifiedExerciseIds).toEqual([]);
+      const mastery = getEngineeringMastery(read.progress);
+      expect(mastery.completedLessonsCount).toBe(2);
+      expect(mastery.verifiedExercisesCount).toBe(2);
+      expect(mastery.totalXp).toBe(150);
+      expect(mastery.rank).toBe("Cadet Engineer");
+    }
   });
 });

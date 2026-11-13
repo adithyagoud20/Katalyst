@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export type QuotaErrorCode =
   | "GUEST_TRIAL_EXHAUSTED"
+  | "GUEST_SESSION_EXPIRED"
   | "MONTHLY_QUOTA_EXHAUSTED"
   | "KILL_SWITCH_ACTIVE"
   | "SHARED_AI_DISABLED"

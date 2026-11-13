@@ -2,9 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDown, ArrowUp, BookOpen, Bot, Check, ChartNoAxesColumnIncreasing, ChevronDown, Command, Compass, Copy, Download, ExternalLink, FileDown, FileUp,
-  FlaskConical, FolderInput, GraduationCap, House, Menu, MessageSquare, MoreHorizontal, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, RefreshCw, RotateCcw, Search, Settings2, Sparkles, Terminal,
-  SquarePen, Trash2, X,
+  ArrowDown, ArrowUp, BookOpen, Bot, Check, ChartNoAxesColumnIncreasing, ChevronDown, Coins, Command, Compass, Copy, Cpu, Download, ExternalLink, FileDown, FileUp,
+  FlaskConical, FolderArchive, FolderInput, GraduationCap, House, Menu, MessageSquare, MoreHorizontal, Palette, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, RefreshCw, RotateCcw, Search, Settings2, ShieldAlert, ShieldCheck, Sparkles, Terminal,
+  SquarePen, Trash2, User as UserIcon, X,
 } from "lucide-react";
 import { AssistantMarkdown } from "@/components/assistant-markdown";
 import { BrandMark } from "@/components/brand-mark";
@@ -18,7 +18,7 @@ import { getDefaultModel, providerCatalog, providerIds, type ModelDiscoveryDiagn
 import { CLOUDFLARE_ACCOUNT_HEADER, DEFAULT_OLLAMA_BASE_URL, MAX_OLLAMA_URL_LENGTH, OLLAMA_URL_HEADER, SESSION_KEY_HEADER } from "@/lib/providers/constants";
 import { readLocalWorkspace, writeLocalWorkspace, type StorageReadResult } from "@/lib/workspace-storage";
 import { commitBackupImport, exportConversationBackup, exportProjectBackup, exportShareableConversation, exportWorkspaceBackup, MAX_BACKUP_BYTES, parseBackup, type ImportMode, type WorkspaceChat as Chat, type WorkspaceData, type WorkspaceMessage as Message, type WorkspaceProject as Project } from "@/lib/workspace-portability";
-import { trackAIRequestFinish, trackAIRequestStart } from "@/lib/ai-activity";
+import { AI_ACTIVITY_KEY, readAIActivity, trackAIRequestFinish, trackAIRequestStart, type AIRequestActivity } from "@/lib/ai-activity";
 import { deleteConversation, moveConversation, renameConversation, setConversationPinned } from "@/lib/workspace-actions";
 import { DEFAULT_USER_PREFERENCES, readUserPreferences, USER_PREFERENCES_KEY, writeUserPreferences, type UserPreferences } from "@/lib/user-preferences";
 import {
@@ -33,7 +33,7 @@ type Status = { defaultProvider: ProviderId; defaultModel: string; providers: Re
 type ModelCatalogState = { models: ModelMetadata[]; loading: boolean; error: string; errorKind?: string; selectionIssue?: string; diagnostic?: ModelDiscoveryDiagnostic; refreshedAt?: number; cached?: boolean };
 type PricingFilter = "all" | "free" | "paid";
 type AppView = ApplicationView;
-type SettingsCategory = "appearance" | "providers" | "models" | "learning" | "workspace" | "privacy" | "account" | "admin";
+type SettingsCategory = "account" | "appearance" | "ai-models" | "usage-credits" | "learning" | "workspace" | "privacy" | "admin";
 type InferenceState = Partial<Record<ProviderId, "pending" | "success" | "permission" | "quota" | "network" | "failed">>;
 type AccountPhase = "checking" | "unconfigured" | "guest" | "migration" | "active" | "conflict" | "error";
 type AccountRemote = { snapshot: AccountSnapshot | null; revision: number; updatedAt: string | null };
@@ -75,14 +75,35 @@ async function saveRemoteAccountSnapshot(snapshot: AccountSnapshot, expectedRevi
   return { conflict: false as const, status: body.status ?? "saved", revision: body.revision! };
 }
 
-const settingsCategories: { id: SettingsCategory; label: string }[] = [
-  { id: "appearance", label: "Appearance" },
-  { id: "providers", label: "AI Providers" },
-  { id: "models", label: "Models" },
-  { id: "learning", label: "Learning" },
-  { id: "workspace", label: "Workspace" },
-  { id: "privacy", label: "Privacy & Security" },
-  { id: "account", label: "Account" },
+type SettingsNavItem = {
+  id: SettingsCategory;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
+};
+
+type SettingsNavGroup = {
+  group: string;
+  items: SettingsNavItem[];
+};
+
+const settingsNavGroups: SettingsNavGroup[] = [
+  {
+    group: "Learner Preferences",
+    items: [
+      { id: "account", label: "Account", icon: UserIcon },
+      { id: "appearance", label: "Appearance", icon: Palette },
+      { id: "learning", label: "Learning", icon: GraduationCap },
+    ],
+  },
+  {
+    group: "System & Developer",
+    items: [
+      { id: "ai-models", label: "AI & Models", icon: Cpu },
+      { id: "usage-credits", label: "Usage & Credits", icon: Coins },
+      { id: "workspace", label: "Workspace", icon: FolderArchive },
+      { id: "privacy", label: "Privacy & Security", icon: ShieldCheck },
+    ],
+  },
 ];
 
 const storageKey = "katalyst.workspace.v1";
@@ -164,6 +185,8 @@ export function Workspace() {
   const [activeProjectId, setActiveProjectId] = useState("");
   const [view, setViewState] = useState<AppView>("home");
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>("appearance");
+  const [activityFilter, setActivityFilter] = useState<ProviderId | "all">("all");
+  const [aiSystem, setAiSystem] = useState<{ sharedAiEnabled: boolean; killSwitchActive: boolean; selectedModelId: string } | null>(null);
   const [inferenceState, setInferenceState] = useState<InferenceState>({});
   const [routeLessonId, setRouteLessonId] = useState("");
   const [skillTab, setSkillTab] = useState<"installed" | "available">("installed");
@@ -244,8 +267,14 @@ export function Workspace() {
     if (window.location.hash !== nextHash) window.history.pushState({ katalyst: true }, "", nextHash);
   }, []);
 
-  const openSettings = (category?: SettingsCategory) => {
-    if (category) setSettingsCategory(category);
+  const openSettings = (category?: SettingsCategory | "providers" | "models") => {
+    if (category) {
+      if (category === "providers" || category === "models") {
+        setSettingsCategory("ai-models");
+      } else {
+        setSettingsCategory(category);
+      }
+    }
     setView("settings");
   };
 
@@ -256,6 +285,7 @@ export function Workspace() {
         const data = await res.json();
         setIsAdmin(Boolean(data.isAdmin));
         setCreditStatus(data.creditStatus);
+        if (data.system) setAiSystem(data.system);
       }
     } catch {
       // Keep existing memory state
@@ -264,6 +294,9 @@ export function Workspace() {
 
   useEffect(() => {
     void refreshAiSession();
+    const handleRefresh = () => { void refreshAiSession(); };
+    window.addEventListener("katalyst:refresh-ai-session", handleRefresh);
+    return () => window.removeEventListener("katalyst:refresh-ai-session", handleRefresh);
   }, [refreshAiSession, accountUser]);
 
   useEffect(() => {
@@ -730,6 +763,7 @@ export function Workspace() {
     } finally {
       if (requestControllerRef.current === controller) requestControllerRef.current = null;
       setPending(false);
+      void refreshAiSession();
       window.setTimeout(() => textareaRef.current?.focus(), 0);
     }
   };
@@ -1207,8 +1241,22 @@ export function Workspace() {
   useEffect(() => {
     if (!preferencesReady) return;
     const root = document.documentElement;
-    root.dataset.theme = preferences.theme;
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+
+    const applyTheme = () => {
+      const resolved = preferences.theme === "system"
+        ? (mediaQuery.matches ? "dark" : "light")
+        : preferences.theme;
+      root.dataset.theme = resolved;
+    };
+
+    applyTheme();
     root.dataset.density = preferences.textDensity;
+
+    if (preferences.theme === "system") {
+      mediaQuery.addEventListener("change", applyTheme);
+      return () => mediaQuery.removeEventListener("change", applyTheme);
+    }
   }, [preferences, preferencesReady]);
 
   useEffect(() => {
@@ -1325,7 +1373,8 @@ export function Workspace() {
       }
 
       const marker = readAccountActiveMarker();
-      if (marker?.userId === userId) {
+      if (marker && marker.userId === userId) {
+        const activeMarker = marker;
         const local = currentAccountSnapshot();
         const localHash = await hashAccountSnapshot(local);
         if (!active) return;
@@ -1334,17 +1383,17 @@ export function Workspace() {
           setAccountError("The account snapshot is missing even though this device has an account marker. Your local copy is preserved; choose a recovery action.");
           return;
         }
-        if (remote.revision > marker.revision && localHash === marker.snapshotHash) {
+        if (remote.revision > activeMarker.revision && localHash === activeMarker.snapshotHash) {
           await applyAccountSnapshot(userId, remote.revision, remote.snapshot);
           return;
         }
-        if (remote.revision < marker.revision || (remote.revision > marker.revision && localHash !== marker.snapshotHash)) {
+        if (remote.revision < activeMarker.revision || (remote.revision > activeMarker.revision && localHash !== activeMarker.snapshotHash)) {
           setAccountPhase("conflict");
           setAccountError("This account changed on another device while this device also has local changes. Choose which copy to keep or merge.");
           return;
         }
         setAccountPhase("active");
-        if (localHash !== marker.snapshotHash) setAccountSyncState("pending");
+        if (localHash !== activeMarker.snapshotHash) setAccountSyncState("pending");
         return;
       }
 
@@ -1435,6 +1484,191 @@ export function Workspace() {
     }
   }, [sidebarCollapsed, sidebarPreferenceReady]);
 
+  const renderUsageAndCreditsSettings = () => {
+    let activityRequests: AIRequestActivity[] = [];
+    try {
+      const raw = window.localStorage.getItem(AI_ACTIVITY_KEY);
+      const res = readAIActivity(raw);
+      if (res.kind === "valid" || res.kind === "missing") activityRequests = res.activity.requests;
+    } catch {
+      // Activity unavailable
+    }
+
+    const filteredRequests = activityFilter === "all"
+      ? activityRequests
+      : activityRequests.filter((r) => r.provider === activityFilter);
+
+    const isGuest = !creditStatus || creditStatus.isGuest;
+    let allocated = 50;
+    let remaining = 50;
+    if (creditStatus) {
+      if (creditStatus.isGuest) {
+        allocated = creditStatus.trialCreditsAllocated;
+        remaining = creditStatus.trialCreditsRemaining;
+      } else {
+        allocated = creditStatus.creditsAllocated;
+        remaining = creditStatus.creditsRemaining;
+      }
+    }
+    const used = Math.max(0, allocated - remaining);
+    const percentRemaining = allocated > 0 ? Math.round((remaining / allocated) * 100) : 0;
+    const isSharedActive = !aiSystem?.killSwitchActive;
+    const sharedModel = aiSystem?.selectedModelId ?? "@cf/meta/llama-3.3-70b-instruct";
+
+    return (
+      <>
+        <div id="settings-usage-credits" className="settings-section-heading">
+          <span className="eyebrow">QUOTA & TELEMETRY</span>
+          <h2>Usage & Credits</h2>
+          <p>KATALYST provides shared AI credits powered by Cloudflare Workers AI. BYOK provider usage consumes 0 credits.</p>
+        </div>
+
+        <article className="settings-card shared-ai-status-card">
+          <div className="context-head">
+            <div>
+              <h2>Shared AI Gateway</h2>
+              <p>Managed Cloudflare Workers AI gateway serving all KATALYST learners.</p>
+            </div>
+            <span className={`status-pill ${isSharedActive ? "ready" : "needs-setup"}`}>
+              <span className="connection-dot" />
+              {isSharedActive ? "Available" : "Maintenance Active"}
+            </span>
+          </div>
+          <div className="provider-lifecycle" aria-label="Shared AI gateway configuration">
+            <span><strong>Managed Provider</strong>Cloudflare Workers AI</span>
+            <span><strong>Active Shared Model</strong>{sharedModel}</span>
+            <span><strong>Credit Weight</strong>1.0 credit / request</span>
+            <span><strong>Infrastructure</strong>Zero-key server proxy</span>
+          </div>
+        </article>
+
+        <article className="settings-card credit-balance-card">
+          <div className="context-head">
+            <div>
+              <h2>{isGuest ? "Guest Trial Allowance" : "Monthly Credit Allowance"}</h2>
+              <p>{isGuest ? "Trial credits for exploring KATALYST without signing in." : "Monthly recurring credits for your KATALYST account."}</p>
+            </div>
+            <span className="local-label">{isGuest ? "Guest Trial" : "Monthly Reset"}</span>
+          </div>
+
+          <div className="credit-meter-block">
+            <div className="credit-meter-header">
+              <span className="credit-meter-big">{remaining.toFixed(1)} <small>/ {allocated} credits</small></span>
+              <span className="credit-meter-percent">{percentRemaining}% remaining</span>
+            </div>
+            <div className="progress-track" role="progressbar" aria-valuenow={percentRemaining} aria-valuemin={0} aria-valuemax={100} aria-label="Credits remaining">
+              <span style={{ width: `${percentRemaining}%` }} />
+            </div>
+            <div className="credit-meter-footer">
+              <span>{used.toFixed(1)} credits used this period</span>
+              {!isGuest && creditStatus && "resetDate" in creditStatus && creditStatus.resetDate && (
+                <span>Next replenishment: {new Date(creditStatus.resetDate).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</span>
+              )}
+            </div>
+          </div>
+
+          {isGuest && (
+            <div className="guest-upgrade-callout">
+              <div>
+                <strong>Unlock 200 monthly AI credits</strong>
+                <p>Sign in with Google to get 200 credits renewed every month, plus sync your learning progress across devices.</p>
+              </div>
+              <button type="button" className="primary-button" onClick={() => openSettings("account")}>
+                Sign in with Google
+              </button>
+            </div>
+          )}
+        </article>
+
+        <article className="settings-card byok-policy-card">
+          <div className="context-head">
+            <div>
+              <h2>Bring Your Own Key (BYOK)</h2>
+              <p>Direct provider connections require zero KATALYST credits.</p>
+            </div>
+            <span className="local-label">0 credits</span>
+          </div>
+          <p className="settings-explainer">
+            When you select <strong>Gemini</strong>, <strong>OpenAI</strong>, <strong>OpenRouter</strong>, or local <strong>Ollama</strong> in the AI & Models tab with your own API key, requests bypass the KATALYST shared credit gateway and connect directly to the provider. <strong>These requests never deduct from your KATALYST monthly credit pool.</strong>
+          </p>
+          <div className="provider-card-actions">
+            <button type="button" className="secondary-button" onClick={() => openSettings("ai-models")}>
+              Configure BYOK Providers
+            </button>
+          </div>
+        </article>
+
+        <article className="settings-card ai-activity-log-card">
+          <div className="context-head">
+            <div>
+              <h2>AI Request History</h2>
+              <p>Recent inference requests initiated from this browser tab. Prompts and keys are never logged.</p>
+            </div>
+            <div className="activity-filter-pills" role="radiogroup" aria-label="Filter activity by provider">
+              {(["all", ...providerIds] as const).map((filterId) => (
+                <button
+                  key={filterId}
+                  type="button"
+                  role="radio"
+                  aria-checked={activityFilter === filterId}
+                  className={`filter-pill ${activityFilter === filterId ? "is-active" : ""}`}
+                  onClick={() => setActivityFilter(filterId)}
+                >
+                  {filterId === "all" ? "All" : providerCatalog[filterId].name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {filteredRequests.length > 0 ? (
+            <div className="activity-table-wrapper">
+              <table className="activity-log-table" aria-label="AI request log">
+                <thead>
+                  <tr>
+                    <th>Time</th>
+                    <th>Provider</th>
+                    <th>Model</th>
+                    <th>Tokens</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRequests.slice(-25).reverse().map((req, i) => (
+                    <tr key={`${req.at}-${i}`}>
+                      <td>
+                        {new Date(req.at).toLocaleDateString(undefined, { month: "short", day: "numeric" })}{" "}
+                        {new Date(req.at).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                      </td>
+                      <td>{providerCatalog[req.provider]?.name ?? req.provider}</td>
+                      <td className="code-font" title={req.model}>{req.model.split("/").pop() ?? req.model}</td>
+                      <td>
+                        {req.usage?.inputTokens !== undefined || req.usage?.outputTokens !== undefined ? (
+                          <small>In: {req.usage?.inputTokens ?? 0} · Out: {req.usage?.outputTokens ?? 0}</small>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </td>
+                      <td>
+                        <span className={`activity-status-tag status-${req.outcome}`}>
+                          {req.outcome}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="activity-empty-state">
+              <Bot size={18} />
+              <p>No recent AI activity recorded for this filter. Start a conversation in the workspace or Kat tutor to generate activity records.</p>
+            </div>
+          )}
+        </article>
+      </>
+    );
+  };
+
   const renderAccountSettings = () => {
     const statusLabel = accountPhase === "checking" ? "Checking account"
       : accountPhase === "unconfigured" ? "Account service not configured"
@@ -1522,7 +1756,7 @@ export function Workspace() {
           <button className={`nav-item ${view === "home" ? "selected" : ""}`} aria-label="Learning Home" title="Learning Home" aria-current={view === "home" ? "page" : undefined} onClick={() => { setView("home"); setMobileNav(false); }}><House size={17} /> Learning Home</button>
           <button className={`nav-item ${view === "paths" ? "selected" : ""}`} aria-label="Explore Learning Paths" title="Explore Learning Paths" aria-current={view === "paths" ? "page" : undefined} onClick={() => { setView("paths"); setMobileNav(false); }}><Compass size={17} /> Explore Learning Paths</button>
           <button className={`nav-item ${view === "my-learning" ? "selected" : ""}`} aria-label="My Learning" title="My Learning" aria-current={view === "my-learning" ? "page" : undefined} onClick={() => { setView("my-learning"); setMobileNav(false); }}><GraduationCap size={17} /> My Learning</button>
-          <button className={`nav-item ${view === "playground" ? "selected" : ""}`} aria-label="C Playground" title="C Playground" aria-current={view === "playground" ? "page" : undefined} onClick={() => { setView("playground", routeLessonId); setMobileNav(false); }}><Terminal size={17} /> C Playground</button>
+          <button className={`nav-item ${view === "playground" ? "selected" : ""}`} aria-label="Playground" title="Playground" aria-current={view === "playground" ? "page" : undefined} onClick={() => { setView("playground", routeLessonId); setMobileNav(false); }}><Terminal size={17} /> Playground</button>
           <button className={`nav-item ${view === "practice" ? "selected" : ""}`} aria-label="Practice Lab" title="Practice Lab" aria-current={view === "practice" ? "page" : undefined} onClick={() => { setView("practice"); setMobileNav(false); }}><FlaskConical size={17} /> Practice Lab</button>
           <button className={`nav-item ${view === "progress" ? "selected" : ""}`} aria-label="Progress" title="Progress" aria-current={view === "progress" ? "page" : undefined} onClick={() => { setView("progress"); setMobileNav(false); }}><ChartNoAxesColumnIncreasing size={17} /> Progress</button>
           <button className={`nav-item ${view === "tutor" ? "selected" : ""}`} aria-label="AI Tutor" title="AI Tutor" aria-current={view === "tutor" ? "page" : undefined} onClick={() => { setView("tutor"); setMobileNav(false); }}><Bot size={17} /> AI Tutor <span className="nav-kat">KAT</span></button>
@@ -1556,7 +1790,7 @@ export function Workspace() {
       <main className="main-panel" id="main-content" tabIndex={-1}>
         <header className="topbar">
           <button className="icon-button mobile-menu" aria-label="Open navigation" aria-expanded={mobileNav} aria-controls="sidebar-nav" onClick={() => setMobileNav(true)}><Menu size={20} /></button>
-          <div className="breadcrumbs"><button className="breadcrumb-root" onClick={() => setView("home")}>KATALYST</button>{view === "workspace" && <><span className="crumb-sep">/</span><span>{activeProject?.name ?? "Workspace"}</span></>}<span className="crumb-sep">/</span><strong>{view === "workspace" ? (activeChat?.title ?? "New conversation") : view === "skills" ? "Skill library" : view === "settings" ? "Settings" : view === "home" ? "Learning Home" : view === "paths" ? "Learning Paths" : view === "my-learning" ? "My Learning" : view === "playground" ? "C Playground" : view === "practice" ? "Practice Lab" : view === "progress" ? "Progress" : view === "tutor" ? "AI Tutor" : "Lesson"}</strong></div>
+          <div className="breadcrumbs"><button className="breadcrumb-root" onClick={() => setView("home")}>KATALYST</button>{view === "workspace" && <><span className="crumb-sep">/</span><span>{activeProject?.name ?? "Workspace"}</span></>}<span className="crumb-sep">/</span><strong>{view === "workspace" ? (activeChat?.title ?? "New conversation") : view === "skills" ? "Skill library" : view === "settings" ? "Settings" : view === "home" ? "Learning Home" : view === "paths" ? "Learning Paths" : view === "my-learning" ? "My Learning" : view === "playground" ? "Playground" : view === "practice" ? "Practice Lab" : view === "progress" ? "Progress" : view === "tutor" ? "AI Tutor" : "Lesson"}</strong></div>
           <div className="topbar-actions">
             <div className="menu-anchor" ref={providerMenuRef}>
               <button className="provider-selector" ref={providerMenuButtonRef} aria-expanded={providerMenuOpen} onClick={() => setProviderMenuOpen((open) => !open)}>
@@ -1605,7 +1839,7 @@ export function Workspace() {
                     type="button"
                     className="ai-quota-pill quota-byok"
                     title="Using Bring-Your-Own-Key provider. Shared KATALYST credits are not consumed."
-                    onClick={() => openSettings("providers")}
+                    onClick={() => openSettings("usage-credits")}
                   >
                     BYOK · {selectedProvider.name}
                   </button>
@@ -1626,7 +1860,7 @@ export function Workspace() {
                     title={creditStatus.isGuest
                       ? "Guest trial balance. Sign in with Google to receive monthly credit allowance."
                       : `Monthly credits. Resets ${creditStatus.resetDate ? new Date(creditStatus.resetDate).toLocaleDateString() : "next month"}.`}
-                    onClick={() => openSettings(creditStatus.isGuest ? "account" : "providers")}
+                    onClick={() => openSettings("usage-credits")}
                   >
                     ✨ {label}
                   </button>
@@ -1695,22 +1929,65 @@ export function Workspace() {
 
         {view === "settings" ? <section className="settings-view">
           <div className="view-heading"><div><span className="eyebrow">WORKSPACE CONFIGURATION</span><h1>Settings</h1><p>Appearance, model access, and local workspace data.</p></div></div>
-          <nav className="settings-section-nav" role="tablist" aria-label="Settings sections" onKeyDown={(event) => {
-            const categories = isAdmin ? [...settingsCategories, { id: "admin" as const, label: "Admin" }] : settingsCategories;
-            const currentIndex = categories.findIndex(({ id }) => id === settingsCategory);
-            const nextIndex = event.key === "ArrowRight" ? (currentIndex + 1) % categories.length
-              : event.key === "ArrowLeft" ? (currentIndex - 1 + categories.length) % categories.length
-                : event.key === "Home" ? 0 : event.key === "End" ? categories.length - 1 : -1;
-            if (nextIndex >= 0) {
-              event.preventDefault();
-              const next = categories[nextIndex].id;
-              setSettingsCategory(next);
-              window.requestAnimationFrame(() => document.getElementById(`settings-tab-${next}`)?.focus());
-            }
-          }}>
-            {(isAdmin ? [...settingsCategories, { id: "admin" as const, label: "Admin" }] : settingsCategories).map(({ id, label }) => <button key={id} id={`settings-tab-${id}`} type="button" role="tab" tabIndex={settingsCategory === id ? 0 : -1} aria-selected={settingsCategory === id} aria-controls="settings-category-panel" onClick={() => setSettingsCategory(id)}>{label}</button>)}
-          </nav>
-          <div className="settings-category-content" id="settings-category-panel" role="tabpanel" aria-labelledby={`settings-tab-${settingsCategory}`}>
+          <div className="settings-layout-grid">
+            <nav className="settings-section-nav settings-grouped-nav" role="tablist" aria-label="Settings sections" onKeyDown={(event) => {
+              const allItems = [
+                ...settingsNavGroups[0].items,
+                ...settingsNavGroups[1].items,
+                ...(isAdmin ? [{ id: "admin" as const, label: "Admin", icon: ShieldAlert }] : []),
+              ];
+              const currentIndex = allItems.findIndex(({ id }) => id === settingsCategory);
+              const nextIndex = (event.key === "ArrowRight" || event.key === "ArrowDown") ? (currentIndex + 1) % allItems.length
+                : (event.key === "ArrowLeft" || event.key === "ArrowUp") ? (currentIndex - 1 + allItems.length) % allItems.length
+                  : event.key === "Home" ? 0 : event.key === "End" ? allItems.length - 1 : -1;
+              if (nextIndex >= 0) {
+                event.preventDefault();
+                const next = allItems[nextIndex].id;
+                setSettingsCategory(next);
+                window.requestAnimationFrame(() => document.getElementById(`settings-tab-${next}`)?.focus());
+              }
+            }}>
+              {settingsNavGroups.map((group) => (
+                <div key={group.group} className="settings-nav-group">
+                  <span className="settings-group-label">{group.group}</span>
+                  {group.items.map(({ id, label, icon: Icon }) => (
+                    <button
+                      key={id}
+                      id={`settings-tab-${id}`}
+                      type="button"
+                      role="tab"
+                      tabIndex={settingsCategory === id ? 0 : -1}
+                      aria-selected={settingsCategory === id}
+                      aria-controls="settings-category-panel"
+                      className={`settings-nav-btn ${settingsCategory === id ? "active" : ""}`}
+                      onClick={() => setSettingsCategory(id)}
+                    >
+                      <Icon size={15} aria-hidden="true" />
+                      <span>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              ))}
+              {isAdmin && (
+                <div className="settings-nav-group">
+                  <span className="settings-group-label">Administration</span>
+                  <button
+                    id="settings-tab-admin"
+                    type="button"
+                    role="tab"
+                    tabIndex={settingsCategory === "admin" ? 0 : -1}
+                    aria-selected={settingsCategory === "admin"}
+                    aria-controls="settings-category-panel"
+                    className={`settings-nav-btn ${settingsCategory === "admin" ? "active" : ""}`}
+                    onClick={() => setSettingsCategory("admin")}
+                  >
+                    <ShieldAlert size={15} aria-hidden="true" />
+                    <span>Admin</span>
+                  </button>
+                </div>
+              )}
+            </nav>
+            <div className="settings-category-content" id="settings-category-panel" role="tabpanel" aria-labelledby={`settings-tab-${settingsCategory}`}>
           {settingsCategory === "appearance" && <article className="settings-card appearance-card" id="settings-appearance">
             <div className="context-head"><div><h2>Appearance</h2><p>Choose a theme and reading density for this browser.</p></div><span className="local-label">Saved locally</span></div>
             <fieldset className="theme-fieldset"><legend>Theme</legend><div className="theme-options">{(["light", "dark", "system"] as const).map((theme) => <button type="button" key={theme} aria-pressed={preferences.theme === theme} className={preferences.theme === theme ? "selected" : ""} onClick={() => setPreferences((current) => ({ ...current, theme }))}>{theme === "system" ? "System" : theme === "dark" ? "Dark" : "Light"}</button>)}</div></fieldset>
@@ -1718,8 +1995,15 @@ export function Workspace() {
             <p className="settings-explainer">{preferences.theme === "system" ? "System follows your device theme." : `${preferences.theme === "dark" ? "Dark" : "Light"} theme stays active in this browser.`} Comfortable reading uses slightly larger text and more generous line spacing.</p>
             {preferencesIssue && <p className="settings-data-issue" role="status">{preferencesIssue}</p>}
           </article>}
-          {settingsCategory === "providers" && <>
-          <div id="settings-ai-providers" className="settings-section-heading"><span className="eyebrow">CONNECTIONS</span><h2>AI Providers</h2><p>Credentials stay server-side or in this tab’s memory. Configuration, model discovery, and inference are reported as separate states.</p></div>
+          {settingsCategory === "ai-models" && <>
+          <div id="settings-ai-providers" className="settings-section-heading"><span className="eyebrow">CONNECTIONS & MODELS</span><h2>AI & Models</h2><p>Credentials stay server-side or in this tab’s memory. Choose your active provider, configure BYOK credentials, and select models.</p></div>
+          <article className="settings-model-card model-settings-card" id="settings-models">
+            <div className="context-head"><div><h2>Models</h2><p>Search and select from models this adapter supports.</p></div><span className="local-label">{selectedProvider.name}</span></div>
+            <p className="active-model-setting">Active selection: <strong>{selectedProvider.name}</strong>{selectedModel ? ` · ${selectedModel.name}` : " · no model selected"}</p>
+            <div className="settings-model-controls"><label className="key-field">Search available models<input type="search" aria-label="Search models in settings" placeholder="Name, publisher, or model ID" value={modelSearch} onChange={(event) => setModelSearch(event.target.value)} /></label><label className="key-field">Selected model<select aria-label="Settings selected model" value={data.models[data.provider]} onChange={(event) => setData((current) => ({ ...current, models: { ...current.models, [current.provider]: event.target.value } }))} disabled={!displayedModels.length}><option value="">No supported models loaded</option>{displayedModels.map((model) => <option key={model.id} value={model.id}>{model.name} · {model.id}</option>)}</select></label><button className="secondary-button" onClick={() => void loadModels(data.provider, true, sessionKeys[data.provider], data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL, sessionCloudflareAccountId)} disabled={modelState.loading}>{modelState.loading ? "Loading…" : "Refresh active catalog"}</button></div>
+            {modelState.error && <div className="inline-error" role="alert">{modelState.error}<button onClick={() => void loadModels(data.provider, true, sessionKeys[data.provider], data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL, sessionCloudflareAccountId)}>Retry</button></div>}
+            <p className="model-catalog-summary">{modelState.models.length} supported model{modelState.models.length === 1 ? "" : "s"}{modelState.refreshedAt ? ` · ${modelState.cached ? "cached" : "checked"} ${new Date(modelState.refreshedAt).toLocaleTimeString()}` : " · select Refresh active catalog to check availability"}</p>
+          </article>
           {providerIds.map((providerId) => {
             const provider = providerCatalog[providerId];
             const configured = isProviderConfigured(providerId);
@@ -1796,13 +2080,7 @@ export function Workspace() {
             </article>;
           })}
           </>}
-          {settingsCategory === "models" && <article className="settings-model-card model-settings-card" id="settings-models">
-            <div className="context-head"><div><h2>Models</h2><p>Search and select from models this adapter supports.</p></div><span className="local-label">{selectedProvider.name}</span></div>
-            <p className="active-model-setting">Active selection: <strong>{selectedProvider.name}</strong>{selectedModel ? ` · ${selectedModel.name}` : " · no model selected"}</p>
-            <div className="settings-model-controls"><label className="key-field">Search available models<input type="search" aria-label="Search models in settings" placeholder="Name, publisher, or model ID" value={modelSearch} onChange={(event) => setModelSearch(event.target.value)} /></label><label className="key-field">Selected model<select aria-label="Settings selected model" value={data.models[data.provider]} onChange={(event) => setData((current) => ({ ...current, models: { ...current.models, [current.provider]: event.target.value } }))} disabled={!displayedModels.length}><option value="">No supported models loaded</option>{displayedModels.map((model) => <option key={model.id} value={model.id}>{model.name} · {model.id}</option>)}</select></label><button className="secondary-button" onClick={() => void loadModels(data.provider, true, sessionKeys[data.provider], data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL, sessionCloudflareAccountId)} disabled={modelState.loading}>{modelState.loading ? "Loading…" : "Refresh active catalog"}</button></div>
-            {modelState.error && <div className="inline-error" role="alert">{modelState.error}<button onClick={() => void loadModels(data.provider, true, sessionKeys[data.provider], data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL, sessionCloudflareAccountId)}>Retry</button></div>}
-            <p className="model-catalog-summary">{modelState.models.length} supported model{modelState.models.length === 1 ? "" : "s"}{modelState.refreshedAt ? ` · ${modelState.cached ? "cached" : "checked"} ${new Date(modelState.refreshedAt).toLocaleTimeString()}` : " · select Refresh active catalog to check availability"}</p>
-          </article>}
+          {settingsCategory === "usage-credits" && renderUsageAndCreditsSettings()}
           {settingsCategory === "learning" && <article className="settings-card learning-settings-card" id="settings-learning"><div className="context-head"><div><h2>Learning</h2><p>Learning progress is stored separately from workspace backups.</p></div><span className="local-label">Explicit completion</span></div><p className="settings-explainer">KATALYST records path enrollment, lesson opens, and lessons you mark complete. It does not infer mastery from chat history or time spent. Current progress stays in this browser.</p><button className="secondary-button" onClick={() => setView("progress")}>Open Progress dashboard</button></article>}
           {settingsCategory === "workspace" && <>
           <div id="settings-workspace" className="settings-section-heading"><span className="eyebrow">LOCAL DATA</span><h2>Workspace</h2><p>Export, restore, and manage your projects and conversations.</p></div>
@@ -1834,6 +2112,7 @@ export function Workspace() {
           <div id="settings-admin" className="settings-section-heading"><span className="eyebrow">ADMINISTRATION</span><h2>AI Controls</h2></div>
           <AdminPanel />
           </>}
+          </div>
           </div>
         </section> : null}
 

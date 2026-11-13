@@ -1,17 +1,39 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type FormEvent } from "react";
-import { ArrowUp, Bot, BookOpen, Code2, Lightbulb, MessageSquareText, Settings2, Terminal, WandSparkles } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { ArrowUp, Bot, BookOpen, Code2, Lightbulb, MessageSquareText, Plus, RotateCcw, Settings2, Square, Terminal, Trash2, WandSparkles } from "lucide-react";
 import { AssistantMarkdown } from "@/components/assistant-markdown";
 import { BrandMark } from "@/components/brand-mark";
 import { CLOUDFLARE_ACCOUNT_HEADER, OLLAMA_URL_HEADER, SESSION_KEY_HEADER } from "@/lib/providers/constants";
 import { providerCatalog, type ProviderId } from "@/lib/providers/catalog";
 import { trackAIRequestFinish, trackAIRequestStart } from "@/lib/ai-activity";
 import { boundTutorHistory, composeTutorReference, composeTutorSkillContext, tutorModes, type TutorMessage, type TutorMode, type TutorWorkspaceActivity } from "@/lib/tutor-request";
+import {
+  addMessageToConversation,
+  clearConversationMessages,
+  createNewConversation,
+  deleteConversation,
+  emptyTutorStore,
+  getOrCreateConversation,
+  getTutorStoreServerSnapshot,
+  getTutorStoreSnapshot,
+  readTutorStore,
+  setActiveConversation,
+  subscribeTutorStore,
+  updateConversationMode,
+  type TutorConversation,
+  type TutorPersistedMessage,
+} from "@/lib/tutor-storage";
 import type { LearningLesson, LearningModule, LearningPath } from "@/lib/learning-curriculum";
-import type { AppliedSkill, SkillOmission, WorkspaceSkill } from "@/lib/skills";
+import type { ExerciseProgressStatus } from "@/lib/learning-progress";
+import type { WorkspaceSkill } from "@/lib/skills";
 
-export type TutorLessonContext = { path: LearningPath; module: LearningModule; lesson: LearningLesson };
+export type TutorLessonContext = {
+  path: LearningPath;
+  module: LearningModule;
+  lesson: LearningLesson;
+  exerciseStatus?: ExerciseProgressStatus;
+};
 
 type Props = {
   provider: ProviderId;
@@ -24,6 +46,7 @@ type Props = {
   context?: TutorLessonContext;
   workspaceActivity?: TutorWorkspaceActivity;
   skills: WorkspaceSkill[];
+  draftPrompt?: string;
   onOpenSettings: () => void;
   onOpenLesson?: () => void;
 };
@@ -37,6 +60,11 @@ const workspaceActions = [
   { label: "Explain program output", icon: MessageSquareText, requires: "output", prompt: "Explain the latest program output and relate it to the current code or lesson when useful. Treat the output as data from the browser run; do not say that you ran the program." },
 ];
 
+const emptySubscribe = () => () => {};
+function useIsClient(): boolean {
+  return useSyncExternalStore(emptySubscribe, () => true, () => false);
+}
+
 export function KatTutor({
   provider,
   model,
@@ -48,20 +76,57 @@ export function KatTutor({
   context,
   workspaceActivity,
   skills,
+  draftPrompt,
   onOpenSettings,
   onOpenLesson,
 }: Props) {
-  const [mode, setMode] = useState<TutorMode>("Concept teacher");
+  const isClient = useIsClient();
+  const store = useSyncExternalStore(subscribeTutorStore, getTutorStoreSnapshot, getTutorStoreServerSnapshot);
   const [applySkills, setApplySkills] = useState(false);
-  const [messages, setMessages] = useState<Array<TutorMessage & { appliedSkills?: AppliedSkill[]; omittedSkills?: SkillOmission[]; responseProvider?: ProviderId; responseModel?: string }>>([]);
+  const [showHistoryMenu, setShowHistoryMenu] = useState(false);
   const [input, setInput] = useState("");
+  const [prevDraftPrompt, setPrevDraftPrompt] = useState(draftPrompt);
+  if (draftPrompt && draftPrompt !== prevDraftPrompt) {
+    setPrevDraftPrompt(draftPrompt);
+    setInput(draftPrompt);
+  }
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const [quotaError, setQuotaError] = useState<{ code: string; message: string; requiresSignIn?: boolean; resetDate?: string } | null>(null);
+
   const conversationRef = useRef<HTMLDivElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
   const followConversationRef = useRef(true);
+  const abortRef = useRef<AbortController | null>(null);
+  const [lastQuestion, setLastQuestion] = useState("");
+
   const enabledSkillCount = skills.filter((skill) => skill.enabled).length;
+
+  const lessonId = context?.lesson.id;
+  const lessonTitle = context?.lesson.title;
+
+  useEffect(() => {
+    if (!lessonId) return;
+    const current = readTutorStore();
+    getOrCreateConversation(current, lessonId, lessonTitle);
+  }, [lessonId, lessonTitle]);
+
+  const activeConversation: TutorConversation = useMemo(() => {
+    return (
+      store.conversations.find((c) => c.id === store.activeConversationId) ??
+      store.conversations[0] ??
+      emptyTutorStore().conversations[0]!
+    );
+  }, [store]);
+
+  const currentMode: TutorMode = activeConversation?.mode ?? "Concept teacher";
+  const messages: TutorPersistedMessage[] = useMemo(() => activeConversation?.messages ?? [], [activeConversation]);
+
+  const setMode = (nextMode: TutorMode) => {
+    if (activeConversation) {
+      updateConversationMode(store, activeConversation.id, nextMode);
+    }
+  };
 
   useLayoutEffect(() => {
     const conversation = conversationRef.current;
@@ -77,6 +142,34 @@ export function KatTutor({
     textarea.style.overflowY = textarea.scrollHeight > 130 ? "auto" : "hidden";
   }, [input]);
 
+  const handleNewConversation = () => {
+    const { conversation } = createNewConversation(
+      store,
+      context?.lesson.id,
+      context?.lesson.title
+    );
+    setActiveConversation(store, conversation.id);
+    setShowHistoryMenu(false);
+  };
+
+  const handleClearHistory = () => {
+    if (!activeConversation) return;
+    clearConversationMessages(store, activeConversation.id);
+  };
+
+  const handleDeleteConversation = (id: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    deleteConversation(store, id);
+  };
+
+  const stop = () => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    setPending(false);
+  };
+
   const ask = async (question: string) => {
     const trimmed = question.trim();
     if (!trimmed || pending) return;
@@ -84,17 +177,47 @@ export function KatTutor({
       setError(`Choose a supported ${providerCatalog[provider].name} model before asking Kat.`);
       return;
     }
-    const nextMessages = boundTutorHistory(messages, trimmed);
+    const currentConv = activeConversation;
+    if (!currentConv) return;
+
+    setLastQuestion(trimmed);
+
     const skillComposition = composeTutorSkillContext(skills, applySkills);
-    const lessonContext = composeTutorReference(mode, context, workspaceActivity, skillComposition.context);
+    const lessonContext = composeTutorReference(currentMode, context, workspaceActivity, skillComposition.context);
+
+    // Prevent duplicate user message if already retrying the same question at the tail
+    const lastMsg = currentConv.messages[currentConv.messages.length - 1];
+    const isRetryOfLastUserTurn = lastMsg && lastMsg.role === "user" && lastMsg.content === trimmed;
+
+    if (!isRetryOfLastUserTurn) {
+      addMessageToConversation(store, currentConv.id, {
+        role: "user",
+        content: trimmed,
+        appliedSkills: skillComposition.appliedSkills,
+        omittedSkills: skillComposition.omittedSkills,
+      });
+    }
+
+    const currentMessages = readTutorStore().conversations.find((c) => c.id === currentConv.id)?.messages ?? [];
+    const historyForRequest: TutorMessage[] = currentMessages.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+    const nextMessages = boundTutorHistory(historyForRequest.slice(0, -1), trimmed);
+
     setInput("");
     setError("");
     setQuotaError(null);
     setPending(true);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
     const activityId = trackAIRequestStart(provider, model);
+
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
+        signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
           ...(sessionKey.trim() ? { [SESSION_KEY_HEADER]: sessionKey.trim() } : {}),
@@ -125,15 +248,35 @@ export function KatTutor({
       }
       if (!result.text?.trim()) throw new Error("The provider returned an empty response. Try again.");
       trackAIRequestFinish(activityId, "complete", result.usage);
-      setMessages([...nextMessages.map((message, index) => index === nextMessages.length - 1
-        ? { ...message, appliedSkills: skillComposition.appliedSkills, omittedSkills: skillComposition.omittedSkills }
-        : message), { role: "assistant" as const, content: result.text, responseProvider: provider, responseModel: model }].slice(-20));
+
+      // Persist assistant response
+      const latestStore = readTutorStore();
+      addMessageToConversation(latestStore, currentConv.id, {
+        role: "assistant",
+        content: result.text,
+        responseProvider: provider,
+        responseModel: model,
+      });
     } catch (requestError) {
-      trackAIRequestFinish(activityId, "failed");
-      setInput(trimmed);
-      setError(requestError instanceof Error ? requestError.message : "Could not reach the selected model provider.");
+      if (controller.signal.aborted) {
+        trackAIRequestFinish(activityId, "stopped");
+        setError("Generation stopped.");
+      } else {
+        trackAIRequestFinish(activityId, "failed");
+        setError(requestError instanceof Error ? requestError.message : "Could not reach the selected model provider.");
+      }
     } finally {
+      abortRef.current = null;
       setPending(false);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("katalyst:refresh-ai-session"));
+      }
+    }
+  };
+
+  const retryLast = () => {
+    if (lastQuestion) {
+      void ask(lastQuestion);
     }
   };
 
@@ -141,6 +284,7 @@ export function KatTutor({
     event.preventDefault();
     void ask(input);
   };
+
   const hasDiagnostics = Boolean(workspaceActivity?.diagnostics?.trim());
   const hasOutput = Boolean(workspaceActivity?.output?.trim());
   const hasEditorCode = Boolean(workspaceActivity?.source.trim());
@@ -154,11 +298,76 @@ export function KatTutor({
   return <section className="tutor-panel integrated-tutor-panel" aria-label="AI Tutor Kat">
     <div className="tutor-heading">
       <div className="tutor-avatar"><Bot size={19} /></div>
-      <div><span className="eyebrow">YOUR LEARNING COMPANION</span><h2>Kat</h2><p>{context ? `${context.module.title} · ${context.lesson.title}` : "A tutor for your engineering questions"}</p></div>
+      <div className="tutor-heading-info">
+        <span className="eyebrow">YOUR LEARNING COMPANION</span>
+        <h2>Kat</h2>
+        <p>{isClient && activeConversation ? activeConversation.title : (context ? `${context.module.title} · ${context.lesson.title}` : "A tutor for your engineering questions")}</p>
+      </div>
+      <div className="tutor-heading-actions">
+        <button type="button" className="c-small-action" onClick={handleNewConversation} title="Start a new conversation" aria-label="New chat">
+          <Plus size={13} /><span>New</span>
+        </button>
+        {messages.length > 0 && (
+          <button type="button" className="c-small-action" onClick={handleClearHistory} title="Clear messages in this chat" aria-label="Clear chat">
+            <RotateCcw size={12} /><span>Clear</span>
+          </button>
+        )}
+        {isClient && store.conversations.length > 1 && (
+          <button type="button" className={`c-small-action${showHistoryMenu ? " is-active" : ""}`} onClick={() => setShowHistoryMenu((prev) => !prev)} title="Show chat history" aria-label="Chat history">
+            <MessageSquareText size={13} /><span>({store.conversations.length})</span>
+          </button>
+        )}
+      </div>
       <span className="tutor-provider">{providerCatalog[provider].name}{modelName ? ` · ${modelName}` : ""}</span>
     </div>
+    {showHistoryMenu && (
+      <div className="tutor-history-dropdown" role="menu" aria-label="Past conversations">
+        <div className="tutor-history-dropdown-header">
+          <strong>Conversations</strong>
+          <button type="button" className="c-small-action" onClick={handleNewConversation}>
+            <Plus size={12} /> New chat
+          </button>
+        </div>
+        <div className="tutor-history-list">
+          {store.conversations.map((c) => (
+            <div
+              key={c.id}
+              role="menuitem"
+              tabIndex={0}
+              className={`tutor-history-item${c.id === store.activeConversationId ? " is-active" : ""}`}
+              onClick={() => {
+                setActiveConversation(store, c.id);
+                setShowHistoryMenu(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  setActiveConversation(store, c.id);
+                  setShowHistoryMenu(false);
+                }
+              }}
+            >
+              <div className="tutor-history-meta">
+                <span className="tutor-history-title">{c.title}</span>
+                <span className="tutor-history-count">{c.messages.length} {c.messages.length === 1 ? "msg" : "msgs"}</span>
+              </div>
+              {store.conversations.length > 1 && (
+                <button
+                  type="button"
+                  className="tutor-history-delete"
+                  onClick={(e) => handleDeleteConversation(c.id, e)}
+                  title="Delete conversation"
+                  aria-label={`Delete conversation ${c.title}`}
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
     <div className="tutor-modes" aria-label="Tutor style">
-      {tutorModes.map((item) => <button key={item.name} type="button" className={mode === item.name ? "selected" : ""} aria-pressed={mode === item.name} title={item.description} onClick={() => setMode(item.name)}>{item.name}</button>)}
+      {tutorModes.map((item) => <button key={item.name} type="button" className={currentMode === item.name ? "selected" : ""} aria-pressed={currentMode === item.name} title={item.description} onClick={() => setMode(item.name)}>{item.name}</button>)}
     </div>
     {context && <div className="tutor-context-note"><BookOpen size={15} /><span><strong>Lesson context:</strong> Kat uses the lesson and coding activity when they help answer your question.</span>{onOpenLesson && <button type="button" onClick={onOpenLesson}>View lesson</button>}</div>}
     <div className="tutor-skill-controls">
@@ -187,8 +396,58 @@ export function KatTutor({
         )}
       </div>
     </div>}
-    {error && !quotaError && <div className="send-error tutor-error" role="alert"><strong>Kat could not answer</strong><span>{error}</span><button type="button" onClick={onOpenSettings}>Open provider settings</button></div>}
-    <form className="tutor-composer" onSubmit={send}><textarea ref={composerInputRef} aria-label="Ask Kat a question" value={input} maxLength={8_000} rows={2} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} placeholder={configured ? "Ask about the lesson, code, or output…" : "Connect a provider to ask Kat…"} disabled={pending} /><button className="send-button" aria-label="Send question to Kat" disabled={!input.trim() || pending || !configured || !model}><ArrowUp size={17} /></button></form>
-    <p className="tutor-footnote">Kat has no web-browsing or code-execution tools and does not claim to run code. Replies are model-generated; check technical details against trusted references. Conversation stays in page memory.</p>
+    {error && !quotaError && (
+      <div className="send-error tutor-error" role="alert">
+        <strong>Kat could not answer</strong>
+        <span>{error}</span>
+        <div className="error-banner-actions">
+          {lastQuestion && error !== "Generation stopped." && (
+            <button type="button" className="retry-button" onClick={retryLast}>
+              <RotateCcw size={13} /> Retry
+            </button>
+          )}
+          <button type="button" onClick={onOpenSettings}>Open provider settings</button>
+        </div>
+      </div>
+    )}
+    <form className="tutor-composer" onSubmit={send}>
+      <textarea
+        ref={composerInputRef}
+        aria-label="Ask Kat a question"
+        value={input}
+        maxLength={8_000}
+        rows={2}
+        onChange={(event) => setInput(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" && !event.shiftKey) {
+            event.preventDefault();
+            event.currentTarget.form?.requestSubmit();
+          }
+        }}
+        placeholder={configured ? "Ask about the lesson, code, or output…" : "Connect a provider to ask Kat…"}
+        disabled={pending}
+      />
+      {pending ? (
+        <button
+          type="button"
+          className="stop-button"
+          aria-label="Stop generating response"
+          title="Stop response"
+          onClick={stop}
+        >
+          <Square size={14} />
+        </button>
+      ) : (
+        <button
+          type="submit"
+          className="send-button"
+          aria-label="Send question to Kat"
+          disabled={!input.trim() || !configured || !model}
+        >
+          <ArrowUp size={17} />
+        </button>
+      )}
+    </form>
+    <p className="tutor-footnote">Kat has no web-browsing or code-execution tools and does not claim to run code. Replies are model-generated; check technical details against trusted references. Conversations are saved to this browser and synced to your account when signed in. Guest conversations belong to this browser.</p>
   </section>;
 }

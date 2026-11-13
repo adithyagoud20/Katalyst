@@ -171,3 +171,135 @@ describe("AI Gateway — Admin Authorization & Security", () => {
     vi.unstubAllEnvs();
   });
 });
+
+describe("AI Gateway — Guest Session Lifecycle & Edge Cases", () => {
+  it("creates a valid server-issued guest session on first request", async () => {
+    const request = new Request("http://localhost:3000/api/ai/session", {
+      headers: { "x-forwarded-for": "198.51.100.12" },
+    });
+    const guestData = await import("@/lib/ai-gateway/guest").then((m) =>
+      m.getOrCreateGuestIdentity(request, null)
+    );
+
+    expect(guestData.guestId).toMatch(/^[0-9a-fA-F-]{36}$/);
+    expect(guestData.status.isGuest).toBe(true);
+    expect(guestData.status.trialCreditsAllocated).toBe(50);
+    expect(guestData.status.trialCreditsRemaining).toBe(50);
+    expect(guestData.status.isExhausted).toBe(false);
+    expect(typeof guestData.cookieToken).toBe("string");
+  });
+
+  it("persists guest identity across page reloads using the cookie token", async () => {
+    const { getOrCreateGuestIdentity } = await import("@/lib/ai-gateway/guest");
+    const firstReq = new Request("http://localhost:3000/api/ai/session", {
+      headers: { "x-forwarded-for": "198.51.100.15" },
+    });
+    const first = await getOrCreateGuestIdentity(firstReq, null);
+
+    // Simulated reload with cookie sent back
+    const secondReq = new Request("http://localhost:3000/api/ai/session", {
+      headers: {
+        "x-forwarded-for": "198.51.100.15",
+        cookie: `katalyst_guest_session=${first.cookieToken}`,
+      },
+    });
+    const second = await getOrCreateGuestIdentity(secondReq, first.cookieToken);
+
+    expect(second.guestId).toBe(first.guestId);
+    expect(second.status.trialCreditsAllocated).toBe(first.status.trialCreditsAllocated);
+  });
+
+  it("handles URL-encoded and quote-wrapped cookie values gracefully", () => {
+    const guestId = "12345678-abcd-1234-abcd-123456789abc";
+    const now = Date.now();
+    const token = signGuestSession(guestId, now, now + 100_000);
+
+    const quoted = `"${token}"`;
+    const encoded = encodeURIComponent(quoted);
+
+    const verifiedFromQuoted = verifyGuestSession(quoted);
+    const verifiedFromEncoded = verifyGuestSession(encoded);
+
+    expect(verifiedFromQuoted?.guestId).toBe(guestId);
+    expect(verifiedFromEncoded?.guestId).toBe(guestId);
+  });
+
+  it("handles missing guest cookie by minting a new valid session", async () => {
+    const { getOrCreateGuestIdentity } = await import("@/lib/ai-gateway/guest");
+    const request = new Request("http://localhost:3000/api/chat", {
+      headers: { "x-forwarded-for": "198.51.100.88" },
+    });
+    const session = await getOrCreateGuestIdentity(request, undefined);
+    expect(session.guestId).toBeDefined();
+    expect(session.status.trialCreditsRemaining).toBe(50);
+  });
+
+  it("handles expired guest sessions by rejecting invalid signatures", () => {
+    const guestId = "12345678-abcd-1234-abcd-123456789abc";
+    const past = Date.now() - 500_000;
+    const expired = signGuestSession(guestId, past - 1000, past);
+    expect(verifyGuestSession(expired)).toBeNull();
+  });
+
+  it("handles concurrent guest initialization requests consistently", async () => {
+    const { getOrCreateGuestIdentity } = await import("@/lib/ai-gateway/guest");
+    const req1 = new Request("http://localhost:3000/api/ai/session", {
+      headers: { "x-forwarded-for": "198.51.100.99" },
+    });
+    const req2 = new Request("http://localhost:3000/api/ai/session", {
+      headers: { "x-forwarded-for": "198.51.100.99" },
+    });
+
+    const [res1, res2] = await Promise.all([
+      getOrCreateGuestIdentity(req1, null),
+      getOrCreateGuestIdentity(req2, null),
+    ]);
+
+    expect(res1.status.trialCreditsAllocated).toBe(50);
+    expect(res2.status.trialCreditsAllocated).toBe(50);
+  });
+
+  it("reserves credits and releases them upon provider cancellation or error", async () => {
+    const { reserveCredits, releaseReservation } = await import("@/lib/ai-gateway/credits");
+    const idKey = "test-idempotency-" + Date.now();
+    const reservation = await reserveCredits({
+      idempotencyKey: idKey,
+      modelId: "@cf/meta/llama-3.3-70b-instruct",
+      estimatedCredits: 1.5,
+      guestId: "12345678-1234-1234-1234-1234567890ab",
+    });
+
+    expect(reservation.ok).toBe(true);
+    expect(reservation.creditsReserved).toBe(1.5);
+
+    // Release must not throw
+    await expect(
+      releaseReservation({
+        reservationId: reservation.reservationId!,
+        outcome: "cancelled",
+      })
+    ).resolves.not.toThrow();
+  });
+
+  it("settles credit reservations accurately", async () => {
+    const { reserveCredits, settleCredits } = await import("@/lib/ai-gateway/credits");
+    const idKey = "test-settle-" + Date.now();
+    const reservation = await reserveCredits({
+      idempotencyKey: idKey,
+      modelId: "@cf/meta/llama-3.3-70b-instruct",
+      estimatedCredits: 1.0,
+      guestId: "12345678-1234-1234-1234-1234567890ab",
+    });
+
+    const settled = await settleCredits({
+      reservationId: reservation.reservationId!,
+      inputTokens: 100,
+      outputTokens: 200,
+      actualCredits: 1.25,
+      isEstimated: false,
+    });
+
+    expect(settled.ok).toBe(true);
+    expect(settled.creditsSettled).toBe(1.25);
+  });
+});

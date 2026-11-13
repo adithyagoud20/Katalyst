@@ -277,7 +277,7 @@ create or replace function public.get_or_create_guest_session(
   p_expires_at timestamptz
 )
 returns table (
-  guest_id text,
+  session_guest_id text,
   trial_credits_allocated integer,
   trial_credits_used numeric,
   trial_credits_reserved numeric,
@@ -287,6 +287,7 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+#variable_conflict use_column
 declare
   v_default_trial integer;
   v_row record;
@@ -308,7 +309,7 @@ begin
   from public.ai_guest_sessions as gs
   where gs.guest_id = p_guest_id;
 
-  return query select v_row.guest_id, v_row.trial_credits_allocated, v_row.trial_credits_used, v_row.trial_credits_reserved, v_row.trial_credits_available;
+  return query select v_row.guest_id as session_guest_id, v_row.trial_credits_allocated, v_row.trial_credits_used, v_row.trial_credits_reserved, v_row.trial_credits_available;
 end;
 $$;
 
@@ -320,7 +321,8 @@ create or replace function public.reserve_ai_credits(
   p_idempotency_key text,
   p_model_id text,
   p_estimated_credits numeric,
-  p_guest_id text default null
+  p_guest_id text default null,
+  p_user_id uuid default null
 )
 returns table (
   status text,
@@ -334,11 +336,12 @@ security definer
 set search_path = ''
 as $$
 declare
-  v_user_id uuid := auth.uid();
+  v_user_id uuid := coalesce(p_user_id, auth.uid());
   v_sys_config record;
   v_period record;
   v_guest record;
   v_reservation_id uuid;
+  v_existing_reserved numeric;
   v_period_start timestamptz;
   v_period_end timestamptz;
   v_available numeric;
@@ -357,15 +360,15 @@ begin
   end if;
 
   -- 2. Idempotency Check
-  select r.id, r.credits_reserved, r.status into v_reservation_id, p_estimated_credits, v_sys_config.kill_switch_active
+  select r.id, r.credits_reserved into v_reservation_id, v_existing_reserved
   from public.ai_credit_reservations as r where r.idempotency_key = p_idempotency_key;
   if found then
-    return query select 'idempotent'::text, v_reservation_id, p_estimated_credits, 0::numeric, null::text;
+    return query select 'idempotent'::text, v_reservation_id, v_existing_reserved, 0::numeric, null::text;
     return;
   end if;
 
   -- 3. Authenticated User Flow
-  if v_user_id is not null and public.has_active_auth_session() then
+  if v_user_id is not null and (p_user_id is not null or public.has_active_auth_session()) then
     v_period_start := date_trunc('month', now() at time zone 'utc') at time zone 'utc';
     v_period_end := (date_trunc('month', now() at time zone 'utc') + interval '1 month') at time zone 'utc';
 
@@ -401,13 +404,13 @@ begin
 
   -- 4. Guest Flow
   elsif p_guest_id is not null then
-    select gs.guest_id, gs.trial_credits_allocated, gs.trial_credits_used, gs.trial_credits_reserved
+    select gs.guest_id, gs.trial_credits_allocated, gs.trial_credits_used, gs.trial_credits_reserved, gs.expires_at
     into v_guest
     from public.ai_guest_sessions as gs
     where gs.guest_id = p_guest_id
     for update;
 
-    if not found then
+    if not found or v_guest.expires_at < now() then
       return query select 'error'::text, null::uuid, 0::numeric, 0::numeric, 'Guest session not found or expired.'::text;
       return;
     end if;
@@ -439,8 +442,8 @@ begin
 end;
 $$;
 
-revoke all on function public.reserve_ai_credits(text, text, numeric, text) from public, anon;
-grant execute on function public.reserve_ai_credits(text, text, numeric, text) to anon, authenticated;
+revoke all on function public.reserve_ai_credits(text, text, numeric, text, uuid) from public, anon;
+grant execute on function public.reserve_ai_credits(text, text, numeric, text, uuid) to anon, authenticated;
 
 -- Core: Settle AI credits upon successful response
 create or replace function public.settle_ai_credits(

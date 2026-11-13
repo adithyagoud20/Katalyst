@@ -175,6 +175,195 @@ M14 implementation is complete. Verification on 2026-11-10: `npm run lint` and `
 
 M15 verification on 2026-11-10: `npm run lint` and `npm run typecheck` passed cleanly; `npm test` passed with 180 tests across 21 files; OAuth, gateway pipelines, and Brevo delivery were validated with mocked adapters.
 
+### M16 — Learning Workspace, AI Memory, Compiler Architecture & Settings (implemented)
+
+- [x] Diagnose and fix C11 browser compiler stdin stream: normalize newlines, handle multiple inputs, pre-fill sample inputs from curriculum examples, and warn before executing stdin-dependent code with empty input.
+- [x] Research and document a hybrid compiler execution architecture for multi-language curricula and electronics simulation in `docs/COMPILER_ARCHITECTURE.md`.
+- [x] Implement a provider-neutral execution interface and registry in `src/lib/execution/`.
+- [x] Implement persistent Kat conversation history under `katalyst.tutor.v1` with multi-thread management (new, clear, rename, delete) and Supabase account snapshot mirroring.
+- [x] Redesign learning workspace with 3 independent scroll panels, draggable/keyboard-accessible splitters, layout persistence (`katalyst.workspace-layout.v1`), and responsive mobile tab state preservation.
+- [x] Reorganize Settings into 8 dedicated categories (`account`, `appearance`, `ai-models`, `usage-credits`, `learning`, `workspace`, `privacy`, `admin`), combining AI providers and models and strictly isolating admin controls.
+- [x] Build a dedicated Usage & Credits telemetry panel with shared gateway status, credit meter, BYOK 0-credit policy notice, and AI request history.
+- [x] Expand automated tests: 207 tests passing across 23 test suites covering stdin handling, execution routing, and tutor persistence; 43 passing Playwright e2e browser tests.
+- [x] Author comprehensive production deployment and environment variable guide in `docs/DEPLOYMENT.md`.
+
+M16 verification on 2026-11-11: `npm run lint`, `npm run typecheck`, and `npm test` passed (207 unit tests across 23 test suites); `npm run test:e2e` passed (43 passed, 1 skipped); browser compiler, execution runner, tutor storage unit suites, and full Playwright e2e suite all verified.
+
+### M17.1 — Scalable Curriculum Engine (implemented)
+
+- [x] Extend curriculum schema with versioned, validated models supporting multi-modal lessons: `theory`, `guided-coding`, `practical-exercise`, `interactive-simulation`, and `assessment`.
+- [x] Support structured theory sections, multiple code examples, interactive demonstration configurations (circuits, flowcharts, memory diagrams, state machines), and curated external resources without custom page implementations.
+- [x] Preserve all 13 existing C Programming Foundations lessons, course ID (`c-programming-foundations`), verified sample runs, and URLs with complete backward compatibility.
+- [x] Reusable lesson experience in `src/components/learning-experience.tsx`: adaptively switch between 2-panel (theory-only, no code workspace) and 3-panel (with code sandbox) layouts with independent scrolling and draggable splitters.
+- [x] Implement 4-state exercise progress tracking (`not-started`, `attempted`, `completed`, `needs-review`) in `src/lib/learning-progress.ts` with interactive controls in both Lesson view and Practice Lab.
+- [x] Backward-compatible progress storage: safe validation of legacy records without `exerciseProgress` and automated completion inference for completed lessons.
+- [x] Rich Kat AI tutor context integration: provide structured lesson metadata, theory sections, code examples, exercise details, hints, learner status, and enforce strict prompt boundary: Kat must never claim code execution without actual compiler results.
+- [x] Author comprehensive curriculum authoring guide, metadata specifications, publication checklist, and copy-pasteable reference lesson in `docs/CURRICULUM_AUTHORING.md`.
+- [x] Full verification: 213 unit tests passing across 23 test suites; 43 passing Playwright e2e browser tests; Next.js 16.4.5 production build clean.
+
+M17.1 verification on 2026-11-11: `npm run lint`, `npm run typecheck`, and `npm test` passed (213 unit tests across 23 test suites); `npm run test:e2e` passed (43 passed, 1 skipped); `npm run build` compiled cleanly.
+
+### M17.2 — Python Foundations Course (implemented)
+
+- [x] Authored complete Python Foundations course (`python-programming-foundations`, version `1.0.0`) in `src/lib/curriculum/python-foundations.ts`.
+- [x] Created `python-programming` subject and registered both C and Python courses in the published catalog.
+- [x] Structured 6 comprehensive modules and 16 ordered lessons:
+  - Module 1: Python Fundamentals and Dynamic Typing (2 lessons)
+  - Module 2: Input, Output, and Operators (3 lessons)
+  - Module 3: Control Flow and Logic (3 lessons)
+  - Module 4: Strings and Built-in Data Structures (3 lessons)
+  - Module 5: Functions, Scope, and Robustness (3 lessons)
+  - Module 6: Files, Modules, and Engineering Projects (2 lessons)
+- [x] Built complete educational components for all 16 lessons: clear learning objectives, prerequisites strictly validating DAG acyclic dependency, estimated durations, in-depth engineering theory sections, practical Python code examples, exercises with progressive hints, solutions, and conceptual checkpoints.
+- [x] Supported multiple lesson modalities: `theory`, `guided-coding`, `practical-exercise`, `interactive-simulation`, and `assessment`.
+- [x] Integrated seamlessly with learning progress tracking (`katalyst.learning.v1`), supporting enrollment, lesson progression, 4-state exercise statuses (`not-started`, `attempted`, `needs-review`, `completed`), and dual-course progress preservation.
+- [x] Verified Supabase cloud snapshot synchronization and guest migration for multi-course enrollment.
+- [x] Validated provider-independent Kat AI tutor context generation with Python lesson context and enforced prompt execution boundaries.
+- [x] Maintained strict runtime honesty: Python lessons cleanly utilize the 2-panel theory/practice layout without displaying or claiming an unconfigured WebAssembly execution sandbox.
+- [x] Preserved 100% backward compatibility for the C Foundations course (all 13 lessons, sample runs, and Wasmer compiler integration intact).
+
+M17.2 verification on 2026-11-11: `npm run lint` and `npm run typecheck` passed cleanly; `npm test` passed with 219 tests across 23 test suites; Playwright e2e browser tests passed; `npm run build` compiled cleanly.
+
+### M17.3 — Learning Experience Redesign, Curriculum Expansion & Execution Providers (implemented)
+
+- [x] **2-Panel Default Learning Workspace**:
+  - Theory / Lesson Guide (50%) on the left and Code Sandbox (50%) on the right.
+  - Kat AI tutor is closed by default to eliminate distraction and promote focused problem-solving.
+  - Added "Ask Kat" / "Hide Kat" workspace top-bar button and panel header close button.
+  - Toggling Kat dynamically switches into an accessible 3-panel layout (Theory 35%, Code 35%, Kat 30%) with draggable and keyboard-accessible splitters.
+  - Kat state is persisted across views and sessions in `katalyst.workspace.layout.v1` (`WorkspaceLayout.katOpen`).
+- [x] **Visual System & Compact Navigation Rail**:
+  - Replaced legacy burnt-orange palette with refined teal/cyan accents (`--signal: #0d9488` light, `#14b8a6` dark; `--action-primary-bg: #0f766e` light, `#14b8a6` dark) ensuring full WCAG AA contrast (>4.5:1).
+  - Deep graphite surfaces (`--surface-code: #1a1d21`) and high-contrast text (`--text-primary: #181a1b` light, `#f1f5f9` dark) for code editors, terminals, and code blocks in all themes.
+  - Compact navigation rail: 220px expanded, 58px collapsed icon rail with bottom avatar and accessible tooltips.
+- [x] **Redesigned Home & Course Discovery**:
+  - Home: quick-resume card (`Continue learning`), hero explanation of learning-first philosophy, 3-step "How KATALYST works" engineering workflow ("Learn concept -> Code in sandbox -> Review & ask Kat"), symmetric C and Python foundation cards with metrics, and Practice Lab teasers.
+  - Paths: symmetric course discovery grid with syllabus module summaries, duration, status badges, and prerequisites.
+- [x] **Expanded Curriculum Content**:
+  - C Programming Foundations: all 13 lessons enhanced with memory layout notes, pitfalls, `starterCode`, and multi-tier progressive hints.
+  - Python Programming Foundations: all 16 lessons across 6 modules enhanced with `starterCode` and progressive hints.
+  - Strictly preserved course IDs (`c-programming-foundations`, `python-programming-foundations`), lesson IDs, and URLs with zero disruption to user progress.
+- [x] **Execution Providers & Multi-Language Runner Subsystem**:
+  - Comprehensive architectural evaluation of Pyodide, Wasmer, Judge0 CE, JDoodle, OneCompiler, and Piston documented in `docs/COMPILER_ARCHITECTURE.md`.
+  - Provider-neutral runner subsystem in `src/lib/execution/`: `WasmerCRunner` for C11 browser WebAssembly and `PyodidePythonRunner` for Python 3.12 WebAssembly micro-runtime.
+  - Dedicated runner test suite in `tests/execution.test.ts`.
+- [x] **CodeMirror 6 Multi-Language Editor**:
+  - Evaluated CodeMirror 6 vs Monaco Editor (bundle size, mobile responsiveness, SSR, accessibility) in `docs/COMPILER_ARCHITECTURE.md`.
+  - Implemented `src/components/code-workspace.tsx` with CodeMirror 6, line numbers, dark graphite theme, C/C++ and Python stream tokenizers, Run/Stop controls, and stdin/output panes.
+- [x] **Full Verification**:
+  - `npm run lint` — passed with 0 errors and 0 warnings.
+  - `npm run typecheck` — passed with 0 errors.
+  - `npm test` — passed with 222 tests across 23 test suites.
+  - `npm run test:e2e` — passed with 44 browser tests (1 skipped).
+  - `npm run build` — passed with Next.js 16.4.5 production output.
+
+M17.3 verification on 2026-11-11: `npm run lint`, `npm run typecheck`, and `npm test` passed (222 unit tests across 23 test suites); `npm run test:e2e` passed (44 passed, 1 skipped); `npm run build` compiled cleanly.
+
+### M17.4 — Theme Override, Unified Multi-Language Playground & Runtime Audit (implemented)
+
+- [x] **Cohesive Theme Override & Contrast Hardening**:
+  - Replaced legacy palette tokens in `src/app/globals.css` with a high-contrast modern engineering theme across Light and Dark modes.
+  - Light mode: `--surface-canvas: #f8fafc`, `--surface-primary: #ffffff`, `--surface-secondary: #f1f5f9`, `--border-subtle: #e2e8f0`, `--text-primary: #0f172a`, `--text-secondary: #334155`, `--accent-primary: #2563eb`, `--accent-hover: #1d4ed8`.
+  - Dark mode: `--surface-canvas: #0b0e14`, `--surface-primary: #111620`, `--surface-secondary: #161c28`, `--border-subtle: #263042`, `--text-primary: #f8fafc`, `--text-secondary: #cbd5e1`, `--accent-primary: #38bdf8`, `--accent-hover: #7dd3fc`.
+  - Fixed dark mode contrast bugs by eliminating misplaced `var(--surface-warning)` overrides from workspace panels, editor panes, output panels, headers, navigation bars, and mobile tabsets.
+  - Fixed `.suggestion:hover` stark white background bug and `.project-active .project-dot` legacy rust color.
+  - Updated design documentation in `docs/DESIGN.md` with complete token tables and interaction principles.
+- [x] **Unified Multi-Language Playground**:
+  - Replaced "C Playground" in navigation rail, breadcrumbs, and page headers with a unified "Playground".
+  - Top Language Selector Bar inside Playground supporting C (C11 · Wasmer WebAssembly), Python (3.12 · Pyodide WebAssembly), and extensible future runtimes (JavaScript ES2024, Circuits SPICE).
+  - CodeMirror dynamic language reconfiguration via `Compartment` (`cpp()` vs `pythonStreamParser`) without losing editor state or remounting components.
+  - Independent draft persistence: `katalyst.c.playground.v1` for C and `katalyst.python.playground.v1` for Python via `src/lib/python-playground.ts`.
+  - Full execution support for Python programs via `executeProgram`, handling stdin normalization, execution progress, timeout protection, stdout/stderr capture, and runtime error diagnosis.
+- [x] **M17.4 Runtime & Workspace Verification Audit**:
+  - Fully verified real in-browser execution with Wasmer C and Pyodide Python.
+  - Verified stdin/stdout normalization across both languages (`scanf` and `input()`).
+  - Unit test suite expanded with `tests/python-playground.test.ts` (225 passing tests across 24 test suites).
+  - Full Playwright E2E browser suite verified across all themes and viewports.
+
+M17.4 verification on 2026-11-12: `npm run lint`, `npm run typecheck`, and `npm test` passed (225 unit tests across 24 test suites); `npm run test:e2e` passed; `npm run build` compiled cleanly.
+
+### M18 — Automated Exercise Verifier & Surgical UI Lock-In (implemented)
+
+- [x] **Surgical UI Lock-In & Contrast Hardening**:
+  - Forced explicit high-contrast colors in `[data-theme="dark"]` for left sidebar nav links and icons (`#d4d4d8`), active items (`rgba(59, 130, 246, 0.16)` / `#60a5fa`), and section headings (`#a1a1aa`).
+  - Replaced bright green styling on top-bar credits badge with clean neutral/blue badge (`background: var(--bg-subtle); border: 1px solid var(--border); color: var(--text-primary); cursor: pointer;`).
+  - Replaced all remaining occurrences of `Georgia` and `serif` in `src/app/globals.css` with clean sans-serif typography (`Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`).
+  - Completely isolated Python playground drafts from C lessons: prevented synchronous dispatch draft leak during language switching via `isSwitchingRef`, cleansed corrupted C drafts on mount, and ensured lesson mode strictly mounts with the lesson's language starter/example code.
+- [x] **Curriculum Test Cases Schema & Authoring**:
+  - Added optional `testCases: ExerciseTestCase[]` to `LearningExercise` in `src/lib/learning-curriculum.ts` and updated Zod validation schema.
+  - Added concrete test cases with stdin, expectedStdout, and matchMode (`exact`, `trimmed`, `contains`, `hidden`) to runnable exercises in `c-programming-foundations` (`trace-hello`, `choose-a-type`, `read-two-values`) and `python-programming-foundations` (`ex-py-first-script`, `ex-py-sensor-variables`, `ex-py-fahrenheit-converter`).
+- [x] **Automated Test Runner Utility**:
+  - Implemented `verifyExerciseSubmission` in `src/lib/exercise-verifier.ts` executing through provider-neutral `executeProgram`.
+  - Cross-platform output normalization (`\r\n` to `\n`), comparison modes (`exact`, `trimmed`, `contains`), and compiler short-circuiting.
+  - Private test case masking (`maskHiddenTestCase`) protecting evaluation details in learner UI.
+- [x] **Interactive Exercise Verification UI**:
+  - Embedded Automated Verifier in `src/components/learning-experience.tsx` with "Verify Solution" button, loading spinner, test result cards, pass/fail status indicators, and diff comparisons.
+  - Auto-updates exercise progress to `completed` on pass or `attempted` on fail in `katalyst.learning.v1`.
+- [x] **Full Verification**:
+  - Added unit test suite `tests/exercise-verifier.test.ts` (9 tests passing).
+  - All 234 unit tests passing across 25 test suites.
+  - Next.js production build compiling cleanly.
+
+M18 verification on 2026-11-12: `npm run lint`, `npm run typecheck`, and `npm test` passed (234 unit tests across 25 test suites); `npm run build` compiled cleanly.
+
+### M19 — Full-Scale Engineering Platform Expansion (implemented)
+
+- [x] **Pillar 1: Curriculum Expansion & 100% Automated Verification**:
+  - Expanded C Programming Foundations (`c-programming-foundations`) with Module 6 (*Systems & Low-Level Engineering*) including 3 new lessons (`bitwise-registers`, `dynamic-memory`, `function-pointers`), bringing C to 16 lessons across 6 modules.
+  - Expanded Python Programming Foundations (`python-programming-foundations`) with Module 7 (*Object-Oriented Systems & Algorithmic Efficiency*) including 3 new lessons (`py-classes-and-encapsulation`, `py-inheritance-dataclasses`, `py-algorithms-and-generators`), bringing Python to 19 lessons across 7 modules.
+  - Authored Course 3: JavaScript & Algorithmic Systems (`js-systems-algorithms`) in `src/lib/curriculum/javascript-algorithms.ts` (10 lessons across 4 modules).
+  - Authored Course 4: Digital Logic & Circuit Foundations (`digital-logic-circuits`) in `src/lib/curriculum/digital-circuits.ts` (8 lessons across 3 modules with interactive simulation configs).
+  - Added runnable `testCases` (with stdin, expectedStdout, and `hidden: true` tests) across all 53 exercises in all 4 courses.
+  - Implemented `JavaScriptWorkerRunner` in `src/lib/execution/js-runner.ts` using isolated Web Workers with Node.js fallback, console stream capture, and timeout safeguards.
+- [x] **Pillar 2: Interactive Engineering Visualizers**:
+  - `src/components/simulators/memory-visualizer.tsx`: Visualizes stack frames (downward growth, variable names, hex addresses, pointer reference arrows) and heap memory blocks (`malloc`/`free`, leaked block warnings, dangling pointer alerts, step-by-step memory lifecycle navigation).
+  - `src/components/simulators/circuit-simulator.tsx`: Digital logic mode (interactive switches, AND/OR/NOT/NAND/NOR/XOR gates, live wire state visualization, live truth table) and Analog mode (interactive V, R, C sliders, Ohm's law metrics, dynamic SVG capacitor charging curves).
+  - Integrated into lesson `interactiveDemo` views and Playground runtime selector.
+- [x] **Pillar 3: Inline Compiler Diagnostics & Kat Error Bridge**:
+  - Implemented `parseDiagnostics` in `src/lib/execution/diagnostics-parser.ts` parsing Clang/GCC C11, Python tracebacks, and JavaScript syntax/runtime errors into structured diagnostic objects (`{ line, column, severity, message }`).
+  - Added inline diagnostic warning banners in `src/components/code-workspace.tsx` with a one-click **"Ask Kat to Explain Error"** action bridging error context directly into the AI tutor panel.
+- [x] **Pillar 4: Upgraded Practice Lab & Mastery Tracking**:
+  - Upgraded Practice Lab into Challenge Hub with multi-course filter pills (All, C, Python, JavaScript, Digital Circuits) and difficulty filters (All, Beginner, Intermediate, Advanced).
+  - Added engineering XP model (`+50 XP` per verified exercise, `+25 XP` per completed lesson) and engineering ranks (Cadet Engineer to Staff Systems Architect) in `src/lib/learning-progress.ts`.
+  - Added Engineering Mastery progress card to Home and Progress views.
+- [x] **Full Verification**:
+  - Added unit test suites `tests/diagnostics-parser.test.ts` (6 tests) and `tests/js-runner.test.ts` (6 tests).
+  - All 249 unit tests passing across 27 test suites.
+  - Playwright E2E suite (45 passing tests, 1 skipped).
+  - Next.js production build compiling cleanly with zero errors.
+
+M19 verification on 2026-11-12: `npm run lint`, `npm run typecheck`, and `npm test` passed (249 unit tests across 27 test suites); `npm run test:e2e` passed (45 passed, 1 skipped); `npm run build` compiled cleanly.
+
+### M20 — M19 E2E Verification, Runtime Hardening & MVP Deployment Readiness (implemented)
+
+- [x] **Playwright E2E Coverage for M19 Platform Features (`e2e/m19-features.spec.ts`)**:
+  - Implemented 5 dedicated browser tests:
+    - 4-Course Catalog Discovery & Navigation (C, Python, JavaScript, Digital Logic).
+    - JavaScript Web Worker Execution & Automated Exercise Verifier.
+    - Interactive Simulators (Circuit Simulator toggle switches/LEDs and Memory Visualizer multi-step memory lifecycle).
+    - Inline Compiler Diagnostics & Kat Error Bridge (pre-populates Kat AI tutor drawer with diagnostic context).
+    - Challenge Hub Multi-Course & Difficulty Filters.
+  - All 5 tests passing in Chromium.
+- [x] **Simulator & Workspace Error Boundary (`src/components/simulators/simulator-error-boundary.tsx`)**:
+  - Wrapped `MemoryVisualizer` and `CircuitSimulator` in React Error Boundaries to prevent unexpected simulator state exceptions from crashing the lesson reading panel or playground.
+  - Hardened teardown guards in `src/components/c-playground.tsx` against unmounted client instances.
+- [x] **Legacy Progress Migration Safety (`src/lib/learning-progress.ts`)**:
+  - Guaranteed seamless backward compatibility for older `katalyst.learning.v1` local storage records lacking `verifiedExerciseIds`, defaulting cleanly to `[]`.
+  - Accurately computes XP and rank from legacy `completedLessons` and explicit `exerciseProgress` records without schema errors or data loss.
+  - Added unit test in `tests/learning-progress.test.ts`.
+- [x] **Production Health Check Endpoint (`src/app/api/health/route.ts`)**:
+  - Added lightweight `GET /api/health` returning `{ ok: true, status: "healthy", coursesCount: 4, services: { cloudflareConfigured: boolean, supabaseConfigured: boolean } }`.
+  - Zero private credential or token exposure in response payload.
+  - Added unit test in `tests/health-route.test.ts`.
+- [x] **MVP Deployment Readiness (`docs/DEPLOYMENT.md`)**:
+  - Documented automated health check endpoint, 4-course verification runbook, and WebAssembly / Web Worker cross-origin isolation (COOP/COEP) constraints.
+- [x] **Full Verification**:
+  - All 251 unit tests passing across 28 test suites.
+  - All 50 Playwright E2E tests passing (45 passed + 1 skipped in `workspace.spec.ts`, 5 passed in `m19-features.spec.ts`).
+  - Next.js production build compiling cleanly with zero errors.
+
+M20 verification on 2026-11-13: `npm run lint`, `npm run typecheck`, and `npm test` passed (251 unit tests across 28 test suites); `npx playwright test e2e/m19-features.spec.ts` passed (5 passed); `npx playwright test e2e/workspace.spec.ts` passed (45 passed, 1 skipped); `npm run build` compiled cleanly.
+
 ### Future planning (not started)
 
 - Verify a configured Google/Supabase deployment before claiming live account functionality. Review rate limits and provider billing before exposing AI routes publicly.

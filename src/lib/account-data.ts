@@ -4,6 +4,12 @@ import { DEFAULT_USER_PREFERENCES, readUserPreferences, type UserPreferences } f
 import { sanitizeImportedSkill } from "@/lib/skills";
 import { MAX_LOCAL_WORKSPACE_BYTES, readLocalWorkspace, serializeLocalWorkspace } from "@/lib/workspace-storage";
 import { applyBackup, workspaceSchema, type WorkspaceData } from "@/lib/workspace-portability";
+import {
+  TUTOR_STORAGE_KEY,
+  tutorStoreSchema,
+  MAX_TUTOR_CONVERSATIONS,
+  type TutorStore,
+} from "@/lib/tutor-storage";
 
 export const ACCOUNT_SNAPSHOT_MAX_BYTES = 9_000_000;
 export const ACCOUNT_LOCAL_CHANGE_EVENT = "katalyst:account-local-data-changed";
@@ -16,6 +22,7 @@ export type AccountSnapshot = {
   workspace: WorkspaceData;
   learningProgress: LearningProgress;
   preferences: UserPreferences;
+  tutorStore?: TutorStore;
 };
 
 export type AccountActiveMarker = { userId: string; revision: number; snapshotHash: string };
@@ -24,6 +31,7 @@ const accountSnapshotShape = z.object({
   workspace: workspaceSchema,
   learningProgress: z.unknown(),
   preferences: z.unknown(),
+  tutorStore: z.unknown().optional(),
 }).strict();
 
 export function parseAccountSnapshot(value: unknown): AccountSnapshot {
@@ -44,7 +52,18 @@ export function parseAccountSnapshot(value: unknown): AccountSnapshot {
   const preferences = readUserPreferences(JSON.stringify(parsed.data.preferences));
   if (preferences.kind !== "valid") throw new Error("Appearance preferences are invalid or use an unsupported version.");
 
-  const snapshot = { workspace, learningProgress: learningProgress.progress, preferences: preferences.preferences };
+  let tutorStore: TutorStore | undefined;
+  if (parsed.data.tutorStore !== undefined) {
+    const parsedTutor = tutorStoreSchema.safeParse(parsed.data.tutorStore);
+    if (parsedTutor.success) tutorStore = parsedTutor.data;
+  }
+
+  const snapshot: AccountSnapshot = {
+    workspace,
+    learningProgress: learningProgress.progress,
+    preferences: preferences.preferences,
+    ...(tutorStore ? { tutorStore } : {}),
+  };
   if (new TextEncoder().encode(JSON.stringify(snapshot)).byteLength > ACCOUNT_SNAPSHOT_MAX_BYTES) {
     throw new Error("The account snapshot exceeds the supported 9 MB limit.");
   }
@@ -76,10 +95,22 @@ export function readAccountSnapshotFromStorage(storage: Pick<Storage, "getItem">
   const preferences = readUserPreferences(preferencesRaw);
   if (preferences.kind !== "valid" && preferences.kind !== "missing") throw new Error("Resolve the saved appearance preference issue before moving this data to an account.");
 
+  const tutorRaw = storage.getItem(TUTOR_STORAGE_KEY);
+  let tutorStore: TutorStore | undefined;
+  if (tutorRaw) {
+    try {
+      const parsedTutor = tutorStoreSchema.safeParse(JSON.parse(tutorRaw));
+      if (parsedTutor.success) tutorStore = parsedTutor.data;
+    } catch {
+      // Ignore corrupt tutor storage in snapshot assembly
+    }
+  }
+
   return parseAccountSnapshot({
     workspace,
     learningProgress: progress.progress,
     preferences: preferences.preferences,
+    ...(tutorStore ? { tutorStore } : {}),
   });
 }
 
@@ -92,6 +123,9 @@ export function writeAccountSnapshotToStorage(storage: Pick<Storage, "setItem">,
   storage.setItem("katalyst.workspace.v1", workspaceJson);
   storage.setItem("katalyst.learning.v1", progressJson);
   storage.setItem("katalyst.preferences.v1", preferencesJson);
+  if (snapshot.tutorStore) {
+    storage.setItem(TUTOR_STORAGE_KEY, JSON.stringify(snapshot.tutorStore));
+  }
   if (typeof window !== "undefined") window.dispatchEvent(new Event(ACCOUNT_SNAPSHOT_APPLIED_EVENT));
   return snapshot;
 }
@@ -143,10 +177,22 @@ export function mergeAccountSnapshots(
     });
   }
 
+  const tutorStore: TutorStore | undefined = account.tutorStore || guest.tutorStore
+    ? {
+        version: 1 as const,
+        activeConversationId: account.tutorStore?.activeConversationId ?? guest.tutorStore?.activeConversationId ?? "conv-general",
+        conversations: [
+          ...(account.tutorStore?.conversations ?? []),
+          ...(guest.tutorStore?.conversations ?? []).filter((gc) => !account.tutorStore?.conversations.some((ac) => ac.id === gc.id)),
+        ].slice(0, MAX_TUTOR_CONVERSATIONS),
+      }
+    : undefined;
+
   const learningProgress = { version: 1 as const, enrollments: [...progressByPath.values()] };
   return parseAccountSnapshot({
     workspace,
     learningProgress,
     preferences: preferenceSource === "guest" ? guest.preferences : account.preferences,
+    ...(tutorStore ? { tutorStore } : {}),
   });
 }

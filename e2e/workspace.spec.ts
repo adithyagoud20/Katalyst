@@ -10,7 +10,8 @@ async function openWorkspace(page: import("@playwright/test").Page) {
 
 async function openSettingsCategory(page: import("@playwright/test").Page, category: string) {
   await page.getByRole("button", { name: "Open settings", exact: true }).click();
-  await page.getByRole("tab", { name: category, exact: true }).click();
+  const targetCategory = category === "AI Providers" || category === "Models" ? "AI & Models" : category;
+  await page.getByRole("tab", { name: targetCategory, exact: true }).click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -352,7 +353,7 @@ test("keeps a fully collapsed, accessible icon rail at desktop and tablet widths
     const sidebar = page.locator(".sidebar");
     await page.getByRole("button", { name: "Collapse navigation" }).click();
     await expect(sidebar).toHaveClass(/sidebar-collapsed/);
-    await expect.poll(() => sidebar.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(76);
+    await expect.poll(() => sidebar.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(48);
     await expect(page.getByRole("button", { name: "Expand navigation" })).toBeVisible();
     await expect(sidebar.getByRole("button", { name: "Learning Home" })).toHaveAttribute("title", "Learning Home");
     await expect(sidebar.getByRole("button", { name: "Workspace", exact: true })).toHaveAttribute("title", "Workspace");
@@ -371,7 +372,7 @@ test("keeps a fully collapsed, accessible icon rail at desktop and tablet widths
     const dimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
     expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
     await page.getByRole("button", { name: "Expand navigation" }).click();
-    await expect.poll(() => sidebar.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(252);
+    await expect.poll(() => sidebar.evaluate((element) => Math.round(element.getBoundingClientRect().width))).toBe(220);
   }
 });
 
@@ -388,22 +389,22 @@ test("keeps the editor and rendered lesson code dark in both appearance themes",
   const editor = page.locator(".c-source-editor-host .cm-editor");
   const terminal = page.locator(".learning-code-panel .c-console-output");
   const codeBlock = page.locator(".lesson-copy .markdown-code-block").first();
-  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(37, 39, 36)");
-  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(245, 241, 232)");
-  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(37, 39, 36)");
-  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(245, 241, 232)");
-  await expect.poll(() => codeBlock.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(37, 39, 36)");
-  await expect.poll(() => codeBlock.locator(".markdown-code-heading").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(51, 49, 46)");
+  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(26, 29, 33)");
+  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(230, 237, 243)");
+  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(26, 29, 33)");
+  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(230, 237, 243)");
+  await expect.poll(() => codeBlock.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(26, 29, 33)");
+  await expect.poll(() => codeBlock.locator(".markdown-code-heading").evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(34, 38, 43)");
 
   await page.getByRole("button", { name: "Open settings", exact: true }).click();
   await page.getByRole("button", { name: "Dark", exact: true }).click();
   await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
   await page.getByRole("button", { name: /start learning|continue this course/i }).click();
-  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(23, 25, 22)");
-  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(242, 238, 229)");
-  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(23, 25, 22)");
-  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(242, 238, 229)");
-  await expect.poll(() => codeBlock.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(23, 25, 22)");
+  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(18, 21, 25)");
+  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(241, 245, 249)");
+  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(18, 21, 25)");
+  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(241, 245, 249)");
+  await expect.poll(() => codeBlock.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(18, 21, 25)");
   const dimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
   expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
 });
@@ -417,7 +418,7 @@ test("shows expected example output without horizontal page overflow in both the
   const expectedOutput = page.locator(".lesson-example-run");
   await expect(expectedOutput).toContainText("Hello, C!");
 
-  for (const [theme, expectedBackground] of [["Light", "rgb(170, 75, 47)"], ["Dark", "rgb(150, 71, 47)"]] as const) {
+  for (const [theme, expectedBackground] of [["Light", "rgb(37, 99, 235)"], ["Dark", "rgb(59, 130, 246)"]] as const) {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByRole("button", { name: "Open settings", exact: true }).click();
     await page.getByRole("button", { name: theme, exact: true }).click();
@@ -446,6 +447,65 @@ test("shows expected example output without horizontal page overflow in both the
       await expect(expectedOutput).toBeVisible();
     }
   }
+});
+
+test("verifies dark mode contrast, readability, and absence of legacy green tones across views", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+
+  await page.getByRole("button", { name: "Open settings", exact: true }).click();
+  await page.getByRole("button", { name: "Dark", exact: true }).click();
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "dark");
+
+  const checkContrastAndLegibility = async (viewName: string) => {
+    const parse = (val: string) => val.match(/\d+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
+    const shellBg = await page.locator(".app-shell").evaluate((el) => getComputedStyle(el).backgroundColor);
+    const [r, g, b] = parse(shellBg);
+    expect(r, `${viewName} shell bg red`).toBeLessThan(40);
+    expect(g, `${viewName} shell bg green`).toBeLessThan(40);
+    expect(b, `${viewName} shell bg blue`).toBeLessThan(40);
+
+    const headings = page.locator("h1, h2");
+    const headingCount = await headings.count();
+    for (let i = 0; i < Math.min(headingCount, 4); i++) {
+      const heading = headings.nth(i);
+      if (await heading.isVisible()) {
+        const text = (await heading.textContent())?.trim();
+        if (text) {
+          const color = await heading.evaluate((el) => getComputedStyle(el).color);
+          const [hr, hg, hb] = parse(color);
+          expect(hr, `${viewName} heading "${text}" red`).toBeGreaterThan(180);
+          expect(hg, `${viewName} heading "${text}" green`).toBeGreaterThan(180);
+          expect(hb, `${viewName} heading "${text}" blue`).toBeGreaterThan(180);
+        }
+      }
+    }
+
+    const legacyGreens = ["rgb(15, 118, 110)", "rgb(20, 184, 166)", "rgb(13, 148, 136)", "rgb(45, 212, 191)"];
+    const elementsWithLegacyColor = await page.evaluate((greens) => {
+      const all = Array.from(document.querySelectorAll("button, a, span, p, h1, h2, div"));
+      return all.some((el) => {
+        const style = window.getComputedStyle(el);
+        return greens.includes(style.backgroundColor) || greens.includes(style.color);
+      });
+    }, legacyGreens);
+    expect(elementsWithLegacyColor, `${viewName} has no legacy green colors`).toBe(false);
+  };
+
+  await checkContrastAndLegibility("Settings");
+
+  await page.getByRole("button", { name: "Learning Home", exact: true }).click();
+  await checkContrastAndLegibility("Learning Home");
+
+  await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
+  await checkContrastAndLegibility("Explore");
+
+  await page.getByRole("button", { name: /start learning|continue this course/i }).first().click();
+  await checkContrastAndLegibility("Lesson Workspace");
+
+  await page.getByRole("button", { name: "Playground", exact: true }).click();
+  await checkContrastAndLegibility("Playground");
 });
 
 test("dismisses provider and model pickers outside and with Escape while preserving menu interaction", async ({ page }) => {
@@ -483,14 +543,12 @@ test("renders one settings category and preserves category selection across app 
   await expect(page.getByRole("heading", { name: "Appearance" })).toBeVisible();
   await expect(page.locator(".settings-card")).toHaveCount(1);
 
-  await page.getByRole("tab", { name: "AI Providers" }).click();
-  await expect(page.getByRole("heading", { name: "AI Providers" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Models", exact: true })).toHaveCount(0);
+  await page.getByRole("tab", { name: "AI & Models" }).click();
+  await expect(page.getByRole("heading", { name: "AI & Models" })).toBeVisible();
   await expect(page.locator(".settings-section-nav")).toHaveCSS("position", "static");
 
-  await page.getByRole("tab", { name: "Models" }).click();
-  await expect(page.getByRole("heading", { name: "Models", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "AI Providers" })).toHaveCount(0);
+  await page.getByRole("tab", { name: "Usage & Credits" }).click();
+  await expect(page.getByRole("heading", { name: "Usage & Credits" })).toBeVisible();
   await page.getByRole("tab", { name: "Workspace" }).click();
   await expect(page.getByRole("heading", { name: "Workspace", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Learning Home" }).click();
@@ -504,7 +562,7 @@ test("keeps the C Playground usable on a phone viewport", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
   await page.getByRole("button", { name: "Open navigation" }).click();
-  await page.getByRole("button", { name: "C Playground", exact: true }).click();
+  await page.getByRole("button", { name: "Playground", exact: true }).click();
   await expect.poll(() => page.locator(".sidebar").evaluate((element) => element.getBoundingClientRect().right)).toBeLessThanOrEqual(0);
   await expect(page.getByRole("heading", { name: "C Workbench" })).toBeVisible();
   await expect(page.getByLabel("C source code")).toBeVisible();
@@ -520,7 +578,7 @@ test("fits the C Workbench at desktop, laptop, tablet, and mobile widths", async
     await page.setViewportSize(viewport);
     await page.goto("/");
     if (viewport.width <= 760) await page.getByRole("button", { name: "Open navigation" }).click();
-    await page.getByRole("button", { name: "C Playground", exact: true }).click();
+    await page.getByRole("button", { name: "Playground", exact: true }).click();
     await expect(page.locator(".c-editor-pane")).toBeVisible();
     const layout = await page.evaluate(() => {
       const editor = document.querySelector(".c-editor-pane")!.getBoundingClientRect();
@@ -653,13 +711,13 @@ test("starts the C learning path and records progress independently of the works
   await page.getByRole("button", { name: /mark lesson complete/i }).click();
   await expect(page.getByRole("button", { name: /lesson completed/i })).toBeVisible();
   await page.getByRole("button", { name: "Progress", exact: true }).click();
-  await expect(page.getByText("1 of 13 lessons", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 of 53 lessons", { exact: true })).toBeVisible();
   await page.waitForFunction(() => window.localStorage.getItem("katalyst.learning.v1")?.includes("source-to-output") === true);
   expect(await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"))).toBe(workspaceBefore);
 
   await page.reload();
   await page.getByRole("button", { name: "My Learning", exact: true }).click();
-  await expect(page.locator(".my-learning-row")).toContainText("1 of 13 lessons complete");
+  await expect(page.locator(".my-learning-row")).toContainText("1 of 16 lessons complete");
 });
 
 test("keeps the integrated lesson workspace and Practice Lab within a phone viewport", async ({ page }) => {
@@ -667,8 +725,8 @@ test("keeps the integrated lesson workspace and Practice Lab within a phone view
   await page.goto("/");
   await page.getByRole("button", { name: "Open navigation" }).click();
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
-  await expect(page.getByText("13 LESSONS", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "13 lessons. 5 modules." })).toBeVisible();
+  await expect(page.getByText("16 LESSONS", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "16 lessons. 6 modules." })).toBeVisible();
   const courseDimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
   expect(courseDimensions.document).toBeLessThanOrEqual(courseDimensions.viewport);
   await page.getByRole("button", { name: /start learning/i }).click();
@@ -704,7 +762,7 @@ test("keeps the integrated lesson workspace and Practice Lab within a phone view
 test("navigates the expanded course and renders exercise metadata and starter code", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
-  await expect(page.getByRole("heading", { name: "13 lessons. 5 modules." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "16 lessons. 6 modules." })).toBeVisible();
   await page.getByRole("button", { name: /start learning/i }).click();
   const pagination = page.getByRole("navigation", { name: "Lesson navigation" });
   for (let index = 0; index < 4; index += 1) await pagination.getByRole("button").last().click();
@@ -714,7 +772,7 @@ test("navigates the expanded course and renders exercise metadata and starter co
   await expect(page.getByRole("heading", { name: "Work with C strings" })).toBeVisible();
   await expect(page.locator(".lesson-checkpoint")).toContainText("What marks the end of a C string");
   await page.getByRole("button", { name: "Practice Lab", exact: true }).click();
-  await expect(page.locator(".practice-card")).toHaveCount(13);
+  await expect(page.locator(".practice-card")).toHaveCount(16);
   await expect(page.locator(".practice-card").filter({ hasText: "Read and report a value" })).toContainText("Practice goal:");
   await expect(page.locator(".practice-card").filter({ hasText: "Read and report a value" }).getByText("View starter code")).toBeVisible();
 });
@@ -747,6 +805,7 @@ test("routes lesson, code, and tutor-style context through integrated Kat withou
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
   await page.getByRole("button", { name: /start learning/i }).click();
+  await page.getByRole("button", { name: "Ask Kat", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Kat", exact: true })).toBeVisible();
   await expect(page.locator(".tutor-context-note")).toContainText("lesson and coding activity when they help answer your question");
   await page.getByRole("button", { name: "Socratic tutor" }).click();
@@ -817,6 +876,7 @@ test("keeps Kat's composer below the message scroller and preserves an upward re
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
   await page.getByRole("button", { name: /start learning/i }).click();
+  await page.getByRole("button", { name: "Ask Kat", exact: true }).click();
   const tutor = page.getByRole("region", { name: "AI Tutor Kat" });
   const conversation = tutor.locator(".tutor-conversation");
   const input = tutor.getByRole("textbox", { name: "Ask Kat a question" });
@@ -1199,35 +1259,80 @@ test("records real AI request metadata and reports it in the local Progress dash
   await expect(page.locator(".ai-dashboard-section")).toContainText("OpenAI");
   await expect(page.locator(".ai-dashboard-section")).toContainText("18 input tokens reported in 1 request");
   await expect(page.locator(".ai-dashboard-section")).toContainText("6 output tokens reported in 1 request");
-  await expect(page.locator(".dashboard-metrics")).toContainText("0 of 13 lessons");
+  await expect(page.locator(".dashboard-metrics")).toContainText("0 of 53 lessons");
   await expect(page.getByText("Local analytics · not synced")).toBeVisible();
 });
 
-test("allows natural mouse-wheel scrolling through the desktop lesson workspace", async ({ page }) => {
+test("supports independent panel scrolling and layout in the desktop lesson workspace", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
   await page.getByRole("button", { name: /start learning/i }).click();
   await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
   await expect(page.locator(".c-source-editor-host .cm-editor")).toBeVisible();
-  await page.screenshot({ path: "work/katalyst-m10-lesson-desktop.png", fullPage: true });
-  const scrollBefore = await page.locator(".learning-view").evaluate((element) => ({ top: element.scrollTop, client: element.clientHeight, content: element.scrollHeight }));
-  expect(scrollBefore.content).toBeGreaterThan(scrollBefore.client);
-  await page.mouse.move(250, 450);
-  await page.mouse.wheel(0, 540);
-  await expect.poll(() => page.locator(".learning-view").evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
-  await expect(page.locator(".learning-panel")).toHaveCSS("overflow-y", "visible");
+  await page.screenshot({ path: "work/katalyst-m16-lesson-desktop.png", fullPage: true });
+
+  const theoryPanel = page.locator(".learning-panel");
+  await expect(theoryPanel).toHaveCSS("overflow-y", "auto");
   await expect(page.locator(".learning-code-panel")).toBeVisible();
+
+  // In M17.3, Kat is optional and closed by default (2-panel layout)
+  await expect(page.locator(".workspace-splitter")).toHaveCount(1);
+  await page.getByRole("button", { name: "Ask Kat", exact: true }).click();
+
+  // With Kat open, 3-panel layout is active
   await expect(page.locator(".learning-kat-panel")).toBeVisible();
+
+  const composer = page.locator(".learning-kat-panel .integrated-tutor-panel .tutor-composer");
+  await expect(composer).toBeVisible();
   const tutorPanel = page.locator(".learning-kat-panel .integrated-tutor-panel");
-  const tutorPanelBottom = await tutorPanel.evaluate((element) => element.getBoundingClientRect().bottom);
-  const tutorFootnoteBottom = await page.getByRole("region", { name: "AI Tutor Kat" }).locator(".tutor-footnote").evaluate((element) => element.getBoundingClientRect().bottom);
-  expect(tutorFootnoteBottom).toBeLessThanOrEqual(tutorPanelBottom + 1);
-  await expect(page.locator(".learning-workspace-header")).toHaveCSS("position", "static");
-  const columns = await page.locator(".learning-workspace-grid").evaluate((element) => getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).map((value) => Number.parseFloat(value)));
-  expect(columns).toHaveLength(3);
-  expect(columns[0] / columns.reduce((sum, value) => sum + value, 0)).toBeGreaterThan(0.24);
-  expect(columns[0] / columns.reduce((sum, value) => sum + value, 0)).toBeLessThan(0.31);
-  expect(columns[1] / columns.reduce((sum, value) => sum + value, 0)).toBeGreaterThan(0.39);
-  expect(columns[2] / columns.reduce((sum, value) => sum + value, 0)).toBeGreaterThan(0.27);
+  const tutorPanelBottom = await tutorPanel.evaluate((el) => el.getBoundingClientRect().bottom);
+  const composerBottom = await composer.evaluate((el) => el.getBoundingClientRect().bottom);
+  expect(composerBottom).toBeLessThanOrEqual(tutorPanelBottom + 2);
+
+  const splitters = page.locator(".workspace-splitter");
+  await expect(splitters).toHaveCount(2);
+  await expect(splitters.first()).toHaveAttribute("role", "separator");
+});
+
+test("isolates admin settings from regular users and guests", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open settings" }).click();
+  await expect(page.getByRole("tab", { name: "Admin" })).toHaveCount(0);
+  await expect(page.locator(".kill-switch-toggle")).toHaveCount(0);
+});
+
+test("displays shared gateway status, credits, and BYOK zero-credit notice in Usage & Credits", async ({ page }) => {
+  await page.goto("/");
+  await openSettingsCategory(page, "Usage & Credits");
+  await expect(page.getByRole("heading", { name: "Usage & Credits" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Shared AI Gateway" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Bring Your Own Key (BYOK)" })).toBeVisible();
+  await expect(page.getByText("0 credits", { exact: true })).toBeVisible();
+});
+
+test("navigates Python Programming Foundations course and verifies 2-panel layout", async ({ page }) => {
+  await page.goto("/#katalyst=paths");
+  await expect(page.getByRole("heading", { name: "Build a foundation" })).toBeVisible();
+
+  // Select Python course from the choice grid
+  await page.getByRole("button", { name: /Python Programming Foundations/i }).click();
+  await expect(page.getByRole("heading", { name: "Python Programming Foundations" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "19 lessons. 7 modules." })).toBeVisible();
+
+  await page.getByRole("button", { name: /start learning/i }).click();
+  await expect(page.getByRole("heading", { name: "From script to interpreter" })).toBeVisible();
+
+  // In M17.3, Python lessons use the multi-language code sandbox with Pyodide
+  await expect(page.locator("#code-panel")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run Python" })).toBeVisible();
+  await expect(page.getByRole("tabpanel", { name: "Lesson and course content" })).toBeVisible();
+
+  // Kat AI is optional and togglable
+  await page.getByRole("button", { name: "Ask Kat", exact: true }).click();
+  await expect(page.getByRole("tabpanel", { name: "Kat AI tutor" })).toBeVisible();
+
+  // Mark lesson complete
+  await page.getByRole("button", { name: /mark lesson complete/i }).click();
+  await expect(page.getByRole("button", { name: /lesson completed/i })).toBeVisible();
 });

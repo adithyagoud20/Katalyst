@@ -1,5 +1,179 @@
 # Changelog
 
+## 0.26.0 — Milestone M20: M19 E2E Verification, Runtime Hardening & MVP Deployment Readiness
+
+- **Playwright E2E Coverage for M19 Platform Features (`e2e/m19-features.spec.ts`)**:
+  - Authored a dedicated, fast Playwright E2E test suite with 5 comprehensive browser tests:
+    - **4-Course Catalog Discovery**: Verifies all 4 courses (C, Python, JavaScript, Digital Circuits) render in Explore with accurate lesson/module counts and language tags (`PYTHON 3.12`, `JAVASCRIPT (ES2024)`, `DIGITAL LOGIC`, `C11`).
+    - **JavaScript Web Worker Execution & Automated Verification**: Verifies CodeWorkspace in JavaScript lessons, code execution in isolated browser Web Workers, and solution grading with automated test case evaluation and XP awards.
+    - **Interactive Simulators**: Tests Circuit Simulator logic gate selection, switch toggling (`0`/`1`), LED output calculation, truth table highlighting, and Memory Visualizer multi-step memory lifecycle navigation and reset.
+    - **Inline Compiler Diagnostics & Kat Error Bridge**: Tests syntax/runtime error capture, inline diagnostic card rendering, and one-click "Ask Kat to Explain Error" bridging error context directly into Kat AI tutor's pre-populated prompt.
+    - **Challenge Hub Multi-Course Filters**: Tests filtering by language (`All Courses`, `JavaScript`, `Circuits`, `Python`, `C`) and difficulty levels.
+- **Simulator & Workspace Error Boundary (`src/components/simulators/simulator-error-boundary.tsx`)**:
+  - Implemented React `SimulatorErrorBoundary` to safely isolate `MemoryVisualizer` and `CircuitSimulator` runtime exceptions.
+  - Displays accessible fallback alerts with error diagnostics and an interactive **Reset Simulator** action, preventing simulator state faults from crashing lesson reading panels or the workbench.
+  - Defensively guarded process, sandbox, and client teardown in `src/components/c-playground.tsx` against unmounted client instances.
+- **Legacy Progress Migration Safety (`src/lib/learning-progress.ts`)**:
+  - Added schema tolerance for older `katalyst.learning.v1` local storage records that lack `verifiedExerciseIds`, defaulting cleanly to `[]`.
+  - Accurately computes engineering XP and rank progression from legacy `completedLessons` and explicit `exerciseProgress` records without schema rejection or data corruption.
+  - Added automated migration unit test in `tests/learning-progress.test.ts`.
+- **Production Health Check Endpoint (`src/app/api/health/route.ts`)**:
+  - Implemented lightweight `GET /api/health` route returning `{ ok: true, status: "healthy", coursesCount: 4, services: { cloudflareConfigured: boolean, supabaseConfigured: boolean } }`.
+  - Verifies zero credential leakage or secret disclosure in response payloads, tested in `tests/health-route.test.ts`.
+- **MVP Deployment Readiness (`docs/DEPLOYMENT.md`)**:
+  - Documented automated health check integration, multi-language WebAssembly / Web Worker cross-origin isolation (COOP/COEP) constraints, and comprehensive 4-course verification runbooks.
+
+## 0.25.0 — Milestone M19: Full-Scale Engineering Platform Expansion
+
+- **Four-Course Engineering Curriculum (53 Lessons, 20 Modules)**:
+  - Scaled KATALYST catalog to 4 complete courses across systems programming, scripting, algorithms, and hardware fundamentals:
+    - `c-programming-foundations`: Added Module 6 (*Systems & Low-Level Engineering*) with 3 new lessons (`bitwise-registers`, `dynamic-memory`, `function-pointers`), bringing C Foundations to 16 lessons across 6 modules.
+    - `python-programming-foundations`: Added Module 7 (*Object-Oriented Systems & Algorithmic Efficiency*) with 3 new lessons (`py-classes-and-encapsulation`, `py-inheritance-dataclasses`, `py-algorithms-and-generators`), bringing Python Foundations to 19 lessons across 7 modules.
+    - `js-systems-algorithms`: Authored new course (Course 3) in `src/lib/curriculum/javascript-algorithms.ts` with 10 lessons across 4 modules exploring V8 memory layout, event loop queues, promise chains, prototypal inheritance, and algorithm efficiency.
+    - `digital-logic-circuits`: Authored new course (Course 4) in `src/lib/curriculum/digital-circuits.ts` with 8 lessons across 3 modules covering Boolean algebra, logic gates, combinational half/full adders, and analog RC / Ohm's Law circuits.
+- **100% Automated Test Case Verification**:
+  - Authored runnable test cases with `stdin`, `expectedStdout`, and hidden edge tests (`hidden: true`) across all 53 exercises in all 4 courses.
+  - Test cases validated via `verifyExerciseSubmission` with carriage return normalization, matching modes, and compilation short-circuiting.
+- **JavaScript Isolated Web Worker Runner**:
+  - Implemented `JavaScriptWorkerRunner` in `src/lib/execution/js-runner.ts` using ephemeral Web Workers with Node.js fallback for unit test isolation.
+  - Intercepts all console stream methods (`log`, `info`, `warn`, `error`) and integrates seamlessly into `ExecutionRegistry` for single-language and multi-test grading.
+  - Added unit test suite in `tests/js-runner.test.ts` (6 tests).
+- **Interactive Engineering Simulators**:
+  - `src/components/simulators/memory-visualizer.tsx`: Stack frame visualizer showing downward stack growth, byte sizes, 16-bit hex addresses, heap blocks with `malloc`/`free`, leaked block warnings, dangling pointer alerts, and step navigation.
+  - `src/components/simulators/circuit-simulator.tsx`: Digital logic mode (interactive gate inputs, live wire voltages, live truth tables) and Analog mode (RC capacitor charging curves, Ohm's Law sliders, real-time power and current calculations).
+  - Integrated into lesson interactive demos and Playground runtime tab.
+- **Compiler Diagnostics & Kat Error Bridge**:
+  - Implemented `parseDiagnostics` in `src/lib/execution/diagnostics-parser.ts` to parse Clang, Python, and JavaScript compiler/runtime errors into structured diagnostic objects (`{ line, column, severity, message }`).
+  - Added inline diagnostic warning banners in `src/components/code-workspace.tsx` with a one-click **"Ask Kat to Explain Error"** action bridging error context directly into the AI tutor panel.
+  - Added unit test suite in `tests/diagnostics-parser.test.ts` (6 tests).
+- **Mastery Lab & Engineering XP / Rank System**:
+  - Added multi-course filter pills (All, C, Python, JavaScript, Digital Circuits) and difficulty filters (All, Beginner, Intermediate, Advanced) to Practice Lab.
+  - Added engineering XP model (`+50 XP` per verified exercise, `+25 XP` per completed lesson) and engineering ranks (Cadet Engineer to Staff Systems Architect) computed via `getEngineeringMastery` in `src/lib/learning-progress.ts`.
+  - Added Engineering Mastery progress card to Home and Progress views.
+
+## 0.24.0 — Automated Exercise Verifier & Surgical UI Lock-In (M18)
+
+- **Automated Exercise Verifier**:
+  - Implemented `verifyExerciseSubmission` in `src/lib/exercise-verifier.ts` to evaluate user code solutions against authored test cases using `executeProgram`.
+  - Normalizes carriage returns (`\r\n` to `\n`) and supports `exact`, `trimmed`, and `contains` matching modes.
+  - Automatically short-circuits subsequent tests upon compilation errors to save execution time and report compilation diagnostics immediately.
+  - Added `maskHiddenTestCase` to sanitize test details in the learner UI when `hidden: true`, masking evaluation inputs, outputs, and internal traces while reporting status.
+  - Added dedicated unit test suite in `tests/exercise-verifier.test.ts` (9 tests covering normalization, matching modes, masking, execution flow, and compiler short-circuiting).
+- **Curriculum Test Cases**:
+  - Added optional `testCases` array to `LearningExercise` in `src/lib/learning-curriculum.ts` and updated Zod validation schema (`exerciseTestCaseSchema`, `exerciseSchema`).
+  - Authored runnable test cases in `c-programming-foundations`:
+    - `trace-hello` (output greeting & newline verification)
+    - `choose-a-type` (double voltage formatting)
+    - `read-two-values` (scanf integer reading with stdin inputs 5, 42, and hidden -7)
+  - Authored runnable test cases in `python-programming-foundations`:
+    - `ex-py-first-script` (print separator formatting)
+    - `ex-py-sensor-variables` (multi-variable sequencing)
+    - `ex-py-fahrenheit-converter` (Celsius string conversion to Fahrenheit)
+- **Interactive Exercise Verifier UI**:
+  - Embedded the Automated Verifier card in `src/components/learning-experience.tsx` within the lesson exercise section.
+  - Added "Verify Solution" button with loading spinner, execution timer, summary pass/fail banners, and side-by-side expected vs actual stdout comparisons for visible tests.
+  - Auto-updates learner progress in `katalyst.learning.v1` to `completed` when all test cases pass, or `attempted` when any test fails.
+- **Surgical UI Lock-In (Bug Fixes 1–3)**:
+  - **Fix 1 (Dark Mode Sidebar & Credits Badge)**: Explicit high-contrast colors in `[data-theme="dark"]` for left sidebar links/icons (`#d4d4d8`), active items (`rgba(59, 130, 246, 0.16)` / `#60a5fa`), and section headings (`#a1a1aa`). Replaced bright green styling on top-bar credits badge with clean neutral/blue badge.
+  - **Fix 2 (Eliminate Georgia/Serif)**: Replaced all legacy `Georgia` and `serif` occurrences in `src/app/globals.css` with clean sans-serif typography (`Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`).
+  - **Fix 3 (Isolate Python Drafts from C Lessons)**: Prevented synchronous dispatch draft leaks during language switching via `isSwitchingRef`, cleansed corrupted C drafts starting with Python syntax on mount, and ensured lesson mode strictly mounts with the lesson's language starter/example code.
+
+## 0.23.0 — Dark Mode Text Visibility & Precision Blue Theme Polish
+
+- **Complete Dark Mode Text Visibility & Readability**:
+  - Diagnosed and resolved low-contrast text in Dark and System Dark modes caused by misallocated accent text variables on headings, copy, and controls.
+  - Replaced misplaced `var(--text-accent)` across breadcrumbs, model dropdowns, welcome area, view headings, skill catalog details, lesson pagination, and Kat AI tutor panels with semantic tokens (`--text-primary`, `--text-secondary`, `--text-muted`, and `--accent-text`).
+  - Added synchronous pre-hydration theme script in `src/app/layout.tsx` to read `katalyst.preferences.v1` and resolve `system` preferences before first render via `window.matchMedia("(prefers-color-scheme: dark)")`, eliminating dark/light theme flashes.
+  - Updated real-time matchMedia listener in `src/components/workspace.tsx` to keep `document.documentElement.dataset.theme` synchronized when the OS color scheme changes.
+- **Elimination of Legacy Green / Teal Colors**:
+  - Removed all teal, forest green, and emerald colors (`#0f766e`, `#14b8a6`, `#0d9488`, `#2dd4bf`, `#183d37`, `#202d2b`, `#134e4a`, `#ccfbf1`, `#f0fdfa`, `#5eead4`, `#112a28`, etc.) from action buttons, active navigation states, links, badges, borders, and icons.
+  - Implemented the modern Neutral Slate + Precision Blue design system:
+    - Light Mode: `--accent-primary: #2563eb`, `--accent-hover: #1d4ed8`, `--action-primary-bg: #2563eb`, `--action-primary-text: #ffffff` (5.21:1 contrast).
+    - Dark Mode: `--accent-primary: #3b82f6`, `--accent-hover: #60a5fa`, `--action-primary-bg: #3b82f6`, `--action-primary-text: #090c10` (5.18:1 contrast).
+    - Retained dark graphite code surfaces (`#1a1d21` light, `#121519` dark) for code editors, terminals, and code blocks.
+- **E2E Dark Mode & Contrast Verification**:
+  - Updated `e2e/workspace.spec.ts` with Precision Blue primary action button assertions.
+  - Added new E2E test verifying dark mode background darkness, heading legibility, and zero legacy teal/green colors across Settings, Learning Home, Explore Paths, Lesson Workspace, and Playground.
+
+## 0.22.0 — Theme Override, Unified Multi-Language Playground & Runtime Audit (M17.4)
+
+- **Theme Palette Override & Contrast Hardening**:
+  - Replaced legacy palette tokens across `src/app/globals.css` with a high-contrast modern engineering theme for Light and Dark modes.
+  - Light mode: `--surface-canvas: #f8fafc`, `--surface-primary: #ffffff`, `--surface-secondary: #f1f5f9`, `--border-subtle: #e2e8f0`, `--text-primary: #0f172a`, `--text-secondary: #334155`, `--accent-primary: #2563eb`, `--accent-hover: #1d4ed8`.
+  - Dark mode: `--surface-canvas: #0b0e14`, `--surface-primary: #111620`, `--surface-secondary: #161c28`, `--border-subtle: #263042`, `--text-primary: #f8fafc`, `--text-secondary: #cbd5e1`, `--accent-primary: #38bdf8`, `--accent-hover: #7dd3fc`.
+  - Fixed dark mode panel backgrounds: removed misplaced `var(--surface-warning)` overrides from `.learning-workspace-header`, `.learning-workspace-panel`, `.learning-panel`, `.learning-kat-panel`, `.workspace-course-nav`, `.c-editor-pane`, `.c-output-pane`, `.lesson-topline`, `.path-curriculum`, `.tutor-composer`, `.lesson-checkpoint`, `.home-path-feature`, `.learning-empty-state`, `.lesson-tutor-intro`, and `.learning-workspace-mobile-tabs`.
+  - Corrected `.suggestion:hover` background from harsh white to `var(--surface-secondary)`, and `.project-active .project-dot` from `#db6947` to `var(--accent-primary)`.
+- **Unified Multi-Language Playground**:
+  - Replaced "C Playground" in sidebar navigation, breadcrumbs, and headers with a unified "Playground".
+  - Implemented top Language Selector Bar inside the playground with active runtimes: C (C11 · Wasmer WebAssembly) and Python (3.12 · Pyodide WebAssembly), alongside coming-soon badges for JavaScript (ES2024) and Circuits (SPICE).
+  - Dynamic CodeMirror 6 language reconfiguration via `Compartment` (`cpp()` vs `pythonStreamParser`) with preserved editor focus and no full-component remounts.
+  - Domain-separated draft storage: `katalyst.c.playground.v1` for C and `katalyst.python.playground.v1` for Python with independent limits and record validation in `src/lib/python-playground.ts`.
+  - Full execution support for Python programs via `executeProgram`, handling stdin normalization, execution progress, timeout protection, stdout/stderr capture, and runtime error diagnosis.
+- **M17.4 Runtime & Workspace Verification Audit**:
+  - Fully verified real in-browser execution with Wasmer C and Pyodide Python.
+  - Verified stdin/stdout normalization across both languages (`scanf` and `input()`).
+  - Updated design documentation in `docs/DESIGN.md` with complete token tables and interaction principles.
+
+## 0.21.0 — Learning Experience Redesign, Curriculum Expansion & Execution Providers (M17.3)
+
+- **Default 2-Panel Learning Workspace**: Restructured the desktop learning workspace into a clean, distraction-free 2-panel default layout: Theory content (50%) on the left and interactive Code Sandbox (50%) on the right.
+- **Optional Kat AI Tutor**: Kat AI tutor is closed by default to cultivate independent problem-solving. Added a top-bar "Ask Kat" / "Hide Kat" toggle and an accessible close button in the Kat header, expanding smoothly into a 3-panel layout (Theory 35%, Code 35%, Kat 30%) with draggable splitters. Panel state and layout widths are persisted in `katalyst.workspace.layout.v1` (`WorkspaceLayout.katOpen`).
+- **Visual Design Overhaul**:
+  - Replaced legacy burnt-orange palette with refined, accessible teal/cyan design tokens (`--signal: #0d9488` light, `#14b8a6` dark; `--action-primary-bg: #0f766e` light, `#14b8a6` dark) guaranteeing full WCAG AA contrast (>4.5:1).
+  - High-contrast typography with deep graphite surfaces (`--surface-code: #1a1d21`) and high-contrast text (`--text-primary: #181a1b` light, `#f1f5f9` dark) across code editors, terminals, and code blocks in all appearance themes.
+  - Compact navigation rail: 220px expanded, 58px collapsed icon rail with bottom avatar and accessible tooltips.
+- **Redesigned Home & Discovery Experiences**:
+  - Redesigned Home page with a quick-resume card (`Continue learning`), hero explanation of KATALYST's learning-first philosophy, 3-step "How KATALYST works" workflow ("Learn concept -> Code in sandbox -> Review & ask Kat"), symmetric C and Python foundation cards with metrics, and Practice Lab teasers.
+  - Redesigned Course Discovery (`paths`) with symmetric C and Python cards, syllabus module listings, duration, status badges, outcomes, and prerequisites.
+- **Curriculum Content Expansion**:
+  - C Programming Foundations: enhanced all 13 lessons with memory layout notes, pitfalls, starter code, and multi-tier progressive hints.
+  - Python Programming Foundations: enhanced all 16 lessons across 6 modules with starter code and progressive hints.
+  - Preserved course IDs (`c-programming-foundations`, `python-programming-foundations`), lesson IDs, and URLs with complete backward compatibility.
+- **Multi-Language Runner Subsystem (`src/lib/execution/`)**:
+  - Authored a comprehensive technical evaluation of execution providers (Pyodide, Wasmer, Judge0 CE, JDoodle, OneCompiler, Piston) and code editors (Monaco vs CodeMirror 6) in `docs/COMPILER_ARCHITECTURE.md`.
+  - Implemented provider-neutral runner subsystem in `src/lib/execution/` with working `WasmerCRunner` for C11 browser WebAssembly and `PyodidePythonRunner` for Python 3.12 WebAssembly micro-runtime.
+- **CodeMirror 6 Multi-Language Editor**:
+  - Built `src/components/code-workspace.tsx` with CodeMirror 6, dark graphite theme, line numbers, C/C++ and Python stream tokenizers, Run/Stop controls, and stdin/terminal panes.
+- **Automated Verification**:
+  - `npm run lint` — passed with 0 errors and 0 warnings.
+  - `npm run typecheck` — passed with 0 errors.
+  - `npm test` — passed with 222 tests across 23 test suites.
+  - `npm run test:e2e` — passed with 44 browser tests (1 skipped).
+  - `npm run build` — passed with Next.js 16.4.5 production output.
+
+## 0.20.0 — Python Foundations Course (M17.2)
+
+- Delivered the first complete Python programming course (`python-programming-foundations`, v1.0.0) authored using the scalable curriculum engine established in M17.1.
+- Registered the new `python-programming` subject in `src/lib/learning-curriculum.ts`, expanding the published catalog from 1 course (13 lessons) to 2 courses (29 lessons).
+- Authored 16 full lessons across 6 comprehensive modules covering interpreter mechanics, dynamic typing, input/output, arithmetic/logical operators, control flow, loops, strings, lists, tuples, dictionaries, sets, functions, LEGB scope rules, exceptions, context-managed file I/O, and an engineering data analyzer capstone project.
+- Incorporated diverse instructional modalities (`theory`, `guided-coding`, `practical-exercise`, `interactive-simulation`, `assessment`) with theory sections, runnable Python code examples, progressive hints, starter code, solutions, and conceptual checkpoints.
+- Validated prerequisite DAG relationships across all 16 lessons, ensuring strictly acyclic sequential dependencies.
+- Maintained honest runtime boundaries: Python lessons operate cleanly in the 2-panel theory/practice layout with Kat tutor without misleading learners with an unconfigured execution environment.
+- Supported seamless dual-enrollment in `src/lib/learning-progress.ts` and Supabase cloud snapshots, preserving existing C course progress without collisions or regressions.
+- Enriched Kat AI tutor context generation with Python curriculum metadata, maintaining strict prompt boundaries against simulated code execution.
+- Expanded automated testing with 219 unit tests passing across 23 test suites and full Playwright e2e browser test suite passing.
+
+## 0.19.0 — Scalable Curriculum Engine (M17.1)
+
+- Extended curriculum schema in `src/lib/learning-curriculum.ts` with validated Zod schemas supporting diverse instructional modalities: `theory`, `guided-coding`, `practical-exercise`, `interactive-simulation`, and `assessment`.
+- Added support for modular theory sections, code examples, interactive system demonstrations (circuits, flowcharts, memory diagrams, state machines), external resources/references, and execution configuration targets.
+- Preserved the existing C Programming Foundations course (`c-programming-foundations`) with 5 modules, all 13 lesson IDs, verified sample runs, and URLs with complete backward compatibility.
+- Adapted `src/components/learning-experience.tsx` to handle lesson modalities dynamically: automatically switches between 2-panel (Theory + Kat Tutor, collapsing empty code tabs) and 3-panel (with Code sandbox) layouts with independent vertical scrolling and draggable/keyboard splitters.
+- Introduced 4-state exercise progress tracking (`not-started`, `attempted`, `completed`, `needs-review`) in `src/lib/learning-progress.ts` with interactive controls in both Lesson view and Practice Lab.
+- Ensured full backward compatibility for learning progress storage: legacy `katalyst.learning.v1` records without `exerciseProgress` parse cleanly, and completed lessons automatically infer completion for their exercises unless explicitly overridden.
+- Enriched Kat AI tutor context generation with structured lesson metadata, theory sections, code examples, exercise details, hints, and learner progress status, enforcing the strict prompt boundary: Kat must never claim code execution without verified runtime output.
+- Authored comprehensive curriculum authoring guide in `docs/CURRICULUM_AUTHORING.md` covering metadata specs, validation rules, publication checklists, and a copy-pasteable reference lesson.
+- Expanded automated test coverage: 213 unit tests passing across 23 test suites; 43 passing Playwright e2e browser tests; clean production build with Next.js 16.4.5.
+
+- Diagnosed and fixed the Wasmer browser-based C11 compiler input stream: implemented `programExpectsStdin` pattern matching and `normalizeStdin` line-buffer normalization (CRLF conversion, trailing newline preservation), prefilled lesson sample input directly into stdin when opening curriculum examples, and added execution confirmation when stdin-expecting programs lack input.
+- Designed a hybrid compiler execution architecture for multi-language curricula (C/C++, Python, Java, JavaScript, HTML/CSS) and electronics simulation (Falstad, Wokwi, ngspice); published detailed trade-offs, security, and cost assessments in `docs/COMPILER_ARCHITECTURE.md`, and built the provider-neutral execution interface in `src/lib/execution/`.
+- Implemented persistent Kat tutor conversation memory under `katalyst.tutor.v1` (`src/lib/tutor-storage.ts`), supporting up to 50 named threads with up to 100 messages, thread creation, clearing, renaming, deletion, teaching mode preservation, duplicate turn prevention on retry, generation stop controls, and Supabase account snapshot synchronization.
+- Redesigned the learning workspace into three independently scrolling panels (Theory, Code, Kat Tutor) with independent vertical scrollbars (`overflow-y: auto`, `min-height: 0`), draggable and keyboard-accessible splitters (`role="separator"`, `aria-orientation="vertical"`), persisted layout state (`katalyst.workspace-layout.v1`), and mobile tab preservation without component unmounting.
+- Reorganized Settings into 8 dedicated categories (`account`, `appearance`, `ai-models`, `usage-credits`, `learning`, `workspace`, `privacy`, `admin`), combining AI providers and models and strictly isolating admin controls behind server-verified authorization.
+- Added a dedicated Usage & Credits panel displaying real-time shared Cloudflare Workers AI gateway status, active model, visual credit allowance meter, BYOK zero-credit notice, and recent AI request telemetry with provider filtering.
+- Published a dedicated production deployment guide (`docs/DEPLOYMENT.md`) explaining host platform secret configuration, security invariants, and verification steps.
+- Expanded test coverage across all new subsystems: 207 unit tests passing across 23 test suites (testing integer input using `scanf()`, multiple inputs, multiple lines, CRLF, EOF, compilation errors, runtime errors, infinite loop timeouts, output limits, and tutor mode isolation) and 43 passing Playwright e2e browser tests.
+
 ## 0.17.0 — Shared AI Gateway, Credits, BYOK, Admin Controls & Brevo (M15)
 
 - Established a central server-side AI Gateway routing all shared Cloudflare Workers AI inference through a strict 11-step pipeline: identity verification, rate limiting, kill-switch checks, model lock, input bounds, atomic credit reservation, settlement, and permanent usage logging.

@@ -58,3 +58,28 @@ export function makeRunnableCProgram(example: string): string {
   const body = source.split("\n").map((line) => line.length ? `    ${line}` : "").join("\n");
   return `${hasStdio ? "" : "#include <stdio.h>\n\n"}int main(void) {\n${body}\n    return 0;\n}\n`;
 }
+
+export function programExpectsStdin(source: string): boolean {
+  return /\b(scanf|getchar|getline|getdelim)\s*\(|\b(fgets|fgetc|getc|fread|fscanf)\s*\([^)]*\bstdin\b|\bcin\s*>>/.test(source);
+}
+
+export function normalizeStdin(stdin: string): string {
+  if (!stdin) return "";
+  const normalized = stdin.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
+}
+
+export function getOutputText(output: { stdout: { text: () => string; truncated: boolean }; stderr: { text: () => string; truncated: boolean } }): string {
+  const stdout = output.stdout.text();
+  const stderr = output.stderr.text();
+  const combined = [stdout, stderr && stderr !== stdout ? stderr : ""].filter(Boolean).join("\n").trim();
+  return `${combined}${output.stdout.truncated || output.stderr.truncated ? "\n\nOutput was cut off at the 64 KB limit." : ""}`;
+}
+
+export function getOutputChannels(output: { stdout: { text: () => string; truncated: boolean }; stderr: { text: () => string; truncated: boolean } }): { stdout: string; stderr: string } {
+  const truncated = "\n[Output cut off at the 64 KB limit.]";
+  return {
+    stdout: `${output.stdout.text()}${output.stdout.truncated ? truncated : ""}`,
+    stderr: `${output.stderr.text()}${output.stderr.truncated ? truncated : ""}`,
+  };
+}

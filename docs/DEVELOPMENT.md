@@ -53,7 +53,16 @@ To run database ownership tests, install/configure the Supabase CLI and local Su
 2. Configure Cloudflare server credentials in `.env.local`: `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
 3. Set your administrative email in `KATALYST_ADMIN_EMAILS` (e.g. `KATALYST_ADMIN_EMAILS=your-email@example.com`).
 4. (Optional) Configure Brevo for transactional email messaging: `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME`.
-5. Restart the server and sign in. Open **Settings → AI Controls** to manage model credit weights, monthly quotas, and the emergency kill switch.
+5. Restart the server and sign in. Open **Settings → Admin** to manage model credit weights, monthly quotas, and the emergency kill switch.
+6. For production deployments, see the [Production Deployment Guide](DEPLOYMENT.md).
+
+## M16 Compiler Infrastructure, Tutor Persistence & Workspace Layout
+
+- **C11 Browser Compiler**: Diagnosed and fixed stdin normalization (`normalizeStdin`), CRLF conversion, trailing newline preservation, integer input via `scanf()`, multiple input lines, and curriculum sample input pre-filling in `src/lib/c-playground.ts` and `src/components/c-playground.tsx`.
+- **Hybrid Compiler Execution**: Provider-neutral execution abstraction in `src/lib/execution/` with runner registry and language target resolution. Full architectural evaluation and security requirements documented in `docs/COMPILER_ARCHITECTURE.md`.
+- **Kat Tutor Memory**: Persisted conversation store (`katalyst.tutor.v1`) in `src/lib/tutor-storage.ts`, with multi-thread history, stable conversation IDs, per-conversation teaching style preservation, duplicate turn prevention on retry, stop generation controls, and Supabase cloud synchronization.
+- **Learning Workspace**: Three independently scrollable panels (`overflow-y: auto`, `min-height: 0`), draggable/keyboard-accessible splitters (`role="separator"`), layout persistence (`katalyst.workspace-layout.v1`), and responsive mobile tab state preservation.
+- **Settings Redesign**: 8 dedicated categories (`Account`, `Appearance`, `AI & Models`, `Usage & Credits`, `Learning`, `Workspace`, `Privacy & Security`, `Admin`) with server-verified admin authorization and dedicated usage telemetry.
 
 ## Checks
 

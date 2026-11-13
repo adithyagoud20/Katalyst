@@ -21,6 +21,14 @@ const DEFAULT_CREDIT_POLICIES: AICreditPolicies = {
 };
 
 const DEFAULT_MODEL_CONFIGS: Record<string, AIModelConfig> = {
+  "@cf/meta/llama-3.3-70b-instruct-fp8-fast": {
+    modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    enabled: true,
+    creditWeight: 1.0,
+    tokenCostMultiplier: 1.0,
+    maxInputTokens: 4096,
+    maxOutputTokens: 2048,
+  },
   "@cf/meta/llama-3.3-70b-instruct": {
     modelId: "@cf/meta/llama-3.3-70b-instruct",
     enabled: true,
@@ -29,11 +37,27 @@ const DEFAULT_MODEL_CONFIGS: Record<string, AIModelConfig> = {
     maxInputTokens: 4096,
     maxOutputTokens: 2048,
   },
+  "@cf/meta/llama-3.1-8b-instruct-fp8": {
+    modelId: "@cf/meta/llama-3.1-8b-instruct-fp8",
+    enabled: true,
+    creditWeight: 0.5,
+    tokenCostMultiplier: 0.5,
+    maxInputTokens: 4096,
+    maxOutputTokens: 2048,
+  },
   "@cf/meta/llama-3.1-8b-instruct": {
     modelId: "@cf/meta/llama-3.1-8b-instruct",
     enabled: true,
     creditWeight: 0.5,
     tokenCostMultiplier: 0.5,
+    maxInputTokens: 4096,
+    maxOutputTokens: 2048,
+  },
+  "@cf/qwen/qwen2.5-coder-32b-instruct": {
+    modelId: "@cf/qwen/qwen2.5-coder-32b-instruct",
+    enabled: true,
+    creditWeight: 1.0,
+    tokenCostMultiplier: 1.0,
     maxInputTokens: 4096,
     maxOutputTokens: 2048,
   },

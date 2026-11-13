@@ -169,7 +169,7 @@ export async function executeGatewayChat(
   // Step 1: Session or guest identity validation
   const cookieHeader = request.headers.get("cookie") || "";
   const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${GUEST_COOKIE_NAME}=([^;]*)`));
-  const guestCookieVal = match ? match[1] : null;
+  const guestCookieVal = match ? decodeURIComponent(match[1].trim()).replace(/^"|"$/g, "") : null;
 
   const authUser = await getVerifiedSupabaseUser();
   const userId = authUser.user?.id || null;
@@ -197,8 +197,14 @@ export async function executeGatewayChat(
   }
 
   // Step 3: Model resolution & admin model lock
-  // The server enforces the administrator's designated shared model unless explicitly supported
-  const targetModelId = systemConfig.selectedModelId || "@cf/meta/llama-3.3-70b-instruct";
+  // Uses client-selected Cloudflare model or administrator designated shared model
+  const rawModelId = (input.model?.startsWith("@cf/") ? input.model : systemConfig.selectedModelId) || "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+  // Map historical model IDs to active Cloudflare inference IDs
+  const targetModelId = rawModelId === "@cf/meta/llama-3.3-70b-instruct"
+    ? "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    : rawModelId === "@cf/meta/llama-3.1-8b-instruct"
+      ? "@cf/meta/llama-3.1-8b-instruct-fp8"
+      : rawModelId;
   const modelConfig = await getAiModelConfig(targetModelId);
   if (!modelConfig.enabled) {
     throw new GatewayError("The configured shared AI model is temporarily unavailable.", 503, {
