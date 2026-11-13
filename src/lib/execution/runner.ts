@@ -9,6 +9,7 @@ import {
 import { WasmerCRunner } from "./c-runner";
 import { PyodidePythonRunner } from "./python-runner";
 import { JavaScriptWorkerRunner } from "./js-runner";
+import { SqlWasmRunner } from "./sql-runner";
 import { RemoteSandboxRunner } from "./remote-runner";
 
 export const DEFAULT_EXECUTION_LIMITS: ExecutionLimits = {
@@ -78,6 +79,7 @@ export function registerDefaultRunners(): void {
   executionRegistry.register(new WasmerCRunner());
   executionRegistry.register(new PyodidePythonRunner());
   executionRegistry.register(new JavaScriptWorkerRunner());
+  executionRegistry.register(new SqlWasmRunner());
   if (typeof process !== "undefined" && process.env?.EXECUTION_REMOTE_ENDPOINT) {
     executionRegistry.register(new RemoteSandboxRunner());
   }

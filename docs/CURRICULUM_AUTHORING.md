@@ -90,13 +90,13 @@ type LearningLesson = {
 
   codeExamples?: Array<{
     title: string;
-    language: "c" | "python" | "javascript" | "typescript" | "sql";
+    language: "c" | "python" | "javascript" | "typescript" | "sql" | "html" | "css";
     code: string;
     description?: string;
   }>;
 
   interactiveDemo?: {
-    kind: "circuit" | "flowchart" | "memory-diagram" | "state-machine";
+    kind: "circuit" | "flowchart" | "memory-diagram" | "state-machine" | "image-lab";
     title?: string;
     description?: string;
     config?: Record<string, unknown>;
@@ -110,7 +110,7 @@ type LearningLesson = {
   }>;
 
   execution?: {
-    language: "c" | "python" | "javascript" | "typescript" | "sql";
+    language: "c" | "python" | "javascript" | "typescript" | "sql" | "html" | "css";
     target?: "browser-wasm" | "server-sandbox" | "simulated";
   };
 
@@ -131,6 +131,14 @@ type LearningLesson = {
     difficulty: "Beginner" | "Developing" | "Applied";
     starterCode?: string;                    // Initial boilerplate for editor
     expectedOutcome: string;                 // Target learning verification
+    testCases?: Array<{                      // Automated verification test cases
+      id: string;
+      label: string;
+      stdin?: string;
+      expectedStdout: string;
+      matchMode?: "exact" | "trimmed" | "contains";
+      hidden?: boolean;
+    }>;
   };
 
   checkpoint: {
@@ -312,14 +320,47 @@ Before publishing or adding a course into `learningCatalog`:
 
 ---
 
-## 6. Official Catalog Courses (Milestone M19)
+## 6. Server-Side Delivery & Client Manifest Architecture (Milestone M21)
 
-As of Milestone M19, the KATALYST catalog features four foundational engineering and computing tracks spanning 53 lessons and 20 modules:
+As KATALYST scaled to 9 courses and 91 lessons, bundling complete lesson content (extensive theory, multiple code examples, solutions, hints, and tests) into the client-side JavaScript bundle resulted in unnecessary payload overhead.
 
-| Course ID | Title | Subject | Modules | Lessons | Execution Language |
+Milestone M21 introduced a **hybrid static/dynamic curriculum split**:
+
+### 6.1 Server Registry & Manifest Generation
+- All detailed course definitions live in server-side files under `src/data/curriculum/`:
+  - `c-foundations.ts`, `python-foundations.ts`, `javascript-algorithms.ts`, `digital-circuits.ts`
+  - `sql-databases.ts`, `html-css-web.ts`, `dsa-mastery.ts`, `prompt-engineering.ts`, `photo-editing-media.ts`
+  - Unified server catalog in `src/data/curriculum/server-catalog.ts`.
+- The compilation step `scripts/generate-manifests.ts` runs automatically during `predev` and `prebuild`. It extracts lightweight summaries (`LearningCatalogManifest`) containing only titles, summaries, module hierarchy, durations, and metadata (about ~92 KB uncompressed).
+- The client UI loads `manifests.ts` synchronously for immediate navigation, course browsing, and catalog filtering with zero network waterfalls.
+
+### 6.2 On-Demand Lesson API Route (`/api/curriculum/lesson`)
+- When a learner navigates to a specific lesson, the lesson view requests the full `LearningLessonDetail` payload on demand:
+  ```http
+  GET /api/curriculum/lesson?courseId=sql-databases&lessonId=sql-select-fundamentals
+  ```
+- The route validates query parameters via Zod, checks against the validated server catalog, and serves the lesson with aggressive caching headers:
+  ```http
+  Cache-Control: public, max-age=3600, stale-while-revalidate=86400
+  ```
+- The frontend client (`src/components/learning-experience.tsx`) maintains an in-memory `Map<string, LearningLessonDetail>` session cache. Switching between previously visited lessons is instantaneous, while initial fetches display a non-shifting pulse skeleton.
+
+---
+
+## 7. Official Catalog Courses (Milestone M21)
+
+As of Milestone M21, the KATALYST catalog features 9 comprehensive engineering and computer science courses spanning 91 lessons and 35 modules across 7 domain categories:
+
+| Course ID | Title | Subject | Modules | Lessons | Execution Language / Runtime |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `c-programming-foundations` | C Programming Foundations | `c-programming` | 6 | 16 | `c` (Wasmer C11 WebAssembly) |
 | `python-programming-foundations` | Python Programming Foundations | `python-programming` | 7 | 19 | `python` (Pyodide 3.12 WebAssembly) |
 | `js-systems-algorithms` | JavaScript & Algorithmic Systems | `js-programming` | 4 | 10 | `javascript` (Isolated Web Worker) |
 | `digital-logic-circuits` | Digital Logic & Circuit Foundations | `digital-circuits` | 3 | 8 | `circuit` (Interactive SVG Simulators) |
+| `sql-databases` | Relational Databases & SQL Architecture | `sql-databases` | 3 | 8 | `sql` (SQLite WASM via `sql.js`) |
+| `html-css-web` | Modern Web Development (HTML5 & CSS3) | `web-development` | 3 | 8 | `html` (Sandboxed Iframe Live Preview) |
+| `dsa-mastery` | Data Structures & Algorithmic Problem Solving | `dsa-mastery` | 4 | 10 | `javascript` / `python` (Web Worker / Pyodide) |
+| `prompt-engineering` | Prompt Architecture & LLM Engineering | `ai-engineering` | 2 | 6 | `markdown` / prompt text (Interactive Analysis) |
+| `photo-editing-media` | Digital Image Processing & Visual Media | `media-engineering`| 2 | 6 | `image-lab` (Interactive Image & Color Lab) |
+
 

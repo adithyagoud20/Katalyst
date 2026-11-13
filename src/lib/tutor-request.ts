@@ -1,8 +1,10 @@
 import {
   resolveLessonHints,
   resolveLessonType,
-  type LearningLesson,
-  type LearningModule,
+  type LearningLessonDetail,
+  type LearningLessonSummary,
+  type LearningModuleDetail,
+  type LearningModuleSummary,
   type LearningPath,
 } from "./learning-curriculum";
 import type { ExerciseProgressStatus } from "./learning-progress";
@@ -13,8 +15,8 @@ export type TutorMessage = { role: "user" | "assistant"; content: string };
 export type TutorWorkspaceActivity = { source: string; diagnostics?: string; output?: string };
 export type TutorLessonReferenceContext = {
   path: LearningPath;
-  module: LearningModule;
-  lesson: LearningLesson;
+  module: LearningModuleSummary | LearningModuleDetail;
+  lesson: LearningLessonSummary | LearningLessonDetail;
   exerciseStatus?: ExerciseProgressStatus;
 };
 
@@ -64,10 +66,10 @@ export function composeTutorReference(
     lessonType: resolveLessonType(context.lesson),
     learningObjectives: context.lesson.objectiveIds.map((id) => context.path.objectives.find((item) => item.id === id)?.title).filter(Boolean),
     prerequisiteLessonIds: context.lesson.prerequisiteLessonIds,
-    lessonContent: context.lesson.content.slice(0, 5_000),
-    ...(context.lesson.theorySections?.length ? { theorySections: context.lesson.theorySections.map((s) => ({ title: s.title, content: s.content.slice(0, 2_000) })) } : {}),
-    ...(context.lesson.codeExamples?.length ? { codeExamples: context.lesson.codeExamples.map((c) => ({ title: c.title, language: c.language, code: c.code.slice(0, 2_000) })) } : {}),
-    currentCheckpoint: context.lesson.checkpoint,
+    lessonContent: ("content" in context.lesson && context.lesson.content ? context.lesson.content.slice(0, 5_000) : ""),
+    ...("theorySections" in context.lesson && context.lesson.theorySections?.length ? { theorySections: context.lesson.theorySections.map((s) => ({ title: s.title, content: s.content.slice(0, 2_000) })) } : {}),
+    ...("codeExamples" in context.lesson && context.lesson.codeExamples?.length ? { codeExamples: context.lesson.codeExamples.map((c) => ({ title: c.title, language: c.language, code: c.code.slice(0, 2_000) })) } : {}),
+    ...("checkpoint" in context.lesson && context.lesson.checkpoint ? { currentCheckpoint: context.lesson.checkpoint } : {}),
     currentExercise: {
       title: context.lesson.exercise.title,
       prompt: context.lesson.exercise.prompt,
@@ -77,7 +79,7 @@ export function composeTutorReference(
       hints: resolveLessonHints(context.lesson.exercise),
       ...(context.exerciseStatus ? { status: context.exerciseStatus } : {}),
     },
-    ...(context.lesson.resources?.length ? { resources: context.lesson.resources.map((r) => ({ title: r.title, description: r.description })) } : {}),
+    ...("resources" in context.lesson && context.lesson.resources?.length ? { resources: context.lesson.resources.map((r) => ({ title: r.title, description: r.description })) } : {}),
     ...(context.lesson.interactiveDemo ? { interactiveDemo: { kind: context.lesson.interactiveDemo.kind, title: context.lesson.interactiveDemo.title } } : {}),
   } : { ...base, subject: "Engineering learning" };
   if (skillContext?.trim()) reference.enabledSkillGuidance = skillContext.slice(0, TUTOR_SKILL_CONTEXT_LIMIT);

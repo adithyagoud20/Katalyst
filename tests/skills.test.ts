@@ -106,4 +106,17 @@ describe("workspace skill composition", () => {
     const result = composeWorkspaceContext(starterSkills);
     expect(result).toEqual({ context: "", appliedSkills: [], omittedSkills: [] });
   });
+
+  it("registers all 8 specialized built-in engineering skills", () => {
+    const skillIds = starterSkills.map((s) => s.id);
+    expect(skillIds).toContain("socratic-reviewer");
+    expect(skillIds).toContain("c-memory-auditor");
+    expect(skillIds).toContain("sql-query-optimizer");
+    expect(skillIds).toContain("dsa-complexity-coach");
+    expect(skillIds).toContain("frontend-a11y-reviewer");
+    expect(skillIds).toContain("prompt-architect");
+    expect(skillIds).toContain("digital-circuit-simplifier");
+    expect(skillIds).toContain("interview-drill-master");
+    expect(starterSkills.length).toBe(11);
+  });
 });

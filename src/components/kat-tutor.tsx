@@ -24,14 +24,20 @@ import {
   type TutorConversation,
   type TutorPersistedMessage,
 } from "@/lib/tutor-storage";
-import type { LearningLesson, LearningModule, LearningPath } from "@/lib/learning-curriculum";
+import type {
+  LearningLessonDetail,
+  LearningLessonSummary,
+  LearningModuleDetail,
+  LearningModuleSummary,
+  LearningPath,
+} from "@/lib/learning-curriculum";
 import type { ExerciseProgressStatus } from "@/lib/learning-progress";
 import type { WorkspaceSkill } from "@/lib/skills";
 
 export type TutorLessonContext = {
   path: LearningPath;
-  module: LearningModule;
-  lesson: LearningLesson;
+  module: LearningModuleSummary | LearningModuleDetail;
+  lesson: LearningLessonSummary | LearningLessonDetail;
   exerciseStatus?: ExerciseProgressStatus;
 };
 

@@ -11,6 +11,11 @@ import {
   pythonProgrammingPath,
   javascriptProgrammingPath,
   digitalCircuitsPath,
+  sqlDatabasesPath,
+  htmlCssWebPath,
+  dsaMasteryPath,
+  promptEngineeringPath,
+  photoEditingMediaPath,
   resolveLessonExecution,
   resolveLessonHints,
   resolveLessonType,
@@ -107,12 +112,9 @@ describe("authored learning catalog", () => {
     };
     const expanded = { subjects: [...learningCatalog.subjects, additionalSubject], courses: [...learningCatalog.courses, draftCourse] };
     expect(validateLearningCatalog(expanded).success).toBe(true);
-    expect(getPublishedLearningCourses(expanded).map((course) => course.id)).toEqual([
-      cProgrammingPath.id,
-      pythonProgrammingPath.id,
-      javascriptProgrammingPath.id,
-      digitalCircuitsPath.id,
-    ]);
+    expect(getPublishedLearningCourses(expanded).map((course) => course.id)).toEqual(
+      learningCatalog.courses.map((course) => course.id)
+    );
   });
 
   it("rejects duplicate IDs, invalid references, broken order, and malformed code fences", () => {
@@ -341,6 +343,62 @@ describe("Python Programming Foundations course", () => {
           const prereqIdx = lessons.findIndex(({ lesson: candidate }) => candidate.id === prereqId);
           expect(prereqIdx, `${lesson.id} prerequisite ${prereqId} must precede it`).toBeLessThan(index);
         }
+      }
+    });
+
+    it("registers SQL Databases course and validates 8 relational lessons", () => {
+      const validation = safeValidateCourse(sqlDatabasesPath);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(sqlDatabasesPath);
+      expect(lessons).toHaveLength(8);
+      for (const { lesson } of lessons) {
+        expect(safeValidateLesson(lesson).success).toBe(true);
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("registers HTML5 & CSS Architecture course and validates 8 web lessons", () => {
+      const validation = safeValidateCourse(htmlCssWebPath);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(htmlCssWebPath);
+      expect(lessons).toHaveLength(8);
+      for (const { lesson } of lessons) {
+        expect(safeValidateLesson(lesson).success).toBe(true);
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("registers DSA Mastery course and validates 10 algorithmic lessons", () => {
+      const validation = safeValidateCourse(dsaMasteryPath);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(dsaMasteryPath);
+      expect(lessons).toHaveLength(10);
+      for (const { lesson } of lessons) {
+        expect(safeValidateLesson(lesson).success).toBe(true);
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("registers Prompt Engineering course and validates 6 LLM system lessons", () => {
+      const validation = safeValidateCourse(promptEngineeringPath);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(promptEngineeringPath);
+      expect(lessons).toHaveLength(6);
+      for (const { lesson } of lessons) {
+        expect(safeValidateLesson(lesson).success).toBe(true);
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("registers Computational Photography course and validates 6 media DSP lessons with Image Lab", () => {
+      const validation = safeValidateCourse(photoEditingMediaPath);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(photoEditingMediaPath);
+      expect(lessons).toHaveLength(6);
+      for (const { lesson } of lessons) {
+        expect(safeValidateLesson(lesson).success).toBe(true);
+        expect(lesson.interactiveDemo?.kind).toBe("image-lab");
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
       }
     });
   });

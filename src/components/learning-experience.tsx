@@ -32,6 +32,7 @@ import { KatTutor, type TutorLessonContext } from "@/components/kat-tutor";
 import { CodeWorkspace } from "@/components/code-workspace";
 import { MemoryVisualizer } from "@/components/simulators/memory-visualizer";
 import { CircuitSimulator } from "@/components/simulators/circuit-simulator";
+import { ImageLabVisualizer } from "@/components/simulators/image-lab-visualizer";
 import { SimulatorErrorBoundary } from "@/components/simulators/simulator-error-boundary";
 import type { ExecutionLanguage } from "@/lib/execution/types";
 import {
@@ -47,7 +48,9 @@ import {
   resolveLessonExecution,
   resolveLessonHints,
   resolveLessonType,
-  type LearningCourse,
+  type LearningCourseDetail,
+  type LearningCourseSummary,
+  type LearningLessonDetail,
   type LearningSection,
   type LessonType,
 } from "@/lib/learning-curriculum";
@@ -101,13 +104,14 @@ main();
 `;
 
 function extractLessonCode(
-  lesson: { content: string; codeExamples?: Array<{ language?: string; code: string }> },
+  lesson: { content?: string; codeExamples?: Array<{ language?: string; code: string }> },
   language: ExecutionLanguage
 ): string | null {
   if (lesson.codeExamples && lesson.codeExamples.length > 0) {
     const matching = lesson.codeExamples.find((ex) => ex.language === language);
     if (matching?.code) return matching.code;
   }
+  if (!lesson.content) return null;
   if (language === "c") {
     return extractCCode(lesson.content) ?? null;
   }
@@ -206,7 +210,7 @@ export function LearningExperience({
   configured: boolean;
   workspaceSummary: WorkspaceSummary;
   skills: WorkspaceSkill[];
-  courses: LearningCourse[];
+  courses: Array<LearningCourseSummary | LearningCourseDetail>;
 }) {
   const [progress, setProgress] = useState<LearningProgress>(emptyLearningProgress);
   const [progressReady, setProgressReady] = useState(false);
@@ -214,6 +218,7 @@ export function LearningExperience({
   const [aiRequests, setAIRequests] = useState<AIRequestActivity[]>([]);
   const [aiActivityIssue, setAIActivityIssue] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id ?? "");
+  const [selectedCategory, setSelectedCategory] = useState<"All" | "Systems" | "Web" | "Algorithms" | "Databases" | "AI & Media" | "Hardware">("All");
   const course = courses.find((item) => item.id === selectedCourseId) ?? courses[0]!;
   const courseSubject = learningSubjects.find((item) => item.id === course.subjectId);
   const courseMark = (courseSubject?.title ?? course.title).slice(0, 1).toUpperCase();
@@ -254,9 +259,59 @@ export function LearningExperience({
 
   const lessonEntries = useMemo(() => flattenLessons(course), [course]);
   const locatedLesson = findLesson(course, activeLessonId) ?? lessonEntries[0];
-  const lesson = locatedLesson?.lesson;
+  const lessonSummary = locatedLesson?.lesson;
   const lessonModule = locatedLesson?.module;
-  const currentIndex = lessonEntries.findIndex((entry) => entry.lesson.id === lesson?.id);
+  const currentIndex = lessonEntries.findIndex((entry) => entry.lesson.id === lessonSummary?.id);
+
+  const lessonDetailCache = useRef<Map<string, LearningLessonDetail>>(new Map());
+  const [activeLessonDetail, setActiveLessonDetail] = useState<LearningLessonDetail | null>(null);
+  const [lessonLoading, setLessonLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!lessonSummary) return;
+    const cacheKey = `${course.id}:${lessonSummary.id}`;
+    const cached = lessonDetailCache.current.get(cacheKey);
+    if (cached) {
+      setActiveLessonDetail(cached);
+      setLessonLoading(false);
+      return;
+    }
+
+    if ("content" in lessonSummary && typeof (lessonSummary as Record<string, unknown>).content === "string") {
+      const full = lessonSummary as unknown as LearningLessonDetail;
+      lessonDetailCache.current.set(cacheKey, full);
+      setActiveLessonDetail(full);
+      setLessonLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLessonLoading(true);
+
+    fetch(`/api/curriculum/lesson?courseId=${encodeURIComponent(course.id)}&lessonId=${encodeURIComponent(lessonSummary.id)}`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then((data: LearningLessonDetail) => {
+        if (cancelled) return;
+        lessonDetailCache.current.set(cacheKey, data);
+        setActiveLessonDetail(data);
+        setLessonLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Failed to load lesson detail:", err);
+        setLessonLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [course.id, lessonSummary]);
+
+  const fullLesson = activeLessonDetail?.id === lessonSummary?.id ? activeLessonDetail : null;
+  const lesson = (fullLesson ?? lessonSummary) as unknown as LearningLessonDetail;
 
   const lessonType: LessonType = lesson ? resolveLessonType(lesson) : "guided-coding";
   const executionConfig = lesson ? resolveLessonExecution(course, lesson) : null;
@@ -328,6 +383,28 @@ export function LearningExperience({
       resumeLesson,
     };
   }, [progress, courses]);
+
+  const filteredCourses = useMemo(() => {
+    if (selectedCategory === "All") return courses;
+    return courses.filter((c) => {
+      switch (selectedCategory) {
+        case "Systems":
+          return c.id.includes("c-programming") || c.id.includes("python-programming");
+        case "Web":
+          return c.id.includes("html") || c.id.includes("js-systems");
+        case "Algorithms":
+          return c.id.includes("dsa") || c.id.includes("js-systems");
+        case "Databases":
+          return c.id.includes("sql");
+        case "AI & Media":
+          return c.id.includes("prompt") || c.id.includes("photo");
+        case "Hardware":
+          return c.id.includes("circuits");
+        default:
+          return true;
+      }
+    });
+  }, [courses, selectedCategory]);
 
   const currentExerciseStatus: ExerciseProgressStatus = lesson && enrolled
     ? getExerciseProgress(progress, course.id, lesson.exercise.id)
@@ -578,7 +655,7 @@ export function LearningExperience({
     onNavigate("lesson", lessonId);
   };
 
-  const selectCourse = (nextCourse: LearningCourse) => {
+  const selectCourse = (nextCourse: LearningCourseSummary | LearningCourseDetail) => {
     setSelectedCourseId(nextCourse.id);
     setActiveLessonId(flattenLessons(nextCourse)[0]?.lesson.id ?? "");
     setTutorLessonId("");
@@ -1068,9 +1145,40 @@ export function LearningExperience({
             </h1>
             <p>Focused engineering paths with real lesson content and practice. Choose a path to inspect its modules and start learning.</p>
           </header>
-          {courses.length > 1 && (
+          <div
+            className="explore-category-filter"
+            role="tablist"
+            aria-label="Course Categories"
+            style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "20px" }}
+          >
+            {(["All", "Systems", "Web", "Algorithms", "Databases", "AI & Media", "Hardware"] as const).map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                role="tab"
+                aria-selected={selectedCategory === cat}
+                className={`category-filter-pill ${selectedCategory === cat ? "active" : ""}`}
+                style={{
+                  padding: "6px 14px",
+                  borderRadius: "20px",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  border: "1px solid var(--border-subtle)",
+                  background: selectedCategory === cat ? "var(--signal)" : "var(--surface-primary)",
+                  color: selectedCategory === cat ? "#ffffff" : "var(--text-secondary)",
+                  cursor: "pointer",
+                  transition: "all 0.15s ease",
+                }}
+                onClick={() => setSelectedCategory(cat)}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {filteredCourses.length > 0 ? (
             <nav className="courses-choice-grid" aria-label="Available courses" style={{ marginBottom: 28 }}>
-              {courses.map((item) => {
+              {filteredCourses.map((item) => {
                 const itemState = getPathProgress(progress, item);
                 const itemLessons = flattenLessons(item);
                 const isSelected = item.id === course.id;
@@ -1099,6 +1207,16 @@ export function LearningExperience({
                       <span className="course-lang-tag">
                         {item.id.includes("python")
                           ? "PYTHON 3.12"
+                          : item.id.includes("sql")
+                          ? "SQL · WASM"
+                          : item.id.includes("html")
+                          ? "HTML5 & CSS3"
+                          : item.id.includes("dsa")
+                          ? "DATA STRUCTURES"
+                          : item.id.includes("prompt")
+                          ? "APPLIED AI"
+                          : item.id.includes("photo")
+                          ? "COMPUTATIONAL MEDIA"
                           : item.id.includes("js")
                           ? "JAVASCRIPT (ES2024)"
                           : item.id.includes("circuits")
@@ -1120,6 +1238,10 @@ export function LearningExperience({
                 );
               })}
             </nav>
+          ) : (
+            <p className="no-courses-found text-sm text-[var(--text-secondary)] mb-6">
+              No courses found in the {selectedCategory} category.
+            </p>
           )}
           <section className="path-detail-shell">
             <div className="path-detail-main">
@@ -1310,9 +1432,21 @@ export function LearningExperience({
                     ? "Python"
                     : c.id.includes("js")
                     ? "JavaScript"
-                    : c.id.includes("circuits")
+                    : c.id.includes("circuit")
                     ? "Circuits"
-                    : "C"}
+                    : c.id.includes("sql")
+                    ? "SQL"
+                    : c.id.includes("html")
+                    ? "HTML & CSS"
+                    : c.id.includes("dsa")
+                    ? "DSA"
+                    : c.id.includes("prompt")
+                    ? "Prompt Eng"
+                    : c.id.includes("photo")
+                    ? "Media DSP"
+                    : c.id === "c-programming-foundations"
+                    ? "C"
+                    : c.title}
                 </button>
               ))}
             </div>
@@ -1382,7 +1516,7 @@ export function LearningExperience({
                     <details>
                       <summary><span>Reveal one possible answer</span><ChevronRight size={14} /></summary>
                       <div className="practice-answer">
-                        <AssistantMarkdown content={entry.lesson.exercise.solution} />
+                        <AssistantMarkdown content={entry.lesson.exercise.solution ?? ""} />
                       </div>
                     </details>
                     <div className="practice-status-selector-row" role="group" aria-label={`Status for ${entry.lesson.exercise.title}`}>
@@ -1784,20 +1918,30 @@ export function LearningExperience({
                   <span>{lessonModule.title}</span>
                   <span>{course.level}</span>
                 </div>
-                <div className="lesson-copy">
-                  {lesson.theorySections && lesson.theorySections.length > 0 ? (
-                    <div className="lesson-theory-sections">
-                      {lesson.theorySections.map((sec, idx) => (
-                        <section key={sec.id || idx} className="lesson-theory-section">
-                          {sec.title && <h3>{sec.title}</h3>}
-                          <AssistantMarkdown content={sec.content} />
-                        </section>
-                      ))}
-                    </div>
-                  ) : (
-                    <AssistantMarkdown content={lesson.content} />
-                  )}
-                </div>
+                {lessonLoading && !fullLesson ? (
+                  <div className="lesson-loading-skeleton py-6 space-y-4" aria-busy="true" aria-label="Loading lesson...">
+                    <div style={{ height: "28px", width: "60%", borderRadius: "6px", background: "var(--bg-subtle)", animation: "pulse 1.5s infinite" }} />
+                    <div style={{ height: "16px", width: "100%", borderRadius: "4px", background: "var(--bg-subtle)", animation: "pulse 1.5s infinite" }} />
+                    <div style={{ height: "16px", width: "92%", borderRadius: "4px", background: "var(--bg-subtle)", animation: "pulse 1.5s infinite" }} />
+                    <div style={{ height: "16px", width: "75%", borderRadius: "4px", background: "var(--bg-subtle)", animation: "pulse 1.5s infinite" }} />
+                    <div style={{ height: "120px", width: "100%", borderRadius: "8px", background: "var(--bg-subtle)", animation: "pulse 1.5s infinite", marginTop: "1rem" }} />
+                  </div>
+                ) : (
+                  <div className="lesson-copy">
+                    {lesson.theorySections && lesson.theorySections.length > 0 ? (
+                      <div className="lesson-theory-sections">
+                        {lesson.theorySections.map((sec, idx) => (
+                          <section key={sec.id || idx} className="lesson-theory-section">
+                            {sec.title && <h3>{sec.title}</h3>}
+                            <AssistantMarkdown content={sec.content} />
+                          </section>
+                        ))}
+                      </div>
+                    ) : (
+                      <AssistantMarkdown content={lesson.content ?? ""} />
+                    )}
+                  </div>
+                )}
               </article>
 
               {lesson.codeExamples && lesson.codeExamples.length > 0 && (
@@ -1847,6 +1991,18 @@ export function LearningExperience({
                               : lesson.interactiveDemo.config?.mode === "pointers"
                               ? "pointers"
                               : "stack-frames"
+                          }
+                        />
+                      </SimulatorErrorBoundary>
+                    </div>
+                  ) : lesson.interactiveDemo.kind === "image-lab" ? (
+                    <div className="mt-3">
+                      <SimulatorErrorBoundary fallbackTitle="Image Lab Encountered an Error">
+                        <ImageLabVisualizer
+                          initialFilter={
+                            typeof lesson.interactiveDemo.config?.filter === "string"
+                              ? lesson.interactiveDemo.config.filter
+                              : "none"
                           }
                         />
                       </SimulatorErrorBoundary>
@@ -2125,17 +2281,19 @@ export function LearningExperience({
                 </div>
               </section>
 
-              <section className="lesson-checkpoint">
-                <div className="checkpoint-kicker"><Lightbulb size={15} /> CHECK YOUR UNDERSTANDING</div>
-                <p>{lesson.checkpoint.prompt}</p>
-                <details>
-                  <summary>Reveal a short explanation <ChevronRight size={14} /></summary>
-                  <p>{lesson.checkpoint.answer}</p>
-                </details>
-                <button className="secondary-button" onClick={askKatAboutLesson}>
-                  <Sparkles size={14} /> Ask Kat for a hint
-                </button>
-              </section>
+              {lesson.checkpoint?.prompt ? (
+                <section className="lesson-checkpoint">
+                  <div className="checkpoint-kicker"><Lightbulb size={15} /> CHECK YOUR UNDERSTANDING</div>
+                  <p>{lesson.checkpoint.prompt}</p>
+                  <details>
+                    <summary>Reveal a short explanation <ChevronRight size={14} /></summary>
+                    <p>{lesson.checkpoint.answer}</p>
+                  </details>
+                  <button className="secondary-button" onClick={askKatAboutLesson}>
+                    <Sparkles size={14} /> Ask Kat for a hint
+                  </button>
+                </section>
+              ) : null}
 
               {enrolled ? (
                 <button

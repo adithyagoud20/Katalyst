@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.27.0 — Milestone M21: Server-Side Curriculum, SQL & HTML/CSS Runtimes, 5 New Courses, Built-In Skills & UI Polish
+
+- **Server-Side Curriculum Architecture & Manifest Split**:
+  - Split curriculum data into lightweight client manifests (`LearningLessonSummary`, `LearningCourseSummary` in `src/data/curriculum/manifests.ts`) and full server-side lesson details (`LearningLessonDetail` in `src/data/curriculum/`).
+  - Built on-demand `/api/curriculum/lesson` endpoint delivering rich markdown, theory deep-dives, code examples, exercises, and test cases with Zod validation, HTTP caching (`Cache-Control: public, max-age=3600, stale-while-revalidate=86400`), and non-shifting loading skeletons.
+- **SQLite WebAssembly (`sql.js`) Local Runner**:
+  - Implemented `SqlWasmRunner` in `src/lib/execution/sql-runner.ts` using official SQLite WebAssembly binaries (`public/vendor/sqljs/`).
+  - Supports deterministic schema setup execution via `stdin`, formatted ASCII tabular output, syntax/constraint diagnostics, and automated test case evaluation.
+- **HTML5 & CSS3 Live Sandboxed Preview**:
+  - Implemented live client-side sandbox iframe (`sandbox="allow-scripts"`) in CodeWorkspace and unified Playground.
+  - Features real-time rendering, Desktop / Mobile (375px) responsive viewport toggles, and manual refresh controls.
+- **Unified Multi-Language Playground Switcher**:
+  - Upgraded Playground to support 6 runtimes: `C (C11)`, `Python (3.12)`, `JavaScript (ES2024)`, `SQL (WASM)`, `HTML & CSS (Live Preview)`, `Digital Circuits (Interactive)`.
+  - Preserves isolated local drafts per language (`katalyst.<lang>.playground.v1`).
+- **5 New Full-Depth Engineering Courses (38 Lessons, 91 Total Lessons)**:
+  - Expanded catalog to 9 comprehensive courses with zero stubs or placeholders:
+    - `sql-databases`: Relational Foundations, Aggregations & Joins, CTEs & ACID Transactions (8 lessons).
+    - `html-css-web`: Semantic HTML5, Accessible Forms, Flexbox, Grid, Custom Properties, Motion (8 lessons).
+    - `dsa-mastery`: Big-O, Two Pointers, Sliding Windows, Monotonic Stacks, Trees, Graphs, DP (10 lessons).
+    - `prompt-engineering`: Tokenization, Temperature/Top-P, Few-Shot ICL, JSON Schemas, ReAct, RAG (6 lessons).
+    - `photo-editing-media`: Pixel Buffers, HSL Luminance, Histograms, Contrast Curves, Convolutions, Blending (6 lessons).
+- **Interactive Image & Color Lab Visualizer**:
+  - Authored `src/components/simulators/image-lab-visualizer.tsx` with procedural test patterns, real-time RGB histogram analysis, Tone Adjustments, and 3x3 spatial convolution kernels (Sharpen, Blur, Edge Detection, Emboss).
+- **Built-in Engineering Skills Expansion**:
+  - Added 8 specialized engineering skills in `src/lib/skills.ts`: Socratic Code Reviewer, C Memory & Pointer Auditor, SQL Query & Index Optimizer, DSA Complexity & Edge-Case Coach, Frontend Semantic & Accessibility Reviewer, Prompt Architecture Refiner, Digital Circuit & Logic Simplifier, Exam & Interview Drill Master.
+- **Explore Category Filter Pills**:
+  - Added category filter pills (`All`, `Systems`, `Web`, `Algorithms`, `Databases`, `AI & Media`, `Hardware`) to the Explore learning paths interface.
+
 ## 0.26.0 — Milestone M20: M19 E2E Verification, Runtime Hardening & MVP Deployment Readiness
 
 - **Playwright E2E Coverage for M19 Platform Features (`e2e/m19-features.spec.ts`)**:

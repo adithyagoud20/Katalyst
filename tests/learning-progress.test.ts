@@ -85,7 +85,7 @@ describe("learning curriculum and local progress", () => {
     progress = completeLesson(progress, cProgrammingPath.id, "source-to-output", now);
     const summary = getLearningDashboardSummary(progress, now);
 
-    expect(summary).toMatchObject({ lessonsCompleted: 1, totalLessons: 53, pathsStarted: 1, totalPaths: 4, pathsCompleted: 0, streak: 3 });
+    expect(summary).toMatchObject({ lessonsCompleted: 1, totalLessons: 91, pathsStarted: 1, totalPaths: 9, pathsCompleted: 0, streak: 3 });
     expect(summary.recentLessons[0]).toMatchObject({ lessonId: "source-to-output", lessonTitle: "From source code to output", kind: "lesson-completed" });
     expect(summary.days.slice(-3).map((day) => day.count)).toEqual([2, 1, 1]);
   });

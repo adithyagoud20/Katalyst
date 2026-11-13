@@ -113,6 +113,8 @@ export async function verifyExerciseSubmission(
       ? "solution.cpp"
       : language === "javascript"
       ? "solution.js"
+      : language === "sql"
+      ? "solution.sql"
       : "solution.c";
 
   for (let index = 0; index < testCases.length; index++) {

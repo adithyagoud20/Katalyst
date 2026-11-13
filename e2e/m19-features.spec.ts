@@ -33,7 +33,7 @@ test.describe("Milestone M19 Features & Architecture E2E Suite", () => {
     await expect(page.getByRole("heading", { name: "Build a foundation" })).toBeVisible();
 
     const courseCards = page.locator(".course-card-unified");
-    await expect(courseCards).toHaveCount(4);
+    await expect(courseCards).toHaveCount(9);
 
     // Verify C Foundations card
     const cCard = courseCards.filter({ hasText: "C Programming Foundations" });
@@ -205,9 +205,9 @@ test.describe("Milestone M19 Features & Architecture E2E Suite", () => {
 
     const practiceCards = page.locator(".practice-card");
 
-    // Filter by All Courses (53 lessons in total)
+    // Filter by All Courses (91 lessons in total across 9 courses)
     await page.getByRole("button", { name: "All Courses", exact: true }).click();
-    await expect(practiceCards).toHaveCount(53);
+    await expect(practiceCards).toHaveCount(91);
 
     // Filter by JavaScript (10 lessons)
     await page.getByRole("button", { name: "JavaScript", exact: true }).click();

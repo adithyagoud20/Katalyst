@@ -364,6 +364,41 @@ M19 verification on 2026-11-12: `npm run lint`, `npm run typecheck`, and `npm te
 
 M20 verification on 2026-11-13: `npm run lint`, `npm run typecheck`, and `npm test` passed (251 unit tests across 28 test suites); `npx playwright test e2e/m19-features.spec.ts` passed (5 passed); `npx playwright test e2e/workspace.spec.ts` passed (45 passed, 1 skipped); `npm run build` compiled cleanly.
 
+### M21 — Server-Side Curriculum, SQL & HTML/CSS Runtimes, 5 New Courses, Built-In Skills & UI Polish (implemented)
+
+- [x] **Pillar 1: Server-Side Curriculum Split & Dynamic Delivery**:
+  - Split curriculum architecture to eliminate client bundle bloat: lightweight client catalog manifests (`src/data/curriculum/manifests.ts`, 92KB) contain summary metadata, while complete lesson details are loaded on demand.
+  - Implemented schema types in `src/lib/learning-curriculum.ts`: `LearningLessonSummary`, `LearningLessonDetail`, `LearningModuleSummary`, `LearningCourseSummary`, and `LearningCatalogManifest`.
+  - Created server-side catalog registry in `src/data/curriculum/server-catalog.ts` and automated generator script `scripts/generate-manifests.ts` hooked into `predev` and `prebuild`.
+  - Built cached, resilient API route `GET /api/curriculum/lesson?courseId=...&lessonId=...` with Zod query validation, 400/404 handling, and HTTP `Cache-Control` (`public, max-age=3600, stale-while-revalidate=86400`).
+  - Added in-memory client-side Map caching and non-shifting pulse skeleton in `src/components/learning-experience.tsx`.
+- [x] **Pillar 2: SQLite WASM Runner, Sandboxed HTML/CSS Preview & Unified Playground**:
+  - Installed `sql.js` (SQLite compiled to WebAssembly) and established local vendor asset copying via `scripts/copy-sqljs-wasm.mjs`.
+  - Implemented `SqlWasmRunner` (`id: "browser-sql-wasm"`, `target: "browser-wasm"`) in `src/lib/execution/sql-runner.ts` with schema setup executed via `stdin`, SQL query execution, ASCII result table formatting, and syntax/constraint error reporting in `stderr`. Registered in `ExecutionRegistry`.
+  - Extended compiler diagnostics parser (`src/lib/execution/diagnostics-parser.ts`) and exercise verifier (`src/lib/exercise-verifier.ts`) for SQL.
+  - Implemented live HTML/CSS sandboxed preview in `src/components/code-workspace.tsx` and `src/components/c-playground.tsx` using `<iframe sandbox="allow-scripts">`, Desktop (100%) / Mobile (375px) viewport toggle, and refresh control.
+  - Expanded `CPlayground` into a unified 6-runtime engineering workbench supporting C (C11), Python (3.12), JavaScript (ES2024), SQL (WASM), HTML & CSS (Live Preview), and Digital Circuits (Interactive), with isolated draft persistence per runtime.
+- [x] **Pillar 3: 5 New Full-Depth Courses (38 Lessons, 91 Total, Zero Stubs) & Image Lab**:
+  - Authored 5 comprehensive new courses under `src/data/curriculum/`:
+    - `sql-databases`: SQL & Relational Database Architecture (8 lessons across 3 modules).
+    - `html-css-web`: Modern HTML5, CSS3 & Responsive Web Design (8 lessons across 3 modules).
+    - `dsa-mastery`: Data Structures & Algorithmic Problem Solving in JavaScript/Python (10 lessons across 4 modules).
+    - `prompt-engineering`: Prompt Architecture & LLM Engineering (6 lessons across 2 modules).
+    - `photo-editing-media`: Digital Image Processing & Visual Media (6 lessons across 2 modules).
+  - Every lesson authored with comprehensive theory sections, code examples, runnable exercises with starter code, multi-tiered hints, solutions, self-check checkpoints, and automated test cases.
+  - Built interactive `ImageLabVisualizer` (`src/components/simulators/image-lab-visualizer.tsx`) with procedural test card, real-time RGB histogram, tone adjustments (Exposure, Contrast, Saturation, RGB channel multipliers), and 3x3 convolution kernels (Sharpen, Blur, Edge Detection, Emboss).
+- [x] **Pillar 4: Built-in Engineering Skills Library Expansion & Explore Polish**:
+  - Added 8 specialized engineering skills to `starterSkills` in `src/lib/skills.ts`: *Socratic Code Reviewer*, *C Memory & Pointer Auditor*, *SQL Query & Index Optimizer*, *DSA Complexity & Edge-Case Coach*, *Frontend Semantic & Accessibility Reviewer*, *Prompt Architecture Refiner*, *Digital Circuit & Logic Simplifier*, and *Exam & Interview Drill Master*.
+  - Added category filter pills (`All`, `Systems`, `Web`, `Algorithms`, `Databases`, `AI & Media`, `Hardware`) to the Explore view in `src/components/learning-experience.tsx`.
+  - Updated production health route (`GET /api/health`) to verify the 9-course catalog.
+  - Authored Playwright E2E browser suite `e2e/m21-platform.spec.ts`.
+- [x] **Full Verification**:
+  - All 266 unit tests passing across 30 test suites.
+  - Typecheck passing with zero errors.
+  - Next.js production build compiling cleanly.
+
+M21 verification on 2026-11-13: `npm run lint`, `npm run typecheck`, and `npm test` passed (266 unit tests across 30 test suites); `e2e/m21-platform.spec.ts` added; Next.js 16.4.5 production build clean.
+
 ### Future planning (not started)
 
 - Verify a configured Google/Supabase deployment before claiming live account functionality. Review rate limits and provider billing before exposing AI routes publicly.

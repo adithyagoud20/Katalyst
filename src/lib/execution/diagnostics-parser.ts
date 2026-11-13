@@ -121,6 +121,16 @@ export function parseDiagnostics(
         raw: stderr.trim(),
       });
     }
+  } else if (language === "sql") {
+    const lineMatch = /(?:line\s+(\d+)|at\s+line\s+(\d+))/i.exec(stderr);
+    const lineNum = lineMatch ? parseInt(lineMatch[1] || lineMatch[2]!, 10) : 1;
+    const msg = lines.filter((l) => l.trim()).join(" ") || "SQL execution error";
+    diagnostics.push({
+      line: lineNum,
+      severity: "error",
+      message: msg.trim(),
+      raw: stderr.trim(),
+    });
   }
 
   return diagnostics;

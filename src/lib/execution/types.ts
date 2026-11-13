@@ -12,6 +12,7 @@ export type ExecutionLanguage =
   | "python"
   | "java"
   | "javascript"
+  | "sql"
   | "html"
   | "circuit";
 

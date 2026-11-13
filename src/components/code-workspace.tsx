@@ -19,9 +19,13 @@ import {
   Check,
   Code2,
   Copy,
+  Eye,
+  Laptop,
   LoaderCircle,
   Play,
   RotateCcw,
+  RotateCw,
+  Smartphone,
   Square,
   Terminal,
   Trash2,
@@ -135,6 +139,131 @@ export const pythonStreamParser = StreamLanguage.define<{ inString: string | nul
   },
 });
 
+const sqlKeywords = new Set([
+  "select", "from", "where", "insert", "into", "values", "update", "delete", "create",
+  "table", "drop", "alter", "join", "inner", "left", "right", "outer", "on", "group",
+  "by", "having", "order", "asc", "desc", "limit", "offset", "distinct", "as", "and",
+  "or", "not", "null", "primary", "key", "foreign", "references", "default", "check",
+  "unique", "with", "union", "all", "case", "when", "then", "else", "end", "is", "in",
+  "between", "like", "exists", "count", "sum", "avg", "min", "max"
+]);
+
+const sqlTypes = new Set([
+  "int", "integer", "text", "real", "blob", "varchar", "boolean", "timestamp", "datetime",
+  "numeric", "float", "double"
+]);
+
+export const sqlStreamParser = StreamLanguage.define<{ inString: string | null }>({
+  startState() {
+    return { inString: null };
+  },
+  token(stream, state) {
+    if (state.inString) {
+      while (!stream.eol()) {
+        const ch = stream.next();
+        if (ch === state.inString) {
+          state.inString = null;
+          break;
+        }
+      }
+      return "string";
+    }
+
+    if (stream.eatSpace()) return null;
+
+    if (stream.match(/^--.*$/)) {
+      stream.skipToEnd();
+      return "comment";
+    }
+
+    if (stream.match(/^\/\*[\s\S]*?\*\//)) {
+      return "comment";
+    }
+
+    const ch = stream.peek();
+    if (ch === '"' || ch === "'") {
+      state.inString = stream.next() || null;
+      while (!stream.eol()) {
+        const nextCh = stream.next();
+        if (nextCh === state.inString) {
+          state.inString = null;
+          break;
+        }
+      }
+      return "string";
+    }
+
+    if (/\d/.test(ch ?? "")) {
+      stream.match(/^[0-9]+(\.[0-9]+)?/);
+      return "number";
+    }
+
+    if (/[a-zA-Z_]/.test(ch ?? "")) {
+      stream.match(/^[a-zA-Z0-9_]+/);
+      const word = stream.current().toLowerCase();
+      if (sqlKeywords.has(word)) return "keyword";
+      if (sqlTypes.has(word)) return "typeName";
+      return "variable";
+    }
+
+    stream.next();
+    return "operator";
+  },
+});
+
+export const htmlStreamParser = StreamLanguage.define<{ inTag: boolean; inAttrString: string | null }>({
+  startState() {
+    return { inTag: false, inAttrString: null };
+  },
+  token(stream, state) {
+    if (stream.match(/^<!--[\s\S]*?-->/)) return "comment";
+
+    if (state.inAttrString) {
+      while (!stream.eol()) {
+        const ch = stream.next();
+        if (ch === state.inAttrString) {
+          state.inAttrString = null;
+          break;
+        }
+      }
+      return "string";
+    }
+
+    if (stream.eatSpace()) return null;
+
+    if (!state.inTag) {
+      if (stream.match(/^<\/?[a-zA-Z0-9-]+/)) {
+        state.inTag = true;
+        return "keyword";
+      }
+      stream.next();
+      return null;
+    } else {
+      if (stream.match(/^\/?>/)) {
+        state.inTag = false;
+        return "keyword";
+      }
+      const ch = stream.peek();
+      if (ch === '"' || ch === "'") {
+        state.inAttrString = stream.next() || null;
+        while (!stream.eol()) {
+          const nextCh = stream.next();
+          if (nextCh === state.inAttrString) {
+            state.inAttrString = null;
+            break;
+          }
+        }
+        return "string";
+      }
+      if (stream.match(/^[a-zA-Z0-9_:-]+/)) {
+        return "propertyName";
+      }
+      stream.next();
+      return "operator";
+    }
+  },
+});
+
 export function CodeWorkspace({
   language,
   initialCode,
@@ -153,18 +282,32 @@ export function CodeWorkspace({
   const [executionTimeMs, setExecutionTimeMs] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [stdinOpen, setStdinOpen] = useState(Boolean(sampleInput));
+  const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
+  const [previewKey, setPreviewKey] = useState(0);
 
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
   const editorViewRef = useRef<EditorView | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const filename =
-    language === "python" ? "main.py" : language === "javascript" ? "main.js" : "main.c";
+    language === "python"
+      ? "main.py"
+      : language === "javascript"
+      ? "main.js"
+      : language === "sql"
+      ? "query.sql"
+      : language === "html"
+      ? "index.html"
+      : "main.c";
   const languageLabel =
     language === "python"
       ? "PYTHON 3.12"
       : language === "javascript"
       ? "JAVASCRIPT (ES2024)"
+      : language === "sql"
+      ? "SQLITE (WASM)"
+      : language === "html"
+      ? "HTML5 & CSS3"
       : "C11";
 
   const parsedDiagnostics: ParsedDiagnostic[] = useMemo(() => {
@@ -185,7 +328,14 @@ export function CodeWorkspace({
   useEffect(() => {
     if (!editorContainerRef.current) return;
 
-    const languageSupport = language === "python" ? pythonStreamParser : cpp();
+    const languageSupport =
+      language === "python"
+        ? pythonStreamParser
+        : language === "sql"
+        ? sqlStreamParser
+        : language === "html"
+        ? htmlStreamParser
+        : cpp();
 
     const state = EditorState.create({
       doc: initialCode,
@@ -252,6 +402,13 @@ export function CodeWorkspace({
   }, [language, initialCode]);
 
   const handleRun = useCallback(async () => {
+    if (language === "html") {
+      setPreviewKey((k) => k + 1);
+      setStatus("ready");
+      setStatusMessage("Preview updated");
+      return;
+    }
+
     if (status === "running") return;
 
     setStatus("running");
@@ -392,9 +549,9 @@ export function CodeWorkspace({
               type="button"
               className="primary-button c-run-button"
               onClick={handleRun}
-              aria-label={`Run ${language === "python" ? "Python" : "program"}`}
+              aria-label={`Run ${language === "python" ? "Python" : language === "html" ? "Preview" : language === "sql" ? "SQL" : "program"}`}
             >
-              <Play size={14} /> Run{language === "python" ? " Python" : ""}
+              {language === "html" ? <Eye size={14} /> : <Play size={14} />} Run{language === "python" ? " Python" : language === "html" ? " Preview" : language === "sql" ? " Query" : ""}
             </button>
           )}
         </div>
@@ -403,8 +560,73 @@ export function CodeWorkspace({
       {/* CodeMirror Editor Area */}
       <div className="workspace-editor-viewport" ref={editorContainerRef} />
 
-      {/* Bottom Terminal / Output Pane */}
-      <div className="workspace-terminal-pane">
+      {/* Bottom Terminal / Output Pane OR HTML Live Preview */}
+      {language === "html" ? (
+        <div className="workspace-terminal-pane html-live-preview-section">
+          <div className="terminal-header-tabs flex items-center justify-between p-2 border-b border-[var(--border-subtle)] bg-[var(--surface-secondary)]">
+            <div className="flex items-center gap-2">
+              <span className="terminal-tab-label active flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]">
+                <Eye size={13} /> Live Sandbox Preview
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                className={`px-2 py-1 text-xs rounded border transition-colors flex items-center gap-1 ${
+                  previewMode === "desktop"
+                    ? "bg-blue-600 text-white border-blue-500 font-semibold"
+                    : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+                }`}
+                onClick={() => setPreviewMode("desktop")}
+                title="Desktop View"
+              >
+                <Laptop size={12} /> Desktop
+              </button>
+              <button
+                type="button"
+                className={`px-2 py-1 text-xs rounded border transition-colors flex items-center gap-1 ${
+                  previewMode === "mobile"
+                    ? "bg-blue-600 text-white border-blue-500 font-semibold"
+                    : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-subtle)] hover:text-[var(--text-primary)]"
+                }`}
+                onClick={() => setPreviewMode("mobile")}
+                title="Mobile View (375px)"
+              >
+                <Smartphone size={12} /> Mobile
+              </button>
+              <button
+                type="button"
+                className="px-2 py-1 text-xs rounded border border-[var(--border-subtle)] bg-[var(--surface-primary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors flex items-center gap-1 ml-1"
+                onClick={() => setPreviewKey((k) => k + 1)}
+                title="Refresh Preview"
+              >
+                <RotateCw size={12} /> Refresh
+              </button>
+            </div>
+          </div>
+          <div className="html-preview-viewport p-4 bg-[var(--surface-primary)] flex justify-center items-start min-h-[320px] overflow-auto">
+            <iframe
+              key={previewKey}
+              sandbox="allow-scripts"
+              srcDoc={source}
+              title="HTML Sandbox Live Preview"
+              className="html-preview-frame transition-all duration-200"
+              style={{
+                width: previewMode === "mobile" ? "375px" : "100%",
+                minWidth: previewMode === "mobile" ? "375px" : undefined,
+                maxWidth: previewMode === "mobile" ? "375px" : "100%",
+                minHeight: "320px",
+                height: "100%",
+                background: "#ffffff",
+                borderRadius: "8px",
+                border: "1px solid var(--border-subtle)",
+                boxShadow: previewMode === "mobile" ? "0 4px 20px rgba(0,0,0,0.15)" : "none",
+              }}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="workspace-terminal-pane">
         <div className="terminal-header-tabs">
           <div className="terminal-tabs-left">
             <span className="terminal-tab-label active">
@@ -498,6 +720,7 @@ export function CodeWorkspace({
           ) : null}
         </div>
       </div>
+      )}
     </div>
   );
 }

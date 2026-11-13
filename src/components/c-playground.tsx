@@ -7,7 +7,7 @@ import { cpp } from "@codemirror/lang-cpp";
 import { bracketMatching, foldGutter, HighlightStyle, indentOnInput, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import { EditorView, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
-import { ArrowLeft, Check, Code2, Copy, Cpu, LoaderCircle, Play, RotateCcw, Square, Terminal } from "lucide-react";
+import { ArrowLeft, Check, Code2, Copy, Cpu, Database, Globe, Laptop, LoaderCircle, Play, RotateCcw, RotateCw, Smartphone, Square, Terminal } from "lucide-react";
 import type { Package, Process, Sandbox, Wasmer } from "@wasmer/sdk/browser";
 import { CircuitSimulator } from "@/components/simulators/circuit-simulator";
 import { SimulatorErrorBoundary } from "@/components/simulators/simulator-error-boundary";
@@ -25,8 +25,6 @@ import {
   limitCPlaygroundRecord,
   normalizeStdin,
   programExpectsStdin,
-  readCPlaygroundRecord,
-  type CPlaygroundRecord,
 } from "@/lib/c-playground";
 import {
   PYTHON_PLAYGROUND_STORAGE_KEY,
@@ -35,12 +33,97 @@ import {
   PYTHON_PLAYGROUND_OUTPUT_LIMIT,
   defaultPythonProgram,
   limitPythonPlaygroundRecord,
-  readPythonPlaygroundRecord,
   programExpectsStdinPython,
-  type PythonPlaygroundRecord,
 } from "@/lib/python-playground";
 import { executeProgram } from "@/lib/execution/runner";
-import { pythonStreamParser } from "./code-workspace";
+import { pythonStreamParser, sqlStreamParser, htmlStreamParser } from "./code-workspace";
+
+export type PlaygroundLanguage = "c" | "python" | "javascript" | "sql" | "html" | "circuit";
+
+export const JS_PLAYGROUND_STORAGE_KEY = "katalyst.js.playground.v1";
+export const SQL_PLAYGROUND_STORAGE_KEY = "katalyst.sql.playground.v1";
+export const HTML_PLAYGROUND_STORAGE_KEY = "katalyst.html.playground.v1";
+export const CIRCUIT_PLAYGROUND_STORAGE_KEY = "katalyst.circuit.playground.v1";
+
+export const defaultJsProgram = `// JavaScript (ES2024) Web Worker Playground
+function computeFibonacci(n) {
+  const sequence = [0, 1];
+  for (let i = 2; i < n; i++) {
+    sequence.push(sequence[i - 1] + sequence[i - 2]);
+  }
+  return sequence;
+}
+
+console.log("Fibonacci(10):", computeFibonacci(10).join(", "));
+`;
+
+export const defaultSqlProgram = `-- SQLite WASM Database Playground
+CREATE TABLE engineers (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  specialty TEXT NOT NULL
+);
+
+INSERT INTO engineers VALUES
+  (1, 'Ada Lovelace', 'Algorithms'),
+  (2, 'Claude Shannon', 'Information Theory'),
+  (3, 'Grace Hopper', 'Compilers');
+
+SELECT * FROM engineers ORDER BY id ASC;
+`;
+
+export const defaultHtmlProgram = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KATALYST Live Preview</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0;
+      padding: 2rem;
+      background: #090d16;
+      color: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 80vh;
+    }
+    .card {
+      background: #131b2e;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 28px;
+      max-width: 440px;
+      text-align: center;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    }
+    h1 { margin-top: 0; color: #60a5fa; font-size: 1.5rem; }
+    p { color: #94a3b8; font-size: 0.95rem; line-height: 1.6; }
+    button {
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>KATALYST Web Sandbox</h1>
+    <p>Live, client-side HTML5 &amp; CSS3 preview. Edits in the editor appear here instantly.</p>
+    <button onclick="alert('Hello from KATALYST!')">Test Interaction</button>
+  </div>
+</body>
+</html>
+`;
 
 export type PendingExample = {
   code: string;
@@ -48,7 +131,7 @@ export type PendingExample = {
   lessonTitle: string;
   requestId: number;
   sampleInput?: string;
-  language?: "c" | "python";
+  language?: PlaygroundLanguage;
 };
 
 export type Activity = { source: string; diagnostics: string; output: string };
@@ -58,7 +141,7 @@ export type PlaygroundProps = {
   onReturnToLesson?: (lessonId: string) => void;
   autoInitialize?: boolean;
   compact?: boolean;
-  initialLanguage?: "c" | "python";
+  initialLanguage?: PlaygroundLanguage;
   onActivityChange?: (activity: Activity) => void;
 };
 
@@ -89,24 +172,72 @@ function describeProgress(phase: string, downloaded: number, total: number | nul
   return "Preparing the local compiler…";
 }
 
-function saveCDraft(source: string, stdin: string): boolean {
+function getPlaygroundStorageKey(lang: PlaygroundLanguage): string {
+  switch (lang) {
+    case "c":
+      return C_PLAYGROUND_STORAGE_KEY;
+    case "python":
+      return PYTHON_PLAYGROUND_STORAGE_KEY;
+    case "javascript":
+      return JS_PLAYGROUND_STORAGE_KEY;
+    case "sql":
+      return SQL_PLAYGROUND_STORAGE_KEY;
+    case "html":
+      return HTML_PLAYGROUND_STORAGE_KEY;
+    case "circuit":
+      return CIRCUIT_PLAYGROUND_STORAGE_KEY;
+  }
+}
+
+function getDefaultProgramForLang(lang: PlaygroundLanguage): string {
+  switch (lang) {
+    case "c":
+      return defaultCProgram;
+    case "python":
+      return defaultPythonProgram;
+    case "javascript":
+      return defaultJsProgram;
+    case "sql":
+      return defaultSqlProgram;
+    case "html":
+      return defaultHtmlProgram;
+    case "circuit":
+      return "";
+  }
+}
+
+function saveDraftForLang(lang: PlaygroundLanguage, src: string, inp: string): boolean {
   try {
-    const record: CPlaygroundRecord = limitCPlaygroundRecord(source, stdin);
-    window.localStorage.setItem(C_PLAYGROUND_STORAGE_KEY, JSON.stringify(record));
+    const key = getPlaygroundStorageKey(lang);
+    if (lang === "c") {
+      const record = limitCPlaygroundRecord(src, inp);
+      window.localStorage.setItem(key, JSON.stringify(record));
+    } else if (lang === "python") {
+      const record = limitPythonPlaygroundRecord(src, inp);
+      window.localStorage.setItem(key, JSON.stringify(record));
+    } else {
+      window.localStorage.setItem(
+        key,
+        JSON.stringify({ version: 1, source: src.slice(0, 100_000), stdin: inp.slice(0, 50_000) })
+      );
+    }
     return true;
   } catch {
     return false;
   }
 }
 
-function savePythonDraft(source: string, stdin: string): boolean {
+function readDraftForLang(lang: PlaygroundLanguage): { source: string; stdin: string } | null {
   try {
-    const record: PythonPlaygroundRecord = limitPythonPlaygroundRecord(source, stdin);
-    window.localStorage.setItem(PYTHON_PLAYGROUND_STORAGE_KEY, JSON.stringify(record));
-    return true;
-  } catch {
-    return false;
-  }
+    const key = getPlaygroundStorageKey(lang);
+    const item = window.localStorage.getItem(key);
+    if (!item) return null;
+    const parsed = JSON.parse(item);
+    if (parsed && typeof parsed.source === "string") {
+      return { source: parsed.source, stdin: parsed.stdin ?? "" };
+    }
+  } catch {}
+  return null;
 }
 
 export function CPlayground({
@@ -117,20 +248,16 @@ export function CPlayground({
   initialLanguage = "c",
   onActivityChange,
 }: PlaygroundProps) {
-  const [activeLanguage, setActiveLanguage] = useState<"c" | "python">(initialLanguage);
-  const [playgroundMode, setPlaygroundMode] = useState<"code" | "circuits">("code");
-  const [source, setSource] = useState(initialLanguage === "python" ? defaultPythonProgram : defaultCProgram);
+  const [activeLanguage, setActiveLanguage] = useState<PlaygroundLanguage>(initialLanguage);
+  const [playgroundMode, setPlaygroundMode] = useState<"code" | "circuits">(
+    initialLanguage === "circuit" ? "circuits" : "code"
+  );
+  const [source, setSource] = useState(getDefaultProgramForLang(initialLanguage));
   const [stdin, setStdin] = useState("");
   const [storageReady, setStorageReady] = useState(false);
   const [storageMessage, setStorageMessage] = useState("");
   const [stage, setStage] = useState<RunStage>("idle");
-  const [status, setStatus] = useState(
-    initialLanguage === "python"
-      ? "Python 3.12 runtime ready."
-      : autoInitialize
-      ? "C11 compiler is loading in the background."
-      : "C11 compiler ready to prepare."
-  );
+  const [status, setStatus] = useState("Ready");
   const [outcome, setOutcome] = useState<RunOutcome>("none");
   const [output, setOutput] = useState("");
   const [stdout, setStdout] = useState("");
@@ -142,6 +269,8 @@ export function CPlayground({
   const [downloadProgress, setDownloadProgress] = useState("");
   const [activeLesson, setActiveLesson] = useState<Pick<PendingExample, "lessonId" | "lessonTitle"> | null>(null);
   const [needsStdinConfirm, setNeedsStdinConfirm] = useState(false);
+  const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
+  const [previewKey, setPreviewKey] = useState(0);
 
   const editorHostRef = useRef<HTMLDivElement>(null);
   const editorViewRef = useRef<EditorView | null>(null);
@@ -162,27 +291,13 @@ export function CPlayground({
     aliveRef.current = true;
     const timer = window.setTimeout(() => {
       try {
-        if (activeLanguage === "python") {
-          const pyRecord = readPythonPlaygroundRecord(window.localStorage.getItem(PYTHON_PLAYGROUND_STORAGE_KEY));
-          if (pyRecord.kind === "valid") {
-            setSource(pyRecord.record.source);
-            setStdin(pyRecord.record.stdin);
-          }
+        const saved = readDraftForLang(activeLanguage);
+        if (saved) {
+          setSource(saved.source);
+          setStdin(saved.stdin);
         } else {
-          const cRecord = readCPlaygroundRecord(window.localStorage.getItem(C_PLAYGROUND_STORAGE_KEY));
-          if (cRecord.kind === "valid") {
-            const isPythonCode = /^\s*(def |import |from |print\()/m.test(cRecord.record.source);
-            if (!isPythonCode) {
-              setSource(cRecord.record.source);
-              setStdin(cRecord.record.stdin);
-            } else {
-              setSource(defaultCProgram);
-              setStdin("");
-              saveCDraft(defaultCProgram, "");
-            }
-          } else if (cRecord.kind === "invalid") {
-            setStorageMessage("The saved C draft could not be read. A new draft will be saved when you edit it.");
-          }
+          setSource(getDefaultProgramForLang(activeLanguage));
+          setStdin("");
         }
       } catch {
         setStorageMessage("Browser storage is unavailable. This draft will stay in memory for this visit.");
@@ -192,9 +307,8 @@ export function CPlayground({
     return () => window.clearTimeout(timer);
   }, [activeLanguage]);
 
-  const saveCurrentDraft = useCallback((lang: "c" | "python", src: string, inp: string): boolean => {
-    if (lang === "python") return savePythonDraft(src, inp);
-    return saveCDraft(src, inp);
+  const saveCurrentDraft = useCallback((lang: PlaygroundLanguage, src: string, inp: string): boolean => {
+    return saveDraftForLang(lang, src, inp);
   }, []);
 
   const updateSource = useCallback((value: string) => {
@@ -279,9 +393,17 @@ export function CPlayground({
     if (!storageReady || !pendingExample || pendingExample.requestId === handledExampleRef.current) return;
     handledExampleRef.current = pendingExample.requestId;
 
-    const detectedLang: "c" | "python" =
+    const detectedLang: PlaygroundLanguage =
       pendingExample.language ??
-      (pendingExample.lessonId.startsWith("py") || pendingExample.lessonId.includes("python") ? "python" : "c");
+      (pendingExample.lessonId.startsWith("py") || pendingExample.lessonId.includes("python")
+        ? "python"
+        : pendingExample.lessonId.startsWith("sql")
+        ? "sql"
+        : pendingExample.lessonId.startsWith("html") || pendingExample.lessonId.startsWith("css")
+        ? "html"
+        : pendingExample.lessonId.startsWith("js")
+        ? "javascript"
+        : "c");
 
     // Guard: In compact lesson mode restricted to C, do not accept python examples
     if (compact && initialLanguage === "c" && detectedLang === "python") {
@@ -316,8 +438,16 @@ export function CPlayground({
       // Update editor
       const editor = editorViewRef.current;
       if (editor) {
+        const modeExt =
+          detectedLang === "python"
+            ? pythonStreamParser
+            : detectedLang === "sql"
+            ? sqlStreamParser
+            : detectedLang === "html"
+            ? htmlStreamParser
+            : cpp();
         editor.dispatch({
-          effects: languageCompartment.reconfigure(detectedLang === "python" ? pythonStreamParser : cpp()),
+          effects: languageCompartment.reconfigure(modeExt),
           changes: { from: 0, to: editor.state.doc.length, insert: nextSource },
         });
       }
@@ -390,47 +520,26 @@ export function CPlayground({
     compilerPromiseRef.current = null;
   }, []);
 
-  const switchLanguage = (targetLang: "c" | "python") => {
+  const switchLanguage = (targetLang: PlaygroundLanguage) => {
     if (targetLang === activeLanguage) return;
     // 1. Save current language draft
     saveCurrentDraft(activeLanguage, source, stdin);
 
-    // 2. Load target language draft
-    let nextSource = "";
-    let nextStdin = "";
-    if (targetLang === "python") {
-      try {
-        const read = readPythonPlaygroundRecord(window.localStorage.getItem(PYTHON_PLAYGROUND_STORAGE_KEY));
-        if (read.kind === "valid") {
-          nextSource = read.record.source;
-          nextStdin = read.record.stdin;
-        } else {
-          nextSource = defaultPythonProgram;
-        }
-      } catch {
-        nextSource = defaultPythonProgram;
-      }
-    } else {
-      try {
-        const read = readCPlaygroundRecord(window.localStorage.getItem(C_PLAYGROUND_STORAGE_KEY));
-        if (read.kind === "valid") {
-          if (/^\s*(def |import |from |print\(|class )/m.test(read.record.source)) {
-            nextSource = defaultCProgram;
-          } else {
-            nextSource = read.record.source;
-          }
-          nextStdin = read.record.stdin;
-        } else {
-          nextSource = defaultCProgram;
-        }
-      } catch {
-        nextSource = defaultCProgram;
-      }
-    }
-
     isSwitchingRef.current = true;
     try {
       setActiveLanguage(targetLang);
+      if (targetLang === "circuit") {
+        setPlaygroundMode("circuits");
+        setNeedsStdinConfirm(false);
+        setStatus("Digital Circuit Simulator ready.");
+        return;
+      }
+
+      setPlaygroundMode("code");
+      const draft = readDraftForLang(targetLang);
+      const nextSource = draft?.source ?? getDefaultProgramForLang(targetLang);
+      const nextStdin = draft?.stdin ?? "";
+
       setSource(nextSource);
       setStdin(nextStdin);
       setNeedsStdinConfirm(false);
@@ -441,19 +550,37 @@ export function CPlayground({
       setError("");
       setOutcome("none");
       setStage("idle");
-      setStatus(
-        targetLang === "python"
-          ? "Python 3.12 runtime ready. Code executes in browser WebAssembly."
-          : compilerState === "ready"
-          ? "C11 compiler ready. Your code stays in this browser."
-          : "C11 compiler ready to prepare."
-      );
+
+      if (targetLang === "html") {
+        setStatus("HTML/CSS Live Sandbox preview ready.");
+        setPreviewKey((k) => k + 1);
+      } else if (targetLang === "sql") {
+        setStatus("SQLite WebAssembly ready.");
+      } else if (targetLang === "javascript") {
+        setStatus("JavaScript worker ready.");
+      } else if (targetLang === "python") {
+        setStatus("Python 3.12 runtime ready. Code executes in browser WebAssembly.");
+      } else {
+        setStatus(
+          compilerState === "ready"
+            ? "C11 compiler ready. Your code stays in this browser."
+            : "C11 compiler ready to prepare."
+        );
+      }
 
       // Reconfigure CodeMirror
       const editor = editorViewRef.current;
       if (editor) {
+        const modeExt =
+          targetLang === "python"
+            ? pythonStreamParser
+            : targetLang === "sql"
+            ? sqlStreamParser
+            : targetLang === "html"
+            ? htmlStreamParser
+            : cpp();
         editor.dispatch({
-          effects: languageCompartment.reconfigure(targetLang === "python" ? pythonStreamParser : cpp()),
+          effects: languageCompartment.reconfigure(modeExt),
           changes: { from: 0, to: editor.state.doc.length, insert: nextSource },
         });
       }
@@ -496,12 +623,23 @@ export function CPlayground({
 
     const expectsInput = activeLanguage === "python" ? programExpectsStdinPython(source) : programExpectsStdin(source);
 
-    if (!source.trim()) {
-      setError(`Add a ${activeLanguage === "python" ? "Python" : "C"} program before running it.`);
+    if (activeLanguage === "circuit") {
+      setStatus("Circuit simulation runs interactively.");
       return;
     }
 
-    if (!forceEmptyStdin && expectsInput && !stdin.trim()) {
+    if (activeLanguage === "html") {
+      setPreviewKey((k) => k + 1);
+      setStatus("HTML/CSS Live Sandbox preview refreshed.");
+      return;
+    }
+
+    if (!source.trim()) {
+      setError(`Add code before running it.`);
+      return;
+    }
+
+    if (!forceEmptyStdin && expectsInput && !stdin.trim() && (activeLanguage === "c" || activeLanguage === "python")) {
       setNeedsStdinConfirm(true);
       setError(
         `This program reads standard input (${
@@ -513,8 +651,8 @@ export function CPlayground({
     }
     setNeedsStdinConfirm(false);
 
-    // Python execution via Pyodide
-    if (activeLanguage === "python") {
+    // Python, JavaScript, and SQL execution via unified executeProgram
+    if (activeLanguage === "python" || activeLanguage === "javascript" || activeLanguage === "sql") {
       const runId = ++runIdRef.current;
       const controller = new AbortController();
       abortRef.current = controller;
@@ -522,7 +660,13 @@ export function CPlayground({
 
       setStage("running");
       setOutcome("none");
-      setStatus("Executing Python program in browser WebAssembly…");
+      setStatus(
+        activeLanguage === "sql"
+          ? "Executing query in SQLite WebAssembly…"
+          : activeLanguage === "javascript"
+          ? "Executing JavaScript in Web Worker…"
+          : "Executing Python program in browser WebAssembly…"
+      );
       setOutput("");
       setStdout("");
       setStderr("");
@@ -530,11 +674,17 @@ export function CPlayground({
       setError("");
 
       try {
+        const filename =
+          activeLanguage === "sql"
+            ? "query.sql"
+            : activeLanguage === "javascript"
+            ? "main.js"
+            : "main.py";
+
         const result = await executeProgram({
-          language: "python",
-          files: [{ path: "main.py", content: source }],
+          language: activeLanguage,
+          files: [{ path: filename, content: source }],
           stdin: normalizeStdin(stdin),
-          entrypoint: "main.py",
           signal: controller.signal,
           limits: {
             timeoutMs: 10_000,
@@ -559,12 +709,12 @@ export function CPlayground({
 
         if (result.ok) {
           setOutcome("success");
-          setStatus(`Program finished in ${result.executionTimeMs} ms in the WebAssembly sandbox.`);
+          setStatus(`Execution completed in ${result.executionTimeMs} ms in local sandbox.`);
         } else {
           const timedOut = result.stage === "timeout" || result.error?.includes("timeout");
           setOutcome(timedOut ? "timeout" : "runtime-error");
           setError(result.stderr || result.error || `Execution failed with status ${result.exitCode}.`);
-          setStatus(timedOut ? "Program timed out and was stopped." : `Program exited with error (status ${result.exitCode}).`);
+          setStatus(timedOut ? "Execution timed out." : `Execution finished with an error.`);
         }
       } catch (runErr) {
         if (!isCurrent()) return;
@@ -736,7 +886,7 @@ export function CPlayground({
   };
 
   const resetSource = () => {
-    const starter = activeLanguage === "python" ? defaultPythonProgram : defaultCProgram;
+    const starter = getDefaultProgramForLang(activeLanguage);
     setSource(starter);
     setStdin("");
     setNeedsStdinConfirm(false);
@@ -782,6 +932,70 @@ export function CPlayground({
       : "Compiler ready to prepare";
 
   const expectsInput = activeLanguage === "python" ? programExpectsStdinPython(source) : programExpectsStdin(source);
+  const langDetails = {
+    python: {
+      eyebrow: "PYTHON PROGRAMMING · WORKBENCH",
+      title: "Python Workbench",
+      desc: "Write, interpret, and run Python 3.12 in your browser.",
+      badge: "Python · 3.12",
+      filename: "main.py",
+      tag: "Python 3.12",
+      engine: "Engine: Pyodide WebAssembly (Python 3.12) · Code is limited to 24 KB, input to 4 KB, output to 64 KB, run to 10 seconds. Network access is disabled.",
+      notice: "Python 3.12 runs in this browser tab via Pyodide WebAssembly; KATALYST does not upload your code.",
+      poweredBy: "Powered by Pyodide",
+    },
+    javascript: {
+      eyebrow: "JAVASCRIPT SYSTEMS · WORKBENCH",
+      title: "JavaScript Workbench",
+      desc: "Write, optimize, and run ES2024 algorithms in an isolated Web Worker.",
+      badge: "JavaScript · ES2024",
+      filename: "main.js",
+      tag: "JavaScript ES2024",
+      engine: "Engine: Web Worker Sandbox · Code is limited to 32 KB, output to 64 KB, run to 10 seconds. DOM and network access are restricted.",
+      notice: "JavaScript runs in this browser tab inside an isolated Web Worker sandbox; KATALYST does not upload your code.",
+      poweredBy: "Powered by Web Worker",
+    },
+    sql: {
+      eyebrow: "RELATIONAL DATABASES · WORKBENCH",
+      title: "SQL Query Workbench",
+      desc: "Write and execute SQL queries against an in-memory SQLite database.",
+      badge: "SQLite · WASM",
+      filename: "query.sql",
+      tag: "SQLite 3.45",
+      engine: "Engine: SQLite WebAssembly (sql.js) · Pure in-memory SQLite engine running entirely in your browser. Queries never leave your machine.",
+      notice: "SQLite 3.45 runs entirely inside your browser via SQLite WebAssembly (sql.js); KATALYST queries never leave your machine.",
+      poweredBy: "Powered by SQLite WASM",
+    },
+    html: {
+      eyebrow: "FRONTEND WEB · WORKBENCH",
+      title: "HTML & CSS Sandbox",
+      desc: "Design, structure, and style HTML5 & CSS3 with instantaneous live rendering.",
+      badge: "HTML5 & CSS3 · Live Preview",
+      filename: "index.html",
+      tag: "HTML5 / CSS3",
+      engine: "Engine: Browser Sandboxed Frame · Rendered client-side in an isolated iframe. No external server requests.",
+      notice: "HTML5 & CSS3 live sandbox renders directly inside an isolated iframe in this browser; KATALYST does not upload your code.",
+      poweredBy: "Powered by Browser Sandbox",
+    },
+    c: {
+      eyebrow: "C PROGRAMMING · WORKBENCH",
+      title: "C Workbench",
+      desc: "Write, compile, and run C11 in your browser.",
+      badge: "C · C11",
+      filename: "main.c",
+      tag: "C11",
+      engine: "Compiler package: clang/clang · Code is limited to 12 KB, input to 2 KB, output to 64 KB, compilation to 15 seconds, and each run to 8 seconds. Network access is disabled.",
+      notice:
+        compilerState === "ready"
+          ? "C11 is ready. Your code compiles to WebAssembly and runs in this browser tab; KATALYST does not upload it."
+          : compilerState === "failed"
+          ? "The C11 compiler could not be prepared. Your lesson is still available; retry setup when ready."
+          : compilerState === "initializing"
+          ? "The C11 compiler is preparing in the background. You can read and edit while it initializes; Run becomes available when setup finishes."
+          : "The C11 compiler is ready. Click Run to prepare and execute your code in this browser.",
+      poweredBy: "Powered by Wasmer",
+    },
+  }[activeLanguage === "circuit" ? "c" : activeLanguage];
 
   return (
     <section
@@ -796,10 +1010,7 @@ export function CPlayground({
             role="tab"
             aria-selected={playgroundMode === "code" && activeLanguage === "c"}
             className={`runtime-tab${playgroundMode === "code" && activeLanguage === "c" ? " active" : ""}`}
-            onClick={() => {
-              setPlaygroundMode("code");
-              switchLanguage("c");
-            }}
+            onClick={() => switchLanguage("c")}
           >
             <Code2 size={14} />
             <span>C (C11)</span>
@@ -810,10 +1021,7 @@ export function CPlayground({
             role="tab"
             aria-selected={playgroundMode === "code" && activeLanguage === "python"}
             className={`runtime-tab${playgroundMode === "code" && activeLanguage === "python" ? " active" : ""}`}
-            onClick={() => {
-              setPlaygroundMode("code");
-              switchLanguage("python");
-            }}
+            onClick={() => switchLanguage("python")}
           >
             <Code2 size={14} />
             <span>Python (3.12)</span>
@@ -822,9 +1030,42 @@ export function CPlayground({
           <button
             type="button"
             role="tab"
+            aria-selected={playgroundMode === "code" && activeLanguage === "javascript"}
+            className={`runtime-tab${playgroundMode === "code" && activeLanguage === "javascript" ? " active" : ""}`}
+            onClick={() => switchLanguage("javascript")}
+          >
+            <Code2 size={14} />
+            <span>JavaScript (ES2024)</span>
+            <span className="runtime-badge badge-wasm">Web Worker</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={playgroundMode === "code" && activeLanguage === "sql"}
+            className={`runtime-tab${playgroundMode === "code" && activeLanguage === "sql" ? " active" : ""}`}
+            onClick={() => switchLanguage("sql")}
+          >
+            <Database size={14} />
+            <span>SQL (WASM)</span>
+            <span className="runtime-badge badge-wasm">SQLite WASM</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={playgroundMode === "code" && activeLanguage === "html"}
+            className={`runtime-tab${playgroundMode === "code" && activeLanguage === "html" ? " active" : ""}`}
+            onClick={() => switchLanguage("html")}
+          >
+            <Globe size={14} />
+            <span>HTML &amp; CSS</span>
+            <span className="runtime-badge badge-wasm">Live Preview</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
             aria-selected={playgroundMode === "circuits"}
             className={`runtime-tab${playgroundMode === "circuits" ? " active" : ""}`}
-            onClick={() => setPlaygroundMode("circuits")}
+            onClick={() => switchLanguage("circuit")}
           >
             <Cpu size={14} />
             <span>Circuit Simulator</span>
@@ -844,19 +1085,13 @@ export function CPlayground({
           {!compact ? (
             <header className="c-playground-heading">
           <div className="c-playground-heading-copy">
-            <span className="eyebrow">
-              {activeLanguage === "python" ? "PYTHON PROGRAMMING · WORKBENCH" : "C PROGRAMMING · WORKBENCH"}
-            </span>
-            <h1 id="c-playground-title">{activeLanguage === "python" ? "Python Workbench" : "C Workbench"}</h1>
-            <p>
-              {activeLanguage === "python"
-                ? "Write, interpret, and run Python 3.12 in your browser."
-                : "Write, compile, and run C11 in your browser."}
-            </p>
+            <span className="eyebrow">{langDetails.eyebrow}</span>
+            <h1 id="c-playground-title">{langDetails.title}</h1>
+            <p>{langDetails.desc}</p>
           </div>
           <div className="c-playground-heading-meta">
             <span className="c-language-label">
-              <Code2 size={14} /> {activeLanguage === "python" ? "Python · 3.12" : "C · C11"}
+              <Code2 size={14} /> {langDetails.badge}
             </span>
             {activeLesson && (
               <button className="learning-text-button" onClick={() => onReturnToLesson(activeLesson.lessonId)}>
@@ -867,37 +1102,27 @@ export function CPlayground({
         </header>
       ) : (
         <h2 id="c-playground-title" className="sr-only">
-          {activeLanguage === "python"
-            ? "Python code editor and local program output"
-            : "C11 code editor and local program output"}
+          {langDetails.title}
         </h2>
       )}
 
       <div className="c-playground-notice">
         <span className="c-playground-status-dot" />
         <p>
-          {activeLanguage === "python"
-            ? "Python 3.12 runs in this browser tab via Pyodide WebAssembly; KATALYST does not upload your code."
-            : compilerState === "ready"
-            ? "C11 is ready. Your code compiles to WebAssembly and runs in this browser tab; KATALYST does not upload it."
-            : compilerState === "failed"
-            ? "The C11 compiler could not be prepared. Your lesson is still available; retry setup when ready."
-            : compilerState === "initializing"
-            ? "The C11 compiler is preparing in the background. You can read and edit while it initializes; Run becomes available when setup finishes."
-            : "The C11 compiler is ready. Click Run to prepare and execute your code in this browser."}{" "}
-          The runtime is cached in this browser.
+          {langDetails.notice}{" "}
+          {activeLanguage === "c" && "The runtime is cached in this browser."}
         </p>
-        <span>{activeLanguage === "python" ? "Powered by Pyodide" : "Powered by Wasmer"}</span>
+        <span>{langDetails.poweredBy}</span>
       </div>
       {storageMessage && <p className="c-playground-storage" role="status">{storageMessage}</p>}
 
       <div className="c-playground-grid">
-        <section className="c-editor-pane" aria-label={activeLanguage === "python" ? "Python source editor" : "C source editor"}>
+        <section className="c-editor-pane" aria-label={`${langDetails.tag} source editor`}>
           <div className="c-pane-heading">
             <div>
               <Code2 size={15} />
-              <strong>{activeLanguage === "python" ? "main.py" : "main.c"}</strong>
-              <span>{activeLanguage === "python" ? "Python 3.12" : "C11"}</span>
+              <strong>{langDetails.filename}</strong>
+              <span>{langDetails.tag}</span>
             </div>
             <div className="c-pane-actions">
               <span>
@@ -911,7 +1136,7 @@ export function CPlayground({
             </div>
           </div>
           <label className="sr-only" htmlFor="c-playground-source">
-            {activeLanguage === "python" ? "Python source code" : "C source code"}
+            {`${langDetails.tag} source code`}
           </label>
           <div
             id="c-playground-source"
@@ -921,9 +1146,7 @@ export function CPlayground({
           />
           <div className="c-editor-footer">
             <span id="c-playground-language">
-              {activeLanguage === "python"
-                ? "Python 3.12 · Pyodide WebAssembly · local draft"
-                : "C11 · clang to WebAssembly · local draft"}
+              {`${langDetails.badge} · local draft`}
             </span>
             <button type="button" className="c-small-action" onClick={resetSource}>
               <RotateCcw size={13} />
@@ -932,110 +1155,178 @@ export function CPlayground({
           </div>
         </section>
 
-        <section className="c-output-pane" aria-label="Program input and output">
-          <div className="c-pane-heading">
-            <div>
-              <Terminal size={15} />
-              <strong>Terminal</strong>
-              <span>{activeLanguage === "python" ? "Python 3.12 ready" : compilerStatus}</span>
-            </div>
-            {stage === "idle" ? (
-              <div className="c-run-actions">
-                {needsStdinConfirm && (
-                  <button type="button" className="c-small-action c-run-eof-button" onClick={() => void runProgram(true)}>
-                    Run with empty input (EOF)
+        {activeLanguage === "html" ? (
+          <section className="c-output-pane flex flex-col" aria-label="HTML and CSS live preview">
+            <div className="c-pane-heading">
+              <div className="flex items-center gap-2">
+                <Globe size={15} />
+                <strong>Live Preview</strong>
+                <span className="text-xs text-[var(--text-secondary)]">Sandbox</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center rounded border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-0.5">
+                  <button
+                    type="button"
+                    className={`px-2 py-0.5 text-xs rounded transition-colors flex items-center gap-1 ${
+                      previewMode === "desktop"
+                        ? "bg-blue-600 text-white font-semibold"
+                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                    onClick={() => setPreviewMode("desktop")}
+                    title="Desktop Preview"
+                  >
+                    <Laptop size={12} /> Desktop
                   </button>
-                )}
+                  <button
+                    type="button"
+                    className={`px-2 py-0.5 text-xs rounded transition-colors flex items-center gap-1 ${
+                      previewMode === "mobile"
+                        ? "bg-blue-600 text-white font-semibold"
+                        : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                    }`}
+                    onClick={() => setPreviewMode("mobile")}
+                    title="Mobile Preview (375px)"
+                  >
+                    <Smartphone size={12} /> Mobile
+                  </button>
+                </div>
                 <button
                   type="button"
-                  className="c-run-button"
-                  onClick={() => void runProgram(false)}
-                  disabled={activeLanguage === "c" && compilerState === "initializing"}
+                  className="c-small-action"
+                  onClick={() => {
+                    setPreviewKey((k) => k + 1);
+                    setStatus("HTML preview refreshed.");
+                  }}
+                  title="Refresh Preview"
                 >
-                  <Play size={14} />
-                  Run code
+                  <RotateCw size={12} /> Refresh
                 </button>
               </div>
-            ) : (
-              <button type="button" className="c-stop-button" onClick={stopRun}>
-                <Square size={12} />
-                Stop
-              </button>
-            )}
-          </div>
-          {activeLanguage === "c" && compilerState === "initializing" && (
-            <div className="c-compiler-progress" role="status">
-              <LoaderCircle size={14} className="c-loading-icon" />
-              <span>{downloadProgress || "Checking the browser cache and preparing C11…"}</span>
             </div>
-          )}
-          {activeLanguage === "c" && compilerState === "failed" && (
-            <div className="c-compiler-failure" role="alert">
-              <span>{error || "Compiler initialization failed."}</span>
-              <button type="button" className="secondary-button" onClick={() => void ensureCompiler().catch(() => undefined)}>
-                Retry compiler setup
-              </button>
+            <div className="p-3 bg-[var(--surface-primary)] flex justify-center items-start flex-1 min-h-[360px] overflow-auto">
+              <iframe
+                key={previewKey}
+                sandbox="allow-scripts"
+                srcDoc={source}
+                title="HTML Live Sandbox Preview"
+                style={{
+                  width: previewMode === "mobile" ? "375px" : "100%",
+                  minWidth: previewMode === "mobile" ? "375px" : undefined,
+                  maxWidth: previewMode === "mobile" ? "375px" : "100%",
+                  minHeight: "360px",
+                  height: "100%",
+                  background: "#ffffff",
+                  borderRadius: "8px",
+                  border: "1px solid var(--border-subtle)",
+                  boxShadow: previewMode === "mobile" ? "0 4px 20px rgba(0,0,0,0.15)" : "none",
+                }}
+              />
             </div>
-          )}
-          <label className="c-stdin-label" htmlFor="c-playground-stdin">
-            Program input <span>stdin · one line at a time</span>
-            {expectsInput && <span className="c-stdin-hint">Input expected</span>}
-          </label>
-          <textarea
-            id="c-playground-stdin"
-            className={`c-stdin-editor${needsStdinConfirm ? " needs-input" : ""}`}
-            value={stdin}
-            onChange={(event) => updateStdin(event.target.value)}
-            placeholder="Enter values here when your program reads input."
-            maxLength={activeLanguage === "python" ? PYTHON_PLAYGROUND_STDIN_LIMIT : C_PLAYGROUND_STDIN_LIMIT}
-            spellCheck={false}
-          />
-          <div className="c-console-heading">
-            <span>Output</span>
-            <span className={`c-run-status outcome-${outcome}`} role="status">
-              {stage !== "idle" && <LoaderCircle size={13} className="c-loading-icon" />}
-              {outcome === "success" && <Check size={13} />}
-              {status}
-            </span>
-            <button
-              type="button"
-              className="c-small-action"
-              onClick={clearOutput}
-              disabled={stage !== "idle"}
-              aria-label="Clear terminal output"
-            >
-              Clear output
-            </button>
-          </div>
-          <div className="c-console-output" aria-live="polite" aria-label="Program output">
-            <div className="c-output-stream">
-              <span>stdout</span>
-              <pre>{stdout || (stage === "idle" ? "Run the example to see its output here." : "Waiting for program output…")}</pre>
+          </section>
+        ) : (
+          <section className="c-output-pane" aria-label="Program input and output">
+            <div className="c-pane-heading">
+              <div>
+                <Terminal size={15} />
+                <strong>Terminal</strong>
+                <span>{activeLanguage === "c" ? compilerStatus : `${langDetails.tag} ready`}</span>
+              </div>
+              {stage === "idle" ? (
+                <div className="c-run-actions">
+                  {needsStdinConfirm && (
+                    <button type="button" className="c-small-action c-run-eof-button" onClick={() => void runProgram(true)}>
+                      Run with empty input (EOF)
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="c-run-button"
+                    onClick={() => void runProgram(false)}
+                    disabled={activeLanguage === "c" && compilerState === "initializing"}
+                  >
+                    <Play size={14} />
+                    {activeLanguage === "sql" ? "Execute SQL" : "Run code"}
+                  </button>
+                </div>
+              ) : (
+                <button type="button" className="c-stop-button" onClick={stopRun}>
+                  <Square size={12} />
+                  Stop
+                </button>
+              )}
             </div>
-            {stderr && (
-              <div className="c-output-stream stderr">
-                <span>stderr</span>
-                <pre>{stderr}</pre>
+            {activeLanguage === "c" && compilerState === "initializing" && (
+              <div className="c-compiler-progress" role="status">
+                <LoaderCircle size={14} className="c-loading-icon" />
+                <span>{downloadProgress || "Checking the browser cache and preparing C11…"}</span>
               </div>
             )}
-          </div>
-          {diagnostics && (
-            <details className="c-compiler-diagnostics" open={outcome === "compile-error"}>
-              <summary>{outcome === "compile-error" ? "Compiler errors" : "Compiler messages"}</summary>
-              <pre>{diagnostics}</pre>
-            </details>
-          )}
-          {error && (activeLanguage === "python" || compilerState !== "failed") && (
-            <div className="c-playground-error" role="alert">
-              {error}
+            {activeLanguage === "c" && compilerState === "failed" && (
+              <div className="c-compiler-failure" role="alert">
+                <span>{error || "Compiler initialization failed."}</span>
+                <button type="button" className="secondary-button" onClick={() => void ensureCompiler().catch(() => undefined)}>
+                  Retry compiler setup
+                </button>
+              </div>
+            )}
+            <label className="c-stdin-label" htmlFor="c-playground-stdin">
+              {activeLanguage === "sql" ? "Schema Setup & Input (Optional)" : "Program input"} <span>stdin · one line at a time</span>
+              {expectsInput && <span className="c-stdin-hint">Input expected</span>}
+            </label>
+            <textarea
+              id="c-playground-stdin"
+              className={`c-stdin-editor${needsStdinConfirm ? " needs-input" : ""}`}
+              value={stdin}
+              onChange={(event) => updateStdin(event.target.value)}
+              placeholder={activeLanguage === "sql" ? "Optional: Enter DDL/DML statements to execute before the main query." : "Enter values here when your program reads input."}
+              maxLength={activeLanguage === "python" ? PYTHON_PLAYGROUND_STDIN_LIMIT : C_PLAYGROUND_STDIN_LIMIT}
+              spellCheck={false}
+            />
+            <div className="c-console-heading">
+              <span>Output</span>
+              <span className={`c-run-status outcome-${outcome}`} role="status">
+                {stage !== "idle" && <LoaderCircle size={13} className="c-loading-icon" />}
+                {outcome === "success" && <Check size={13} />}
+                {status}
+              </span>
+              <button
+                type="button"
+                className="c-small-action"
+                onClick={clearOutput}
+                disabled={stage !== "idle"}
+                aria-label="Clear terminal output"
+              >
+                Clear output
+              </button>
             </div>
-          )}
-        </section>
+            <div className="c-console-output" aria-live="polite" aria-label="Program output">
+              <div className="c-output-stream">
+                <span>stdout</span>
+                <pre>{stdout || (stage === "idle" ? "Run the example to see its output here." : "Waiting for program output…")}</pre>
+              </div>
+              {stderr && (
+                <div className="c-output-stream stderr">
+                  <span>stderr</span>
+                  <pre>{stderr}</pre>
+                </div>
+              )}
+            </div>
+            {diagnostics && (
+              <details className="c-compiler-diagnostics" open={outcome === "compile-error"}>
+                <summary>{outcome === "compile-error" ? "Compiler errors" : "Compiler messages"}</summary>
+                <pre>{diagnostics}</pre>
+              </details>
+            )}
+            {error && (activeLanguage !== "c" || compilerState !== "failed") && (
+              <div className="c-playground-error" role="alert">
+                {error}
+              </div>
+            )}
+          </section>
+        )}
       </div>
       <p className="c-playground-footnote">
-        {activeLanguage === "python"
-          ? "Engine: Pyodide WebAssembly (Python 3.12) · Code is limited to 24 KB, input to 4 KB, output to 64 KB, run to 10 seconds. Network access is disabled."
-          : "Compiler package: clang/clang · Code is limited to 12 KB, input to 2 KB, output to 64 KB, compilation to 15 seconds, and each run to 8 seconds. Network access is disabled."}
+        {langDetails.engine}
       </p>
         </>
       )}

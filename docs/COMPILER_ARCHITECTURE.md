@@ -227,3 +227,41 @@ A critical part of M17.3 was evaluating modern web-based code editor solutions t
 - `CircuitSimulator` (`src/components/simulators/circuit-simulator.tsx`):
   - Digital Mode: Interactive logic gates (AND, OR, NOT, NAND, NOR, XOR), dynamic toggle inputs, live wire state visualization (high/low logic levels), and real-time truth table evaluation.
   - Analog Mode: RC circuit capacitor charging/discharging curves, Ohm's law ($V=IR$), interactive sliders for resistance, capacitance, and supply voltage, with live power and current readouts.
+
+---
+
+## 9. Milestone M21 Execution Enhancements
+
+### 9.1 SQLite WebAssembly Runner (`SqlWasmRunner`)
+- **Location**: `src/lib/execution/sql-runner.ts` (`id: "browser-sql-wasm"`, `target: "browser-wasm"`).
+- **Core Technology**: `sql.js` (official SQLite 3 C engine compiled to WebAssembly via Emscripten).
+- **Asset Distribution**: WASM binaries and glue code are vendor-copied to `public/vendor/sqljs/` (`sql-wasm.wasm`, `sql-wasm.js`) via `scripts/copy-sqljs-wasm.mjs`.
+- **Schema Initialization via Stdin**: When pre-populated schemas or datasets are required (such as in exercises), SQL DDL/DML statements passed in `request.stdin` are executed deterministically before the user's query executes.
+- **ASCII Table Formatter**: Multi-row, multi-column query result sets (`db.exec`) are converted into cleanly formatted, human-readable ASCII tables with aligned columns, dividers, and row count summaries.
+- **Error Handling**: SQLite syntax errors, table constraints, foreign key violations, and missing column exceptions are captured cleanly and mapped to `stderr` with informative diagnostics.
+- **Zero Server Overhead**: The database lives entirely in browser WebAssembly memory; queries execute in <2ms with zero cloud egress or server state.
+
+### 9.2 Live HTML & CSS Sandboxed Iframe Preview
+- **Location**: `src/components/code-workspace.tsx` & `src/components/c-playground.tsx`.
+- **Security Boundary**: Rendered inside an `<iframe sandbox="allow-scripts">` element with `data:` URI or `srcdoc`. The sandbox forbids top-level navigation, same-origin access, form submissions outside the sandbox, and local storage access.
+- **Responsive Viewport Controls**: Provides an instant toggle between Desktop (100% fluid width) and Mobile (375px responsive simulator frame) with visible viewport dimension tags and an instant reload button.
+- **Live Sync**: Learner edits to HTML markup and embedded CSS styles immediately reflect in the preview upon execution or automated reload.
+
+### 9.3 Unified 6-Runtime Playground Workbench
+- **Location**: `src/components/c-playground.tsx`.
+- **Supported Runtimes**:
+  1. `C (C11)`: Clang/LLVM WebAssembly compiler via Wasmer SDK with stdin support.
+  2. `Python (3.12)`: CPython WebAssembly micro-runtime via Pyodide.
+  3. `JavaScript (ES2024)`: Isolated Web Worker execution with console stream capture.
+  4. `SQL (WASM)`: SQLite 3 WebAssembly engine with schema pre-seeding and table formatting.
+  5. `HTML & CSS (Live Preview)`: Sandboxed iframe preview with desktop/mobile viewport toggle.
+  6. `Digital Circuits (Interactive)`: Falstad-inspired logic gate and RC circuit visualizer.
+- **Draft Isolation**: Each runtime maintains an independent, isolated draft key (`katalyst.<runtime>.playground.v1`) to prevent code cross-contamination when switching between runtimes.
+
+### 9.4 Interactive Image Lab & Signal Processing Visualizer
+- **Location**: `src/components/simulators/image-lab-visualizer.tsx`.
+- **Architecture**: Pure HTML5 Canvas procedural rendering engine generating a 256x256 test card with color bars, radial color wheel, and grayscale gradient.
+- **Real-Time Histogram**: Computes 256-bin RGB frequency distributions dynamically across all 65,536 pixels using an SVG area chart overlay.
+- **Tone & Color Adjustments**: Interactive sliders for Exposure (-2 to +2 EV), Contrast (-100 to +100), Saturation (0 to 200%), and individual RGB channel multipliers.
+- **Convolution Kernels**: 3x3 spatial filter matrices for Sharpen, Box Blur, Gaussian Blur, Sobel Edge Detection, and Emboss applied via normalized pixel neighbor convolution with clamp-to-edge boundary handling.
+
