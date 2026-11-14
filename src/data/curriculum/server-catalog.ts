@@ -7,24 +7,37 @@ import {
 } from "@/lib/learning-curriculum";
 
 import { cProgrammingSubject, cProgrammingPath } from "./c-foundations";
+import { cppProgrammingSubject, cppProgrammingCourse } from "./cpp-programming";
 import { pythonProgrammingSubject, pythonProgrammingPath } from "./python-foundations";
+import { aiAppWebDevSubject, aiAppWebDevCourse } from "./ai-app-web-dev";
+import { arduinoEmbeddedSubject, arduinoEmbeddedCourse } from "./arduino-embedded";
+import { esp32IotSubject, esp32IotCourse } from "./esp32-iot-systems";
+import { breadboardElectronicsSubject, breadboardElectronicsCourse } from "./breadboard-electronics";
 import { javascriptProgrammingSubject, javascriptProgrammingPath } from "./javascript-algorithms";
-import { digitalCircuitsSubject, digitalCircuitsPath } from "./digital-circuits";
 import { sqlDatabasesSubject, sqlDatabasesPath } from "./sql-databases";
 import { htmlCssWebSubject, htmlCssWebPath } from "./html-css-web";
 import { dsaMasterySubject, dsaMasteryPath } from "./dsa-mastery";
 import { promptEngineeringSubject, promptEngineeringPath } from "./prompt-engineering";
 import { photoEditingMediaSubject, photoEditingMediaPath } from "./photo-editing-media";
+import { digitalCircuitsSubject, digitalCircuitsPath } from "./digital-circuits";
 
 export {
   cProgrammingSubject,
   cProgrammingPath,
+  cppProgrammingSubject,
+  cppProgrammingCourse,
   pythonProgrammingSubject,
   pythonProgrammingPath,
+  aiAppWebDevSubject,
+  aiAppWebDevCourse,
+  arduinoEmbeddedSubject,
+  arduinoEmbeddedCourse,
+  esp32IotSubject,
+  esp32IotCourse,
+  breadboardElectronicsSubject,
+  breadboardElectronicsCourse,
   javascriptProgrammingSubject,
   javascriptProgrammingPath,
-  digitalCircuitsSubject,
-  digitalCircuitsPath,
   sqlDatabasesSubject,
   sqlDatabasesPath,
   htmlCssWebSubject,
@@ -35,30 +48,42 @@ export {
   promptEngineeringPath,
   photoEditingMediaSubject,
   photoEditingMediaPath,
+  digitalCircuitsSubject,
+  digitalCircuitsPath,
 };
 
 export const serverSubjects: LearningSubject[] = [
   cProgrammingSubject,
+  cppProgrammingSubject,
   pythonProgrammingSubject,
+  aiAppWebDevSubject,
+  arduinoEmbeddedSubject,
+  esp32IotSubject,
+  breadboardElectronicsSubject,
   javascriptProgrammingSubject,
-  digitalCircuitsSubject,
   sqlDatabasesSubject,
   htmlCssWebSubject,
   dsaMasterySubject,
   promptEngineeringSubject,
   photoEditingMediaSubject,
+  digitalCircuitsSubject,
 ];
 
 export const serverCourses: LearningCourse[] = [
   cProgrammingPath,
+  cppProgrammingCourse,
   pythonProgrammingPath,
+  aiAppWebDevCourse,
+  arduinoEmbeddedCourse,
+  esp32IotCourse,
+  breadboardElectronicsCourse,
   javascriptProgrammingPath,
-  digitalCircuitsPath,
   sqlDatabasesPath,
   htmlCssWebPath,
   dsaMasteryPath,
   promptEngineeringPath,
   photoEditingMediaPath,
+  digitalCircuitsPath,
 ];
 
 let _validatedCatalog: LearningCatalog | null = null;
@@ -99,12 +124,23 @@ export function getServerCourse(courseId: string): LearningCourse | undefined {
   return getServerCatalog().courses.find((course) => course.id === courseId);
 }
 
-export function getServerLesson(courseId: string, lessonId: string): LearningLesson | undefined {
-  const course = getServerCourse(courseId);
-  if (!course) return undefined;
-  for (const mod of course.modules) {
-    for (const lesson of mod.lessons) {
-      if (lesson.id === lessonId) return lesson;
+export function getServerLesson(courseIdOrLessonId: string, maybeLessonId?: string): LearningLesson | undefined {
+  const catalog = getServerCatalog();
+  if (maybeLessonId) {
+    const course = catalog.courses.find((c) => c.id === courseIdOrLessonId);
+    if (!course) return undefined;
+    for (const mod of course.modules) {
+      const match = mod.lessons.find((l) => l.id === maybeLessonId);
+      if (match) return match;
+    }
+    return undefined;
+  }
+  for (const course of catalog.courses) {
+    for (const mod of course.modules) {
+      const match = mod.lessons.find((l) => l.id === courseIdOrLessonId);
+      if (match) {
+        return match;
+      }
     }
   }
   return undefined;

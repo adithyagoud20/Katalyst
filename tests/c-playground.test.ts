@@ -143,20 +143,25 @@ describe("C Playground inputs, compiler infrastructure and execution limits", ()
 
     it("exports isolated storage keys and valid starter programs for all playground runtimes", async () => {
       const {
+        CPP_PLAYGROUND_STORAGE_KEY,
         JS_PLAYGROUND_STORAGE_KEY,
         SQL_PLAYGROUND_STORAGE_KEY,
         HTML_PLAYGROUND_STORAGE_KEY,
         CIRCUIT_PLAYGROUND_STORAGE_KEY,
+        defaultCppProgram,
         defaultJsProgram,
         defaultSqlProgram,
         defaultHtmlProgram,
       } = await import("../src/components/c-playground");
 
+      expect(CPP_PLAYGROUND_STORAGE_KEY).toBe("katalyst.cpp.playground.v1");
       expect(JS_PLAYGROUND_STORAGE_KEY).toBe("katalyst.js.playground.v1");
       expect(SQL_PLAYGROUND_STORAGE_KEY).toBe("katalyst.sql.playground.v1");
       expect(HTML_PLAYGROUND_STORAGE_KEY).toBe("katalyst.html.playground.v1");
       expect(CIRCUIT_PLAYGROUND_STORAGE_KEY).toBe("katalyst.circuit.playground.v1");
 
+      expect(defaultCppProgram).toContain("std::cout");
+      expect(defaultCppProgram).toContain("std::vector");
       expect(defaultJsProgram).toContain("computeFibonacci");
       expect(defaultSqlProgram).toContain("CREATE TABLE engineers");
       expect(defaultHtmlProgram).toContain("<!DOCTYPE html>");

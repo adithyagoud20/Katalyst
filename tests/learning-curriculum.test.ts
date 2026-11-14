@@ -5,9 +5,14 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   cProgrammingPath,
+  cppProgrammingCourse,
+  arduinoEmbeddedCourse,
+  esp32IotCourse,
+  breadboardElectronicsCourse,
   flattenLessons,
   getPublishedLearningCourses,
   learningCatalog,
+  publishedLearningCourses,
   pythonProgrammingPath,
   javascriptProgrammingPath,
   digitalCircuitsPath,
@@ -399,6 +404,64 @@ describe("Python Programming Foundations course", () => {
         expect(safeValidateLesson(lesson).success).toBe(true);
         expect(lesson.interactiveDemo?.kind).toBe("image-lab");
         expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("registers C++ Systems & Object-Oriented Programming and validates 8 C++17 lessons", () => {
+      const validation = safeValidateCourse(cppProgrammingCourse);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(cppProgrammingCourse);
+      expect(lessons).toHaveLength(8);
+      for (const { lesson } of lessons) {
+        expect(safeValidateLesson(lesson).success).toBe(true);
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("registers Arduino Uno Embedded Systems course and validates 6 AVR lessons", () => {
+      const validation = safeValidateCourse(arduinoEmbeddedCourse);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(arduinoEmbeddedCourse);
+      expect(lessons).toHaveLength(6);
+      for (const { lesson } of lessons) {
+        expect(safeValidateLesson(lesson).success).toBe(true);
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("registers ESP32 Dual-Core IoT Systems course and validates 6 FreeRTOS lessons", () => {
+      const validation = safeValidateCourse(esp32IotCourse);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(esp32IotCourse);
+      expect(lessons).toHaveLength(6);
+      for (const { lesson } of lessons) {
+        expect(safeValidateLesson(lesson).success).toBe(true);
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("registers Practical Breadboard Prototyping course and validates 6 electronics lessons", () => {
+      const validation = safeValidateCourse(breadboardElectronicsCourse);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(breadboardElectronicsCourse);
+      expect(lessons).toHaveLength(6);
+      for (const { lesson } of lessons) {
+        expect(safeValidateLesson(lesson).success).toBe(true);
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("enforces pure server-side lessons in published client manifests (Deliverable 3)", () => {
+      expect(publishedLearningCourses).toHaveLength(14);
+      for (const course of publishedLearningCourses) {
+        for (const mod of course.modules) {
+          for (const lesson of mod.lessons) {
+            // Manifests must NEVER contain heavy markdown content or exercise solutions
+            expect((lesson as Record<string, unknown>).content).toBeUndefined();
+            expect((lesson as Record<string, unknown>).theorySections).toBeUndefined();
+            expect(lesson.exercise.solution).toBeUndefined();
+          }
+        }
       }
     });
   });

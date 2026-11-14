@@ -7,7 +7,7 @@ import {
 
 export class WasmerCRunner implements ExecutionRunner {
   readonly id = "browser-c-wasmer";
-  readonly name = "Wasmer Clang C11 WebAssembly";
+  readonly name = "Wasmer Clang C11 / C++17 WebAssembly";
   readonly target = "browser-wasm" as const;
 
   supportsLanguage(language: ExecutionLanguage): boolean {
@@ -31,7 +31,7 @@ export class WasmerCRunner implements ExecutionRunner {
         ok: false,
         exitCode: -1,
         stdout: "",
-        stderr: `Language ${request.language} is not supported by the Wasmer C runner.`,
+        stderr: `Language ${request.language} is not supported by the Wasmer C/C++ runner.`,
         executionTimeMs: 0,
         runner: "browser-wasm",
         stage: "error",
@@ -39,40 +39,69 @@ export class WasmerCRunner implements ExecutionRunner {
     }
 
     const startTime = performance.now();
-    const mainFile = request.files.find((f) => f.path.endsWith(".c") || f.path.endsWith(".cpp")) || request.files[0];
+    const isCpp = request.language === "cpp";
+    const mainFile = request.files.find((f) =>
+      isCpp ? f.path.endsWith(".cpp") || f.path.endsWith(".cc") : f.path.endsWith(".c")
+    ) || request.files[0];
     const sourceCode = mainFile?.content ?? "";
     const stdinContent = request.stdin ?? "";
 
-    // Node.js / test environment execution via system clang/gcc
+    // Node.js / test environment execution via system clang/gcc/c++
     if (typeof window === "undefined") {
       try {
         const { spawnSync } = await import("node:child_process");
-        const proc = spawnSync("bash", ["-c", `
-          TEMP_DIR=$(mktemp -d)
-          echo "${sourceCode.replace(/"/g, '\\"')}" > "$TEMP_DIR/main.c"
-          cc -std=c11 -Wall -Wextra "$TEMP_DIR/main.c" -o "$TEMP_DIR/a.out" 2> "$TEMP_DIR/compile.err"
-          if [ $? -eq 0 ]; then
-            "$TEMP_DIR/a.out" <<< "${stdinContent.replace(/"/g, '\\"')}"
-          else
-            cat "$TEMP_DIR/compile.err" >&2
-            exit 1
-          fi
-          rm -rf "$TEMP_DIR"
-        `], {
+        const { mkdtempSync, writeFileSync, rmSync } = await import("node:fs");
+        const { tmpdir } = await import("node:os");
+        const { join } = await import("node:path");
+
+        const tempDir = mkdtempSync(join(tmpdir(), "katalyst-c-"));
+        const fileName = isCpp ? "main.cpp" : "main.c";
+        const filePath = join(tempDir, fileName);
+        const binaryPath = join(tempDir, "a.out");
+
+        writeFileSync(filePath, sourceCode, "utf-8");
+
+        const compilerCmd = isCpp ? "c++" : "cc";
+        const compileArgs = isCpp
+          ? ["-std=c++17", "-Wall", "-Wextra", filePath, "-o", binaryPath]
+          : ["-std=c11", "-Wall", "-Wextra", filePath, "-o", binaryPath];
+
+        const compileProc = spawnSync(compilerCmd, compileArgs, {
+          timeout: 5000,
           encoding: "utf-8",
-          timeout: request.limits?.timeoutMs ?? 8000,
-          maxBuffer: request.limits?.outputLimitBytes ?? 64000,
         });
 
+        if (compileProc.status !== 0) {
+          rmSync(tempDir, { recursive: true, force: true });
+          const executionTimeMs = Math.round(performance.now() - startTime);
+          return {
+            ok: false,
+            exitCode: compileProc.status ?? 1,
+            stdout: "",
+            stderr: compileProc.stderr || compileProc.stdout || "Compilation failed.",
+            executionTimeMs,
+            runner: "browser-wasm",
+            stage: "error",
+          };
+        }
+
+        const runProc = spawnSync(binaryPath, [], {
+          input: stdinContent,
+          timeout: request.limits?.timeoutMs ?? 8000,
+          maxBuffer: request.limits?.outputLimitBytes ?? 64000,
+          encoding: "utf-8",
+        });
+
+        rmSync(tempDir, { recursive: true, force: true });
         const executionTimeMs = Math.round(performance.now() - startTime);
         return {
-          ok: proc.status === 0,
-          exitCode: proc.status ?? (proc.error ? -1 : 0),
-          stdout: proc.stdout ?? "",
-          stderr: proc.stderr ?? (proc.error ? String(proc.error.message) : ""),
+          ok: runProc.status === 0,
+          exitCode: runProc.status ?? (runProc.error ? -1 : 0),
+          stdout: runProc.stdout ?? "",
+          stderr: runProc.stderr ?? (runProc.error ? String(runProc.error.message) : ""),
           executionTimeMs,
           runner: "browser-wasm",
-          stage: proc.status === 0 ? "finished" : "error",
+          stage: runProc.status === 0 ? "finished" : "error",
         };
       } catch (err) {
         return {

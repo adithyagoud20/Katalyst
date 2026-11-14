@@ -12,19 +12,39 @@ export const learningSubjects: LearningSubject[] = [
     "description": "A small, systems-oriented language for learning how programs use values, control flow, functions, and memory-backed data."
   },
   {
+    "id": "cpp-systems",
+    "title": "C++ Systems & Object-Oriented Programming",
+    "description": "Modern C++17 systems programming, RAII resource management, templates, and STL algorithms."
+  },
+  {
     "id": "python-programming",
     "title": "Python programming",
     "description": "A versatile, high-level language emphasizing readability, rapid development, and rich standard libraries for engineering computation, automation, and data analysis."
   },
   {
+    "id": "ai-engineering",
+    "title": "AI Engineering & Full-Stack Systems",
+    "description": "Scaffold, architect, and ship production-grade full-stack web applications using generative AI tools, free-tier cloud backends, and Next.js."
+  },
+  {
+    "id": "arduino-embedded-subject",
+    "title": "Arduino Uno Embedded Systems & ATmega328P",
+    "description": "Master physical computing, AVR Harvard architecture, digital/analog GPIO registers, PWM modulation, and non-blocking firmware state machines."
+  },
+  {
+    "id": "esp32-iot-subject",
+    "title": "ESP32 Dual-Core IoT Systems & FreeRTOS",
+    "description": "Architect connected IoT systems using the Xtensa dual-core processor, FreeRTOS tasks, 3.3V logic constraints, 12-bit ADC, LEDC PWM, and Wi-Fi telemetry."
+  },
+  {
+    "id": "breadboard-electronics-subject",
+    "title": "Practical Breadboard Prototyping & Circuits",
+    "description": "Master physical circuit prototyping on solderless breadboards, terminal bus architectures, current limiting, voltage dividers, and multimeter troubleshooting."
+  },
+  {
     "id": "js-programming",
     "title": "JavaScript & Algorithms",
     "description": "High-performance event-driven computing, memory management with TypedArrays, and classic data structures for modern systems and browser runtimes."
-  },
-  {
-    "id": "digital-circuits",
-    "title": "Digital Circuits & Logic",
-    "description": "From physical Ohm's Law and RC timing circuits to Boolean algebra, combinational logic gates, and sequential memory latches."
   },
   {
     "id": "databases-sql",
@@ -50,6 +70,11 @@ export const learningSubjects: LearningSubject[] = [
     "id": "media-dsp",
     "title": "Computational Photography & Digital Media",
     "description": "Pixel buffers, RGBA color models, HSL conversions, histogram tone mapping, spatial 2D convolutions, and Porter-Duff compositing."
+  },
+  {
+    "id": "digital-circuits",
+    "title": "Digital Circuits & Logic",
+    "description": "From physical Ohm's Law and RC timing circuits to Boolean algebra, combinational logic gates, and sequential memory latches."
   }
 ];
 
@@ -599,6 +624,323 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             "checkpoint": {
               "prompt": "How does a function pointer enable flexible state machines and event-driven architectures?",
               "answer": "Instead of using monolithic switch-case blocks, event handlers or state transition callbacks can be registered and invoked dynamically."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "cpp-programming",
+    "subjectId": "cpp-systems",
+    "title": "C++17 Systems & Object-Oriented Programming",
+    "description": "Master modern ISO C++17: references, RAII, move semantics, operator overloading, smart pointers, templates, and high-performance STL containers.",
+    "level": "Developing",
+    "version": "1.0.0",
+    "prerequisites": [
+      "c-programming-foundations"
+    ],
+    "objectives": [
+      {
+        "id": "cpp-ref-const",
+        "title": "Use lvalue references, const references, and function overloading safely without unnecessary copies."
+      },
+      {
+        "id": "cpp-raii-classes",
+        "title": "Implement RAII classes with deterministic constructor acquisition and destructor resource release."
+      },
+      {
+        "id": "cpp-op-overload",
+        "title": "Overload arithmetic and stream operators while enforcing const correctness and value semantics."
+      },
+      {
+        "id": "cpp-stl-vectors",
+        "title": "Utilize std::vector and std::array with capacity management, iterators, and cache-friendly layout."
+      },
+      {
+        "id": "cpp-stl-maps",
+        "title": "Employ std::map and std::unordered_map for logarithmic and amortized O(1) key-value indexing."
+      },
+      {
+        "id": "cpp-stl-algos",
+        "title": "Compose STL algorithms (std::transform, std::copy_if, std::accumulate) with modern C++ lambdas."
+      },
+      {
+        "id": "cpp-smart-ptrs",
+        "title": "Enforce single and shared ownership semantics using std::unique_ptr and std::shared_ptr."
+      },
+      {
+        "id": "cpp-templates",
+        "title": "Write reusable generic functions and container class templates with compile-time type safety."
+      }
+    ],
+    "learningOutcomes": [
+      "Write idiomatic, memory-safe modern C++17 without naked pointers or manual delete calls.",
+      "Structure production classes adhering to RAII for deterministic resource management.",
+      "Utilize standard template library containers, iterators, and lambdas for high-performance data processing.",
+      "Implement generic data structures and algorithms using function and class templates."
+    ],
+    "estimatedDurationMinutes": 220,
+    "publicationStatus": "published",
+    "modules": [
+      {
+        "id": "cpp-m1-foundations-raii",
+        "order": 1,
+        "title": "C++ Foundations, References & RAII",
+        "summary": "Transition from C to modern C++ with references, const correctness, encapsulation, and RAII.",
+        "lessons": [
+          {
+            "id": "cpp-references-overloading",
+            "order": 1,
+            "title": "References, Const Correctness & Function Overloading",
+            "summary": "Replace pointer syntax with memory-safe references, prevent mutation using const correctness, and resolve overloaded functions.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "cpp-ref-const"
+            ],
+            "prerequisiteLessonIds": [],
+            "estimatedDurationMinutes": 25,
+            "execution": {
+              "language": "cpp"
+            },
+            "exercise": {
+              "id": "ex-cpp-references",
+              "title": "Implement Swap and Formatted Scalar Multiply",
+              "difficulty": "Developing",
+              "expectedOutcome": "Outputs scaled integer and repeated string matching test assertions.",
+              "prompt": "Implement an overloaded function `scale(int& val, int factor)` that scales an integer in-place by reference, and `scale(const std::string& str, int count)` that returns a repeated string.",
+              "objectiveId": "cpp-ref-const",
+              "starterCode": "#include <iostream>\n#include <string>\n\n// TODO: Implement void scale(int& val, int factor)\n// TODO: Implement std::string scale(const std::string& str, int count)\n\nint main() {\n    int value = 15;\n    // Scale value by 3\n    // Print: \"Scaled: \" << value\n    // Print repeated: scale(\"KAT\", 3)\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is `const std::string&` preferred over `std::string` as a function parameter type?",
+              "answer": "It avoids heap-allocating and copying the entire string buffer while preventing unintended mutations."
+            }
+          },
+          {
+            "id": "cpp-classes-raii",
+            "order": 2,
+            "title": "Classes, Encapsulation, Constructors & RAII",
+            "summary": "Structure clean object-oriented classes with private members, initializer lists, and deterministic RAII cleanup.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "cpp-raii-classes"
+            ],
+            "prerequisiteLessonIds": [
+              "cpp-references-overloading"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "cpp"
+            },
+            "exercise": {
+              "id": "ex-cpp-raii",
+              "title": "Build a Managed Ring Buffer with RAII",
+              "difficulty": "Developing",
+              "expectedOutcome": "Outputs elements and confirms automatic destruction.",
+              "prompt": "Create a class `ManagedArray` with private dynamic int array, constructor taking `size_t capacity`, a `set(size_t index, int val)` method, a `get(size_t index) const` method, and a destructor that prints `Array destroyed`.",
+              "objectiveId": "cpp-raii-classes",
+              "starterCode": "#include <iostream>\n\nclass ManagedArray {\nprivate:\n    size_t capacity_;\n    int* buffer_;\npublic:\n    // TODO: Constructor initializing capacity_ and buffer_\n    // TODO: Destructor freeing buffer_ and printing \"Array destroyed\\n\"\n    // TODO: set(size_t idx, int val) and get(size_t idx) const\n};\n\nint main() {\n    {\n        ManagedArray arr(3);\n        arr.set(0, 100);\n        arr.set(1, 200);\n        arr.set(2, 300);\n        std::cout << \"arr[1]=\" << arr.get(1) << \"\\n\";\n    }\n    std::cout << \"Scope finished\\n\";\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "When is an object's destructor executed in C++?",
+              "answer": "Automatically when the object's enclosing lexical scope terminates or when deleted from the heap."
+            }
+          },
+          {
+            "id": "cpp-operator-overloading",
+            "order": 3,
+            "title": "Operator Overloading & Custom Copy/Move Semantics",
+            "summary": "Overload arithmetic and stream operators while enforcing value semantics, rule of five, and const correctness.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "cpp-op-overload"
+            ],
+            "prerequisiteLessonIds": [
+              "cpp-classes-raii"
+            ],
+            "estimatedDurationMinutes": 25,
+            "execution": {
+              "language": "cpp"
+            },
+            "exercise": {
+              "id": "ex-cpp-operators",
+              "title": "Implement Complex Number Addition and Multiplication",
+              "difficulty": "Developing",
+              "expectedOutcome": "Outputs formatted complex arithmetic results.",
+              "prompt": "Implement a `Complex` struct with `real` and `imag` doubles, overloading `operator+`, `operator*`, and `operator<<` printing `a + bi`.",
+              "objectiveId": "cpp-op-overload",
+              "starterCode": "#include <iostream>\n\nstruct Complex {\n    double real;\n    double imag;\n\n    // TODO: operator+\n    // TODO: operator* (a+bi)*(c+di) = (ac - bd) + (ad + bc)i\n};\n\n// TODO: operator<< printing \"real + imag i\"\n\nint main() {\n    Complex c1{3.0, 2.0};\n    Complex c2{1.0, 4.0};\n    Complex sum = c1 + c2;\n    Complex prod = c1 * c2;\n    std::cout << \"Sum: \" << sum << \"\\n\";\n    std::cout << \"Prod: \" << prod << \"\\n\";\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "Why must `operator<<` return `std::ostream&`?",
+              "answer": "To enable chained stream insertions like `std::cout << a << b;` without creating stream copies."
+            }
+          }
+        ]
+      },
+      {
+        "id": "cpp-m2-stl-containers-algos",
+        "order": 2,
+        "title": "The Standard Template Library & Iterators",
+        "summary": "Contiguous sequence containers, sorted maps, iterators, and declarative lambda algorithms.",
+        "lessons": [
+          {
+            "id": "cpp-stl-vector-sequence",
+            "order": 4,
+            "title": "Sequence Containers: Vector, Deque, and Array",
+            "summary": "Utilize std::vector and std::array with capacity management, iterators, and cache-friendly layout.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "cpp-stl-vectors"
+            ],
+            "prerequisiteLessonIds": [
+              "cpp-operator-overloading"
+            ],
+            "estimatedDurationMinutes": 25,
+            "execution": {
+              "language": "cpp"
+            },
+            "exercise": {
+              "id": "ex-cpp-vector",
+              "title": "Buffer Capacity Optimization & In-Place Processing",
+              "difficulty": "Developing",
+              "expectedOutcome": "Outputs processed elements after vector transformations.",
+              "prompt": "Read integer count `N` from stdin, reserve space in `std::vector<int>`, populate with `N` integers read from stdin, double each odd number, and print the resulting elements separated by spaces.",
+              "objectiveId": "cpp-stl-vectors",
+              "starterCode": "#include <iostream>\n#include <vector>\n\nint main() {\n    int n;\n    if (!(std::cin >> n) || n <= 0) return 0;\n\n    std::vector<int> vec;\n    // TODO: reserve capacity for n elements\n    // TODO: read n elements into vec\n    // TODO: double every odd number\n    // TODO: print elements separated by space\n\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "What is the time complexity of appending an element to a `std::vector` when capacity is exceeded?",
+              "answer": "O(N) to reallocate and move existing elements, but amortized O(1) across a sequence of appends."
+            }
+          },
+          {
+            "id": "cpp-stl-associative-maps",
+            "order": 5,
+            "title": "Associative Containers: Maps and Hash Tables",
+            "summary": "Employ std::map and std::unordered_map for logarithmic and amortized O(1) key-value indexing.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "cpp-stl-maps"
+            ],
+            "prerequisiteLessonIds": [
+              "cpp-stl-vector-sequence"
+            ],
+            "estimatedDurationMinutes": 25,
+            "execution": {
+              "language": "cpp"
+            },
+            "exercise": {
+              "id": "ex-cpp-maps",
+              "title": "Telemetry Sensor Register Aggregator",
+              "difficulty": "Developing",
+              "expectedOutcome": "Outputs alphabetical sensor totals.",
+              "prompt": "Read `N` lines containing sensor name and measurement integer. Store total readings and count in `std::map<std::string, int>`, and output each sensor with its accumulated reading sorted by name.",
+              "objectiveId": "cpp-stl-maps",
+              "starterCode": "#include <iostream>\n#include <map>\n#include <string>\n\nint main() {\n    int n;\n    if (!(std::cin >> n)) return 0;\n\n    std::map<std::string, int> telemetry;\n    // TODO: Read n pairs of (name, value) and accumulate into telemetry\n    // TODO: Print each sensor as \"sensor_name: total_value\"\n\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "Why does `std::map` guarantee sorted keys while `std::unordered_map` does not?",
+              "answer": "`std::map` is backed by a balanced binary search tree, whereas `std::unordered_map` uses an array of hash buckets."
+            }
+          },
+          {
+            "id": "cpp-stl-algorithms-iterators",
+            "order": 6,
+            "title": "STL Iterators, Lambdas, and Functional Algorithms",
+            "summary": "Compose STL algorithms like std::transform and std::copy_if with modern C++ lambdas.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "cpp-stl-algos"
+            ],
+            "prerequisiteLessonIds": [
+              "cpp-stl-associative-maps"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "cpp"
+            },
+            "exercise": {
+              "id": "ex-cpp-algorithms",
+              "title": "Filter and Sum Above Threshold",
+              "difficulty": "Developing",
+              "expectedOutcome": "Outputs count and sum of filtered values.",
+              "prompt": "Read integer threshold `T` and count `N`, followed by `N` integers. Use `std::copy_if` to collect values greater than `T`, compute their sum with `std::accumulate`, and print `Count: C Sum: S`.",
+              "objectiveId": "cpp-stl-algos",
+              "starterCode": "#include <iostream>\n#include <vector>\n#include <algorithm>\n#include <numeric>\n\nint main() {\n    int threshold, n;\n    if (!(std::cin >> threshold >> n)) return 0;\n\n    std::vector<int> values(n);\n    for (int i = 0; i < n; ++i) std::cin >> values[i];\n\n    // TODO: Filter elements > threshold into a new vector using std::copy_if and back_inserter\n    // TODO: Compute sum using std::accumulate\n    // TODO: Print \"Count: \" << count << \" Sum: \" << sum\n\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "What does `std::back_inserter(container)` do when passed as an output iterator?",
+              "answer": "It creates an iterator that automatically invokes `container.push_back()` for each assigned element."
+            }
+          }
+        ]
+      },
+      {
+        "id": "cpp-m3-memory-templates",
+        "order": 3,
+        "title": "Memory Safety, Smart Pointers & Generic Programming",
+        "summary": "Exclusive unique_ptr, shared ownership, and compile-time generic templates.",
+        "lessons": [
+          {
+            "id": "cpp-smart-pointers",
+            "order": 7,
+            "title": "Smart Pointers: Ownership with unique_ptr and shared_ptr",
+            "summary": "Enforce single and shared ownership semantics using std::unique_ptr and std::shared_ptr.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "cpp-smart-ptrs"
+            ],
+            "prerequisiteLessonIds": [
+              "cpp-stl-algorithms-iterators"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "cpp"
+            },
+            "exercise": {
+              "id": "ex-cpp-smart-ptrs",
+              "title": "Task Queue with Unique Ownership",
+              "difficulty": "Developing",
+              "expectedOutcome": "Outputs processed unique task payloads.",
+              "prompt": "Implement a struct `Task` with `id` and `payload` string. Write a function `std::unique_ptr<Task> createTask(int id, const std::string& p)` and process tasks stored in a `std::vector<std::unique_ptr<Task>>`, printing their IDs and payloads.",
+              "objectiveId": "cpp-smart-ptrs",
+              "starterCode": "#include <iostream>\n#include <memory>\n#include <vector>\n#include <string>\n\nstruct Task {\n    int id;\n    std::string payload;\n};\n\n// TODO: Implement std::unique_ptr<Task> createTask(int id, const std::string& p)\n\nint main() {\n    std::vector<std::unique_ptr<Task>> queue;\n    // TODO: Create 2 tasks with IDs 1 and 2, push to queue using std::move\n    // TODO: Iterate and print: \"Task [id]: payload\"\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "Can a `std::unique_ptr` be copied by assignment (`ptr2 = ptr1`)?",
+              "answer": "No. `std::unique_ptr` deletes its copy constructor and copy assignment operator; ownership can only be transferred with `std::move`."
+            }
+          },
+          {
+            "id": "cpp-templates-polymorphism",
+            "order": 8,
+            "title": "Templates, Generic Programming & Polymorphism",
+            "summary": "Write reusable generic functions and container class templates with compile-time type safety.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "cpp-templates"
+            ],
+            "prerequisiteLessonIds": [
+              "cpp-smart-pointers"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "cpp"
+            },
+            "exercise": {
+              "id": "ex-cpp-templates",
+              "title": "Build a Generic Stack Template",
+              "difficulty": "Developing",
+              "expectedOutcome": "Outputs top elements after stack operations.",
+              "prompt": "Implement a generic `SimpleStack<T>` class template with dynamic vector storage, `push(const T& val)`, `pop()`, and `peek() const`. Test with both integers and strings.",
+              "objectiveId": "cpp-templates",
+              "starterCode": "#include <iostream>\n#include <vector>\n#include <string>\n\n// TODO: Implement template <typename T> class SimpleStack\n\nint main() {\n    // Test with int\n    // SimpleStack<int> s1; s1.push(10); s1.push(20);\n    // std::cout << \"Int Top: \" << s1.peek() << \"\\n\";\n\n    // Test with std::string\n    // SimpleStack<std::string> s2; s2.push(\"Alpha\"); s2.push(\"Beta\");\n    // std::cout << \"Str Top: \" << s2.peek() << \"\\n\";\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "What is the performance difference between static template polymorphism and dynamic virtual function polymorphism?",
+              "answer": "Static templates are resolved at compile time with zero vtable pointer indirection and full compiler inlining."
             }
           }
         ]
@@ -1358,6 +1700,1033 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
     ]
   },
   {
+    "id": "ai-app-web-dev",
+    "subjectId": "ai-engineering",
+    "title": "AI-Powered App & Web Development",
+    "description": "Learn to build, architect, and deploy production-grade full-stack web applications using generative AI tools, free-tier cloud backends, and Next.js.",
+    "level": "Applied",
+    "version": "1.0.0",
+    "prerequisites": [
+      "Fundamental HTML, CSS & JavaScript concepts",
+      "Basic terminal and Git familiarity"
+    ],
+    "objectives": [
+      {
+        "id": "ai-workflow-specs",
+        "title": "Scaffold modular React and Next.js applications using precise architectural specifications."
+      },
+      {
+        "id": "ai-prompt-debug",
+        "title": "Apply prompt constraints, automated diff reviews, and iterative error debugging loops."
+      },
+      {
+        "id": "ai-free-routing",
+        "title": "Route requests across Gemini, Cloudflare, and OpenRouter free tiers via secure server-side environment secrets."
+      },
+      {
+        "id": "ai-route-handlers",
+        "title": "Build type-safe Next.js Route Handlers with Zod request validation and structured streaming error handling."
+      },
+      {
+        "id": "ai-supabase-auth-rls",
+        "title": "Configure Supabase Google OAuth authentication, relational PostgreSQL tables, and Row Level Security (RLS)."
+      },
+      {
+        "id": "ai-deploy-checklist",
+        "title": "Deploy production web apps to Vercel/Cloudflare with COOP/COEP isolation, secret management, and zero compute costs."
+      }
+    ],
+    "learningOutcomes": [
+      "Scaffold modular React and Next.js applications using precise architectural specifications.",
+      "Debug complex runtime issues using structured prompt constraints and Git diff reviews.",
+      "Route AI inference through Gemini, Cloudflare, and OpenRouter free tiers without client-side key leakage.",
+      "Build type-safe Next.js Route Handlers with Zod request validation.",
+      "Configure Supabase Google OAuth and write bulletproof PostgreSQL Row Level Security (RLS) policies.",
+      "Deploy production applications with security headers and automated health checks."
+    ],
+    "estimatedDurationMinutes": 165,
+    "publicationStatus": "published",
+    "modules": [
+      {
+        "id": "ai-module-workflow",
+        "order": 1,
+        "title": "AI-Assisted Architecture & Engineering Workflow",
+        "summary": "Master prompt constraints, architectural specifications, and structured debugging loops.",
+        "lessons": [
+          {
+            "id": "ai-workflow-specs",
+            "order": 1,
+            "title": "AI-Assisted Engineering Workflow & Scaffolding",
+            "summary": "Structure clean, modular Next.js applications using generative AI specs, architectural framing, and avoiding spaghetti code.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ai-workflow-specs"
+            ],
+            "prerequisiteLessonIds": [],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-ai-scaffold-manifest",
+              "title": "Scaffold a Validated Application Manifest",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Generate a valid application manifest respecting production security constraints.",
+              "prompt": "Write a function `buildAppConfig(appName, environment, providers)` that takes an app name, environment string ('dev' | 'staging' | 'prod'), and an array of AI provider names. Return an object `{ appName: string, env: string, activeProviders: string[], secureMode: boolean }`. If environment is 'prod', `secureMode` must be true; otherwise false. Print the JSON string.",
+              "objectiveId": "ai-workflow-specs",
+              "starterCode": "function buildAppConfig(appName, environment, providers) {\n  // Implement application manifest builder\n  return null;\n}\n\nconst config = buildAppConfig(\"Katalyst Web\", \"prod\", [\"gemini\", \"cloudflare\"]);\nconsole.log(JSON.stringify(config));"
+            },
+            "checkpoint": {
+              "prompt": "Why must AI-generated code be reviewed against strict TypeScript boundaries before merging?",
+              "answer": "Generative models can synthesize plausible code with subtle type hallucinations or unstated dependencies. Enforcing strict TypeScript validation and clear module contracts ensures breaking changes are caught immediately at compile time."
+            }
+          },
+          {
+            "id": "ai-prompting-architecture-debugging",
+            "order": 2,
+            "title": "Prompting for Architecture, Constraints, and Debugging",
+            "summary": "Master precision context framing, constraint enforcement, Git diff reviews, and automated error diagnostics.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ai-prompt-debug"
+            ],
+            "prerequisiteLessonIds": [
+              "ai-workflow-specs"
+            ],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-ai-diagnostic-cleaner",
+              "title": "Build a Safe Error Diagnostic Parser",
+              "difficulty": "Developing",
+              "expectedOutcome": "Extract structured diagnostic metadata from raw compiler error logs.",
+              "prompt": "Write a function `parseCompilerError(rawError)` that parses a single-line GCC/Clang diagnostic string in the format `file.c:line:col: severity: message`. Return an object `{ file: string, line: number, severity: string, message: string }`. If the string does not match, return null. Print the parsed result of `\"main.c:14:5: error: expected ';' before 'return'\"` as JSON.",
+              "objectiveId": "ai-prompt-debug",
+              "starterCode": "function parseCompilerError(rawError) {\n  // Parse compiler diagnostic string\n  return null;\n}\n\nconst parsed = parseCompilerError(\"main.c:14:5: error: expected ';' before 'return'\");\nconsole.log(JSON.stringify(parsed));"
+            },
+            "checkpoint": {
+              "prompt": "Why should you request targeted diffs from coding assistants rather than full file replacements?",
+              "answer": "Full file replacements often introduce subtle regressions, accidentally remove existing edge-case handlers, or reset uncommitted edits. Targeted diffs make every modification transparent and easy to verify."
+            }
+          }
+        ]
+      },
+      {
+        "id": "ai-module-apis-routing",
+        "order": 2,
+        "title": "Free Cloud Models, API Routing & Security",
+        "summary": "Integrate Gemini, Cloudflare, and OpenRouter free tiers securely via Next.js Route Handlers.",
+        "lessons": [
+          {
+            "id": "ai-free-api-keys-model-routing",
+            "order": 3,
+            "title": "Free Model APIs, Routing & Environment Secret Security",
+            "summary": "Integrate Gemini API, Cloudflare Workers AI, and OpenRouter free tiers securely via server-side environment variables.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ai-free-routing"
+            ],
+            "prerequisiteLessonIds": [
+              "ai-prompting-architecture-debugging"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-ai-key-redactor",
+              "title": "Redact Secret Tokens in Telemetry",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Mask sensitive credentials before logging or analytics recording.",
+              "prompt": "Write a function `redactSecret(token)` that takes a string. If the string is shorter than 8 characters, return '***'. Otherwise, return the first 3 characters, followed by '...', followed by the last 3 characters. Example: 'sk-ant-api03-12345678' -> 'sk-...678'. Print the redacted version of 'AIzaSyD-Free-Gemini-Key-99'.",
+              "objectiveId": "ai-free-routing",
+              "starterCode": "function redactSecret(token) {\n  // Redact token securely\n  return \"\";\n}\n\nconsole.log(redactSecret(\"AIzaSyD-Free-Gemini-Key-99\"));"
+            },
+            "checkpoint": {
+              "prompt": "What happens if an API key is stored in NEXT_PUBLIC_GEMINI_KEY instead of GEMINI_API_KEY?",
+              "answer": "Next.js automatically embeds any variable prefixed with NEXT_PUBLIC_ into the compiled client-side JavaScript bundles. Any visitor can extract it from browser DevTools, exhaust your quotas, or impersonate your account."
+            }
+          },
+          {
+            "id": "ai-frontend-backend-api-routes",
+            "order": 4,
+            "title": "Connecting Frontend UI to AI Route Handlers with Zod",
+            "summary": "Build type-safe Next.js App Router Route Handlers with Zod payload validation, streaming responses, and error boundaries.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ai-route-handlers"
+            ],
+            "prerequisiteLessonIds": [
+              "ai-free-api-keys-model-routing"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-ai-payload-validator",
+              "title": "Validate API Chat Payload",
+              "difficulty": "Developing",
+              "expectedOutcome": "Enforce rigid payload schemas before processing AI inference requests.",
+              "prompt": "Write a function `validateRequest(body)` that checks if `body.message` is a non-empty string under 500 characters and `body.history` is an array. If valid, return `{ valid: true, message: body.message.trim(), historyCount: body.history.length }`. If invalid, return `{ valid: false, error: 'Invalid payload' }`. Test with `{ message: ' Hello Kat! ', history: [1, 2] }` and print as JSON.",
+              "objectiveId": "ai-route-handlers",
+              "starterCode": "function validateRequest(body) {\n  // Validate request payload\n  return null;\n}\n\nconst res = validateRequest({ message: \" Hello Kat! \", history: [1, 2] });\nconsole.log(JSON.stringify(res));"
+            },
+            "checkpoint": {
+              "prompt": "Why must input validation happen on the server even if client-side validation is already in place?",
+              "answer": "Client-side validation is easily bypassed using curl, Postman, or automated scripts. Server-side validation guarantees that malicious or corrupted requests cannot reach downstream databases or billable model APIs."
+            }
+          }
+        ]
+      },
+      {
+        "id": "ai-module-persistence-deploy",
+        "order": 3,
+        "title": "Full-Stack Persistence & Production Shipping",
+        "summary": "Configure Supabase PostgreSQL with Row Level Security, COOP/COEP headers, and edge deployment.",
+        "lessons": [
+          {
+            "id": "ai-supabase-auth-postgres-rls",
+            "order": 5,
+            "title": "Supabase Authentication, PostgreSQL Schemas & RLS",
+            "summary": "Configure user authentication, relational PostgreSQL tables, and strict Row Level Security policies for multi-tenant data.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ai-supabase-auth-rls"
+            ],
+            "prerequisiteLessonIds": [
+              "ai-frontend-backend-api-routes"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-ai-rls-policy",
+              "title": "Author an RLS Policy Statement",
+              "difficulty": "Developing",
+              "expectedOutcome": "Declare declarative database-level access control rules.",
+              "prompt": "Write a SQL statement that creates a policy named `allow_owner_all` on table `chat_messages` for all operations (`FOR ALL`), ensuring the authenticated user (`auth.uid()`) matches `user_id` in the `USING` clause.",
+              "objectiveId": "ai-supabase-auth-rls",
+              "starterCode": "-- Write RLS policy\nCREATE POLICY \"allow_owner_all\" ..."
+            },
+            "checkpoint": {
+              "prompt": "What is the danger of disabling Row Level Security on a database table in production?",
+              "answer": "If RLS is disabled, any authenticated user query that lacks an explicit user_id filter will return all users' private records across the entire application."
+            }
+          },
+          {
+            "id": "ai-production-deployment-checklist",
+            "order": 6,
+            "title": "Production Deployment, CORS, and Zero-Cost Edge Hosting",
+            "summary": "Prepare applications for production on Vercel and Cloudflare with security headers, secrets management, and health checks.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ai-deploy-checklist"
+            ],
+            "prerequisiteLessonIds": [
+              "ai-supabase-auth-postgres-rls"
+            ],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-ai-health-check",
+              "title": "Format a Health Check Payload",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Build a sanitized production health check payload.",
+              "prompt": "Write a function `createHealthCheck(isDbOk, isAiOk)` that returns `{ ok: boolean, status: string, checks: { db: boolean, ai: boolean } }`. If both are true, `ok` is true and `status` is 'healthy'. Otherwise, `ok` is false and `status` is 'degraded'. Test with `true, true` and print the output as JSON.",
+              "objectiveId": "ai-deploy-checklist",
+              "starterCode": "function createHealthCheck(isDbOk, isAiOk) {\n  // Format health check payload\n  return null;\n}\n\nconsole.log(JSON.stringify(createHealthCheck(true, true)));"
+            },
+            "checkpoint": {
+              "prompt": "Why should you never deploy an AI application to production without a dedicated /api/health endpoint?",
+              "answer": "Uptime monitoring tools, load balancers, and container orchestrators rely on lightweight health endpoints to detect cold-start failures, database disconnections, and edge routing faults before routing real traffic to degraded instances."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "arduino-embedded",
+    "subjectId": "arduino-embedded-subject",
+    "title": "Arduino Uno Embedded Systems & ATmega328P",
+    "description": "Master physical computing, AVR Harvard architecture, digital/analog GPIO registers, PWM modulation, and non-blocking firmware state machines.",
+    "level": "Developing",
+    "version": "1.0.0",
+    "prerequisites": [
+      "Basic C/C++ or programming syntax",
+      "Elementary electronics concepts (Ohm's law)"
+    ],
+    "objectives": [
+      {
+        "id": "ard-sketch-lifecycle",
+        "title": "Understand ATmega328P AVR Harvard architecture, setup() initialization, and loop() execution cycles."
+      },
+      {
+        "id": "ard-digital-io",
+        "title": "Configure digital GPIO direction with pinMode(), source/sink currents, and execute single-cycle port manipulation."
+      },
+      {
+        "id": "ard-pullup-inputs",
+        "title": "Interface pushbuttons with INPUT_PULLUP and implement software debounce state filters."
+      },
+      {
+        "id": "ard-adc-analog",
+        "title": "Sample continuous analog voltages using the 10-bit Successive Approximation ADC and calculate millivolt resolutions."
+      },
+      {
+        "id": "ard-pwm-serial",
+        "title": "Generate analog-equivalent signals via Pulse-Width Modulation (PWM) and stream UART serial telemetry."
+      },
+      {
+        "id": "ard-millis-fsm",
+        "title": "Design non-blocking finite state machines using millis() time slicing to eliminate blocking delay() calls."
+      }
+    ],
+    "learningOutcomes": [
+      "Understand ATmega328P AVR Harvard architecture and sketch execution lifecycles.",
+      "Configure digital GPIO pins and manipulate direct port registers at single-cycle speeds.",
+      "Eliminate floating input noise using internal pull-up resistors and debouncing.",
+      "Sample continuous physical quantities with the 10-bit Successive Approximation ADC.",
+      "Modulate actuator power and brightness using hardware PWM duty cycles.",
+      "Construct cooperative non-blocking state machines with millis() timing."
+    ],
+    "estimatedDurationMinutes": 165,
+    "publicationStatus": "published",
+    "modules": [
+      {
+        "id": "ard-module-lifecycle",
+        "order": 1,
+        "title": "Sketch Lifecycle & Digital Out",
+        "summary": "Master the ATmega328P execution cycle, pin mapping, electrical limits, and port registers.",
+        "lessons": [
+          {
+            "id": "arduino-sketch-lifecycle",
+            "order": 1,
+            "title": "Arduino Sketch Lifecycle, Setup/Loop & Pin Mapping",
+            "summary": "Understand the ATmega328P core, setup() and loop() execution lifecycles, and board header mapping.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-sketch-lifecycle"
+            ],
+            "prerequisiteLessonIds": [],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-ard-lifecycle-sim",
+              "title": "Simulate Arduino Setup and Loop Execution",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Model the sequential setup and looping execution flow of an embedded sketch.",
+              "prompt": "Write a function `runSketch(iterations)` that returns an array of strings representing execution logs. The first element must be `'SETUP: READY'`. Then, for each cycle from 1 up to `iterations`, add `'LOOP: TICK ' + i`. Print the output formatted as JSON for 2 iterations.",
+              "objectiveId": "ard-sketch-lifecycle",
+              "starterCode": "function runSketch(iterations) {\n  // Return setup and loop log entries\n  return [];\n}\n\nconsole.log(JSON.stringify(runSketch(2)));"
+            },
+            "checkpoint": {
+              "prompt": "Why does an embedded microcontroller run an infinite loop in main() rather than returning 0?",
+              "answer": "Unlike desktop computers where programs run on top of an OS and terminate upon completion, a microcontroller is dedicated to controlling hardware continuously until electrical power is disconnected."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Arduino Uno Interactive Circuit Simulator",
+              "description": "Inspect digital pin headers, onboard LED L (Pin 13), and interactive virtual serial monitor."
+            }
+          },
+          {
+            "id": "arduino-digital-io",
+            "order": 2,
+            "title": "Digital Output, Current Sinking/Sourcing & Port Registers",
+            "summary": "Configure pin direction, sink and source current within electrical limits, and manipulate PORTB/DDRB registers.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-digital-io"
+            ],
+            "prerequisiteLessonIds": [
+              "arduino-sketch-lifecycle"
+            ],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-ard-bitmask-calc",
+              "title": "Compute Register Bitmask for Port Manipulation",
+              "difficulty": "Developing",
+              "expectedOutcome": "Apply bitwise operations to simulate hardware register configuration.",
+              "prompt": "Write a function `setPinInPort(currentPort, pinBit, state)` where `currentPort` is an 8-bit integer (0-255), `pinBit` is 0-7, and `state` is boolean (`true` for HIGH, `false` for LOW). If state is true, set that bit to 1 using bitwise OR. If false, clear that bit to 0 using bitwise AND with inverted mask. Return the new port value. Test with currentPort = 0x00, pinBit = 5, state = true. Print the hex string formatted as `0x` followed by uppercase hex (e.g. `0x20`).",
+              "objectiveId": "ard-digital-io",
+              "starterCode": "function setPinInPort(currentPort, pinBit, state) {\n  // Apply bitmask operation\n  return 0;\n}\n\nconst val = setPinInPort(0x00, 5, true);\nconsole.log(\"0x\" + val.toString(16).toUpperCase());"
+            },
+            "checkpoint": {
+              "prompt": "What is the maximum safe continuous current a single ATmega328P GPIO pin can source or sink?",
+              "answer": "The recommended continuous design limit is 20 mA per pin, with an absolute maximum threshold of 40 mA before thermal destruction risks occur."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Digital I/O & Current Simulation",
+              "description": "Toggle digital pins HIGH and LOW to inspect current sourcing, sinking, and port register states."
+            }
+          }
+        ]
+      },
+      {
+        "id": "ard-module-io-sensing",
+        "order": 2,
+        "title": "Digital In & Analog Sensing",
+        "summary": "Interface active-low pushbuttons with internal pull-ups, filter contact bounce, and sample 10-bit analog voltages.",
+        "lessons": [
+          {
+            "id": "arduino-pullup-inputs",
+            "order": 3,
+            "title": "Internal Pull-Up Resistors, Pushbuttons & Switch Debounce",
+            "summary": "Prevent floating CMOS input states using INPUT_PULLUP and filter mechanical switch contact bouncing in software.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-pullup-inputs"
+            ],
+            "prerequisiteLessonIds": [
+              "arduino-digital-io"
+            ],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-ard-debounce-filter",
+              "title": "Implement Software Switch Debouncer",
+              "difficulty": "Developing",
+              "expectedOutcome": "Filter transient mechanical switch noise to produce a stable digital state.",
+              "prompt": "Write a function `filterBounce(readings, threshold)` where `readings` is an array of raw logic values `[0, 1]` sampled at 1ms intervals, and `threshold` is the number of identical consecutive readings required to validate a state change. Start with confirmed state = 1. Return the final confirmed state after processing the array. Test with `readings = [1, 0, 0, 1, 0, 0, 0, 0]` and `threshold = 3`. Print the result.",
+              "objectiveId": "ard-pullup-inputs",
+              "starterCode": "function filterBounce(readings, threshold) {\n  // Implement debouncing state filter\n  return 1;\n}\n\nconsole.log(filterBounce([1, 0, 0, 1, 0, 0, 0, 0], 3));"
+            },
+            "checkpoint": {
+              "prompt": "Why does an INPUT_PULLUP pin read LOW when a pushbutton is pressed?",
+              "answer": "The pushbutton connects the pin directly to Ground (0V). Because the internal pull-up resistor has high resistance (30kΩ), current safely flows to ground and the pin measures 0V."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Pushbutton & Debounce Simulation",
+              "description": "Test active-low switch behavior with internal pull-up and observe contact bounce waveforms."
+            }
+          },
+          {
+            "id": "arduino-adc-analog",
+            "order": 4,
+            "title": "10-Bit ADC Architecture, Potentiometers & Sensor Sampling",
+            "summary": "Sample continuous analog signals, calculate quantization steps, and convert analogRead() raw counts to voltages.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-adc-analog"
+            ],
+            "prerequisiteLessonIds": [
+              "arduino-pullup-inputs"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-ard-adc-calc",
+              "title": "Calculate Physical Voltage from Raw ADC Count",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Convert discrete 10-bit ADC integer readings to real-world electrical quantities.",
+              "prompt": "Write a function `rawToMillivolts(rawCount, vRefVolts)` that calculates the measured potential in millivolts rounded to the nearest integer. Formula: `Math.round((rawCount * (vRefVolts * 1000)) / 1023)`. Calculate the millivolts for rawCount = 512 with vRef = 5.0V. Print the result.",
+              "objectiveId": "ard-adc-analog",
+              "starterCode": "function rawToMillivolts(rawCount, vRefVolts) {\n  // Convert count to millivolts\n  return 0;\n}\n\nconsole.log(rawToMillivolts(512, 5.0));"
+            },
+            "checkpoint": {
+              "prompt": "What is the voltage resolution per step for the Arduino Uno 10-bit ADC with a 5V reference?",
+              "answer": "Approximately 4.88 millivolts (5.0V / 1024 counts)."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Interactive 10-Bit ADC & Potentiometer Lab",
+              "description": "Adjust virtual potentiometer slider to see continuous 0-5V input convert into discrete 0-1023 ADC counts."
+            }
+          }
+        ]
+      },
+      {
+        "id": "ard-module-pwm-fsm",
+        "order": 3,
+        "title": "PWM & Non-Blocking State Machines",
+        "summary": "Generate pulse-width modulated outputs, stream UART serial telemetry, and construct non-blocking state machines.",
+        "lessons": [
+          {
+            "id": "arduino-pwm-serial",
+            "order": 5,
+            "title": "Pulse-Width Modulation (PWM), Timers & UART Serial Telemetry",
+            "summary": "Control LED brightness and motor speed using hardware PWM duty cycles and stream structured telemetry over UART.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-pwm-serial"
+            ],
+            "prerequisiteLessonIds": [
+              "arduino-adc-analog"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-ard-pwm-calc",
+              "title": "Compute 8-Bit PWM Register Value",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Calculate 8-bit timer register duty cycles for proportional power modulation.",
+              "prompt": "Write a function `targetVoltageToPwm(targetVolts, vSupply)` that computes the 8-bit integer PWM value (0 to 255) needed to produce a desired average voltage. Clamp output between 0 and 255: `Math.min(255, Math.max(0, Math.round((targetVolts / vSupply) * 255)))`. Calculate PWM for 3.3V on a 5.0V supply. Print the resulting integer.",
+              "objectiveId": "ard-pwm-serial",
+              "starterCode": "function targetVoltageToPwm(targetVolts, vSupply) {\n  // Return clamped 8-bit PWM value\n  return 0;\n}\n\nconsole.log(targetVoltageToPwm(3.3, 5.0));"
+            },
+            "checkpoint": {
+              "prompt": "Why does an LED appear dimmer when driven with a 50% PWM signal compared to 100%?",
+              "answer": "The LED turns on and off 490 times per second. Human persistence of vision integrates the pulses, perceiving the average light output over time rather than rapid individual flickers."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "PWM Waveform & Serial Telemetry Console",
+              "description": "Modulate duty cycle percentages and view synthetic oscilloscope square waves alongside serial data streams."
+            }
+          },
+          {
+            "id": "arduino-millis-fsm",
+            "order": 6,
+            "title": "Non-Blocking Finite State Machines with millis() & Scheduling",
+            "summary": "Eliminate blocking delay() calls using software timers, cooperative multitasking, and finite state machines.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-millis-fsm"
+            ],
+            "prerequisiteLessonIds": [
+              "arduino-pwm-serial"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-ard-fsm-sim",
+              "title": "Simulate Traffic Light State Transitions",
+              "difficulty": "Developing",
+              "expectedOutcome": "Model cyclic finite state machines for predictable embedded automation.",
+              "prompt": "Write a function `simulateTrafficLight(ticks)` that advances a state machine through states `'GREEN'`, `'YELLOW'`, `'RED'`. Duration rules: GREEN lasts 3 ticks, YELLOW lasts 1 tick, RED lasts 2 ticks. Starting at tick 0 in GREEN, run for `ticks` transitions and return an array of the active state at each tick from 0 to ticks - 1. Test with `ticks = 7`. Print as JSON.",
+              "objectiveId": "ard-millis-fsm",
+              "starterCode": "function simulateTrafficLight(ticks) {\n  // Simulate timed traffic state machine\n  return [];\n}\n\nconsole.log(JSON.stringify(simulateTrafficLight(7)));"
+            },
+            "checkpoint": {
+              "prompt": "Why is (currentMillis - previousMillis >= interval) preferred over (currentMillis >= previousMillis + interval)?",
+              "answer": "Unsigned subtraction correctly handles 32-bit integer overflow rollover at 49.7 days without requiring any special condition checks."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Non-Blocking Traffic Controller Lab",
+              "description": "Interact with multiple asynchronous LEDs and button inputs executing simultaneously without blocking pauses."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "esp32-iot-systems",
+    "subjectId": "esp32-iot-subject",
+    "title": "ESP32 Dual-Core IoT Systems & FreeRTOS",
+    "description": "Architect connected IoT systems using the Xtensa dual-core processor, FreeRTOS tasks, 3.3V logic constraints, 12-bit ADC, LEDC PWM, and Wi-Fi telemetry.",
+    "level": "Developing",
+    "version": "1.0.0",
+    "prerequisites": [
+      "Embedded C/C++ syntax",
+      "Microcontroller basics (Arduino or AVR)"
+    ],
+    "objectives": [
+      {
+        "id": "esp-dual-core-logic",
+        "title": "Navigate Xtensa 32-bit dual-core architecture, FreeRTOS task scheduling, and strict 3.3V logic level constraints."
+      },
+      {
+        "id": "esp-gpio-strapping",
+        "title": "Identify bootstrap/strapping pins, input-only pins (GPIO 34-39), and select safe peripherals without boot failures."
+      },
+      {
+        "id": "esp-12bit-adc",
+        "title": "Configure 12-bit ADC attenuation curves (0dB to 11dB), correct silicon non-linearity, and sample sensors on ADC1."
+      },
+      {
+        "id": "esp-ledc-pwm",
+        "title": "Allocate hardware LEDC timers, assign channels to arbitrary GPIOs, and modulate duty cycle with up to 16-bit resolution."
+      },
+      {
+        "id": "esp-wifi-telemetry",
+        "title": "Establish 802.11 b/g/n Wi-Fi station connectivity and transmit serialized JSON telemetry payloads via HTTP REST."
+      },
+      {
+        "id": "esp-deep-sleep",
+        "title": "Configure Ultra-Low-Power (ULP) deep sleep modes, preserve variables in RTC slow memory, and handle external wakeups."
+      }
+    ],
+    "learningOutcomes": [
+      "Navigate Xtensa 32-bit dual-core architecture and FreeRTOS task scheduling.",
+      "Prevent silicon overvoltage using voltage dividers and logic level shifters.",
+      "Identify bootstrap strapping pins and select safe peripheral GPIOs.",
+      "Sample analog sensors with the 12-bit ADC using dB attenuation curves.",
+      "Allocate hardware LEDC timers and modulate PWM duty cycle with up to 16-bit resolution.",
+      "Stream structured JSON sensor telemetry over 802.11 Wi-Fi networks.",
+      "Reduce power consumption to 15µA using Deep Sleep and RTC memory."
+    ],
+    "estimatedDurationMinutes": 175,
+    "publicationStatus": "published",
+    "modules": [
+      {
+        "id": "esp-module-arch-logic",
+        "order": 1,
+        "title": "ESP32 Architecture & 3.3V Logic",
+        "summary": "Navigate the Xtensa dual-core architecture, FreeRTOS background tasks, 3.3V limits, and bootstrap strapping pins.",
+        "lessons": [
+          {
+            "id": "esp32-dual-core-logic",
+            "order": 1,
+            "title": "ESP32 Tensilica Dual-Core Architecture & 3.3V Logic Constraints",
+            "summary": "Master the Xtensa LX6 dual-core architecture, FreeRTOS background tasks, and critical 3.3V electrical boundaries.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-dual-core-logic"
+            ],
+            "prerequisiteLessonIds": [],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-esp-logic-divider",
+              "title": "Calculate 5V to 3.3V Voltage Divider Ratio",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Evaluate voltage divider circuit parameters to protect 3.3V ESP32 silicon.",
+              "prompt": "Write a function `isSafeForEsp32(vIn, r1, r2)` that returns `true` if the attenuated voltage `vIn * (r2 / (r1 + r2))` is less than or equal to `3.6` volts, and `false` if it exceeds 3.6V. Test with `vIn = 5.0, r1 = 1000, r2 = 2000` (safe) and `vIn = 5.0, r1 = 500, r2 = 2000` (overvoltage). Print the two boolean results joined by a comma.",
+              "objectiveId": "esp-dual-core-logic",
+              "starterCode": "function isSafeForEsp32(vIn, r1, r2) {\n  // Check if output voltage <= 3.6V\n  return false;\n}\n\nconsole.log(isSafeForEsp32(5.0, 1000, 2000) + \",\" + isSafeForEsp32(5.0, 500, 2000));"
+            },
+            "checkpoint": {
+              "prompt": "What is the absolute maximum voltage you can safely apply to any ESP32 GPIO pin?",
+              "answer": "3.6 Volts. Any voltage exceeding 3.6V (such as direct 5V from an Arduino Uno or 5V sensor) risks permanently burning the GPIO driver circuitry."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "ESP32 Pinout & 3.3V Logic Checker",
+              "description": "Inspect dual-core processor stats, memory maps, and 3.3V logic level threshold tolerances."
+            }
+          },
+          {
+            "id": "esp32-gpio-strapping",
+            "order": 2,
+            "title": "GPIO Matrix, Strapping Pins & Safe Pin Selection",
+            "summary": "Identify hardware strapping/boot pins, input-only pins, and configure safe GPIOs without causing boot loops.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-gpio-strapping"
+            ],
+            "prerequisiteLessonIds": [
+              "esp32-dual-core-logic"
+            ],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-esp-pin-checker",
+              "title": "Classify ESP32 GPIO Capability",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Filter ESP32 GPIOs based on hardware capabilities and silicon constraints.",
+              "prompt": "Write a function `canPinOutput(gpio)` that returns `true` if the GPIO pin is capable of driving an output, and `false` if it is an input-only pin (34, 35, 36, 39) or connected to internal flash memory (6, 7, 8, 9, 10, 11). Test with GPIOs `[4, 34, 7, 21]` and print the results as JSON.",
+              "objectiveId": "esp-gpio-strapping",
+              "starterCode": "function canPinOutput(gpio) {\n  // Return true if pin can output\n  return false;\n}\n\nconst testPins = [4, 34, 7, 21];\nconsole.log(JSON.stringify(testPins.map(canPinOutput)));"
+            },
+            "checkpoint": {
+              "prompt": "What happens if an external circuit pulls GPIO 0 LOW while the ESP32 is powered on or reset?",
+              "answer": "The chip enters UART Download/Flashing bootloader mode instead of executing application firmware from SPI Flash."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "ESP32 GPIO Pin Safe-Selector",
+              "description": "Interactive pinout showing which pins are safe to use for buttons, relays, and LEDs without triggering boot failures."
+            }
+          }
+        ]
+      },
+      {
+        "id": "esp-module-adc-pwm",
+        "order": 2,
+        "title": "High-Resolution ADC & LEDC PWM",
+        "summary": "Configure 12-bit ADC attenuation curves, compensate for non-linearity, and allocate hardware LEDC PWM timers.",
+        "lessons": [
+          {
+            "id": "esp32-12bit-adc",
+            "order": 3,
+            "title": "12-Bit Successive Approximation ADC, Attenuation & Non-Linearity",
+            "summary": "Sample analog signals with 4096 levels, configure dB attenuation, and account for silicon non-linearity near 0V and 3.3V.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-12bit-adc"
+            ],
+            "prerequisiteLessonIds": [
+              "esp32-gpio-strapping"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-esp-adc-resolution",
+              "title": "Calculate 12-Bit ADC Voltage with Attenuation",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Calculate calibrated voltage measurements from 12-bit ADC data.",
+              "prompt": "Write a function `adcCountToMillivolts(rawCount, maxMillivolts)` that converts a 12-bit ADC reading (0 to 4095) into millivolts rounded to the nearest integer. Formula: `Math.round((rawCount * maxMillivolts) / 4095)`. Calculate for rawCount = 2048 with maxMillivolts = 3120 (11dB attenuation). Print the result.",
+              "objectiveId": "esp-12bit-adc",
+              "starterCode": "function adcCountToMillivolts(rawCount, maxMillivolts) {\n  // Convert 12-bit count to millivolts\n  return 0;\n}\n\nconsole.log(adcCountToMillivolts(2048, 3120));"
+            },
+            "checkpoint": {
+              "prompt": "Why should you never use ADC2 pins for analog sensors in an IoT project?",
+              "answer": "ADC2 is internally shared with the ESP32 Wi-Fi hardware controller. As soon as Wi-Fi connects or transmits packets, ADC2 conversions fail."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "12-Bit ADC Non-Linearity & Curve Visualizer",
+              "description": "Compare linear 10-bit Arduino readings against 12-bit ESP32 ADC curves with non-linear saturation zones."
+            }
+          },
+          {
+            "id": "esp32-ledc-pwm",
+            "order": 4,
+            "title": "LEDC Hardware PWM Channels, Timers & Duty Cycle Resolution",
+            "summary": "Configure the ESP32 LED Control (LEDC) peripheral with customizable bit resolution, frequency, and channel routing.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-ledc-pwm"
+            ],
+            "prerequisiteLessonIds": [
+              "esp32-12bit-adc"
+            ],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-esp-pwm-maxduty",
+              "title": "Compute Maximum LEDC Duty Cycle Value",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Calculate hardware timer register boundaries across arbitrary PWM resolutions.",
+              "prompt": "Write a function `maxDutyForResolution(bits)` that returns the maximum duty cycle integer: `(1 << bits) - 1`. For bits = 10 (10-bit resolution), the result is `1023`. Test with bits = 10 and bits = 12. Print the two values joined by a comma.",
+              "objectiveId": "esp-ledc-pwm",
+              "starterCode": "function maxDutyForResolution(bits) {\n  // Compute max duty count\n  return 0;\n}\n\nconsole.log(maxDutyForResolution(10) + \",\" + maxDutyForResolution(12));"
+            },
+            "checkpoint": {
+              "prompt": "Why can you attach LEDC PWM channel 0 to virtually any GPIO pin on the ESP32?",
+              "answer": "The ESP32 features an internal GPIO Matrix crossbar switch that routes peripheral digital output signals to arbitrary physical pins."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "ESP32 LEDC PWM Synthesizer",
+              "description": "Experiment with PWM timer resolutions from 8-bit to 16-bit and observe frequency/duty cycle boundaries."
+            }
+          }
+        ]
+      },
+      {
+        "id": "esp-module-wifi-lowpower",
+        "order": 3,
+        "title": "Wireless Telemetry & Low Power",
+        "summary": "Connect to 802.11 Wi-Fi networks, stream JSON REST payloads, and maximize battery lifetime using Deep Sleep.",
+        "lessons": [
+          {
+            "id": "esp32-wifi-http-telemetry",
+            "order": 5,
+            "title": "Wi-Fi Station Mode, REST API Client & JSON Telemetry",
+            "summary": "Connect to 802.11 b/g/n networks, serialize sensor readings into JSON, and dispatch HTTP POST telemetry payloads.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-wifi-telemetry"
+            ],
+            "prerequisiteLessonIds": [
+              "esp32-ledc-pwm"
+            ],
+            "estimatedDurationMinutes": 35,
+            "exercise": {
+              "id": "ex-esp-telemetry-fmt",
+              "title": "Format JSON Telemetry Payload",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Serialize embedded sensor data into standard JSON format for cloud APIs.",
+              "prompt": "Write a function `formatTelemetry(deviceId, tempC, lightLux)` that returns a valid JSON string with keys `\"id\"`, `\"temp\"`, and `\"lux\"`. Values should be `deviceId` (string), `tempC` (rounded to 1 decimal place), and `lightLux` (integer). Test with `formatTelemetry(\"node-alpha\", 23.456, 450)`. Print the JSON string.",
+              "objectiveId": "esp-wifi-telemetry",
+              "starterCode": "function formatTelemetry(deviceId, tempC, lightLux) {\n  // Format JSON payload\n  return \"\";\n}\n\nconsole.log(formatTelemetry(\"node-alpha\", 23.456, 450));"
+            },
+            "checkpoint": {
+              "prompt": "Why can an inadequate 3.3V power supply cause the ESP32 to reboot continuously when connecting to Wi-Fi?",
+              "answer": "The Wi-Fi radio power amplifier draws sudden transient spikes of up to 500-800 mA during RF packet bursts. If the power supply sags below 2.43V, the hardware brownout detector triggers a reset."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Interactive Wi-Fi & REST Telemetry Console",
+              "description": "Simulate connecting to Wi-Fi access points, DHCP IP assignment, and transmitting HTTP POST JSON payloads."
+            }
+          },
+          {
+            "id": "esp32-deep-sleep-rtc",
+            "order": 6,
+            "title": "Deep Sleep Power Modes, RTC Memory & External Wakeup Sources",
+            "summary": "Reduce power consumption from 150mA to 10µA using Deep Sleep, preserve state in RTC slow memory, and configure wakeups.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-deep-sleep"
+            ],
+            "prerequisiteLessonIds": [
+              "esp32-wifi-http-telemetry"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-esp-sleep-battery",
+              "title": "Calculate Average IoT Current Consumption",
+              "difficulty": "Developing",
+              "expectedOutcome": "Calculate weighted average power consumption across active and deep sleep operational duty cycles.",
+              "prompt": "Write a function `calcAverageCurrent(activeMa, activeSec, sleepUa, sleepSec)` that calculates the average current in milliamperes rounded to 3 decimal places. Formula: `(activeSec * activeMa + sleepSec * (sleepUa / 1000)) / (activeSec + sleepSec)`. Compute for activeMa = 120, activeSec = 2, sleepUa = 15, sleepSec = 58. Print the rounded number.",
+              "objectiveId": "esp-deep-sleep",
+              "starterCode": "function calcAverageCurrent(activeMa, activeSec, sleepUa, sleepSec) {\n  // Return average current in mA\n  return 0;\n}\n\nconsole.log(calcAverageCurrent(120, 2, 15, 58));"
+            },
+            "checkpoint": {
+              "prompt": "Why must variables intended to survive deep sleep be annotated with RTC_DATA_ATTR?",
+              "answer": "Standard SRAM is completely unpowered during Deep Sleep to conserve energy. Only the 8 KB of RTC slow memory remains powered to preserve annotated state variables."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "ESP32 Battery Life & Power Calculator",
+              "description": "Calculate expected battery longevity in days and years based on deep sleep duration versus active Wi-Fi transmit time."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "breadboard-electronics",
+    "subjectId": "breadboard-electronics-subject",
+    "title": "Practical Breadboard Prototyping & Circuits",
+    "description": "Master physical circuit prototyping on solderless breadboards, terminal bus architectures, current limiting, voltage dividers, and multimeter troubleshooting.",
+    "level": "Beginner",
+    "version": "1.0.0",
+    "prerequisites": [
+      "Elementary algebra",
+      "Basic curiosity about physical computing"
+    ],
+    "objectives": [
+      {
+        "id": "bb-bus-continuity",
+        "title": "Trace internal breadboard phosphor-bronze spring clips, 5-hole terminal rows, and DIP isolation center trenches."
+      },
+      {
+        "id": "bb-power-rails",
+        "title": "Distribute dual power rails (5V/3.3V/GND), bridge middle split gaps, and add bypass decoupling capacitors."
+      },
+      {
+        "id": "bb-led-resistors",
+        "title": "Calculate LED forward voltage drops, size current-limiting resistors with Ohm's Law, and decode 4-band/5-band color rings."
+      },
+      {
+        "id": "bb-switch-pullups",
+        "title": "Wire tactile pushbuttons with external pull-up/pull-down resistor networks to prevent indeterminate floating CMOS states."
+      },
+      {
+        "id": "bb-voltage-dividers",
+        "title": "Construct two-resistor voltage dividers, read potentiometers, and scale analog sensor voltages to microcontroller limits."
+      },
+      {
+        "id": "bb-troubleshooting",
+        "title": "Systematically debug breadboard faults using digital multimeters (voltage, continuity buzzer, and resistance modes)."
+      }
+    ],
+    "learningOutcomes": [
+      "Trace internal spring-clip rows and understand DIP component isolation trenches.",
+      "Distribute dual power rails and eliminate power rail interruptions caused by split gaps.",
+      "Size current-limiting resistors for any LED color using Ohm's Law.",
+      "Wire tactile momentary pushbuttons with pull-up and pull-down resistor networks.",
+      "Design two-resistor voltage divider circuits and interface resistive analog sensors.",
+      "Systematically troubleshoot faulty hardware prototypes using digital multimeters."
+    ],
+    "estimatedDurationMinutes": 150,
+    "publicationStatus": "published",
+    "modules": [
+      {
+        "id": "bb-module-anatomy-power",
+        "order": 1,
+        "title": "Solderless Breadboard Anatomy & Power Rails",
+        "summary": "Master internal phosphor-bronze spring clips, DIP isolation trenches, power buses, and bypass decoupling.",
+        "lessons": [
+          {
+            "id": "breadboard-bus-continuity",
+            "order": 1,
+            "title": "Solderless Breadboard Anatomy, Internal Clips & Continuity",
+            "summary": "Discover the internal spring-clip rows, 0.1-inch pitch, and center DIP isolation trench of solderless breadboards.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "bb-bus-continuity"
+            ],
+            "prerequisiteLessonIds": [],
+            "estimatedDurationMinutes": 20,
+            "exercise": {
+              "id": "ex-bb-continuity-eval",
+              "title": "Evaluate Breadboard Node Continuity",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Model breadboard spring clip connectivity rules.",
+              "prompt": "Write a function `isNodeConnected(rowA, colA, rowB, colB)` that returns `true` if two breadboard coordinates share the same electrical clip, and `false` otherwise. Rule: rowA must equal rowB, and both colA and colB must either be on the left side ('a'-'e') or both on the right side ('f'-'j'). Test with `('15', 'b', '15', 'e')` (connected) and `('15', 'b', '15', 'g')` (separated by trench). Print the two boolean results joined by a comma.",
+              "objectiveId": "bb-bus-continuity",
+              "starterCode": "function isNodeConnected(rowA, colA, rowB, colB) {\n  // Return true if points are connected\n  return false;\n}\n\nconsole.log(isNodeConnected(15, 'b', 15, 'e') + \",\" + isNodeConnected(15, 'b', 15, 'g'));"
+            },
+            "checkpoint": {
+              "prompt": "Why is there an empty center trench separating columns a-e from f-j on a breadboard?",
+              "answer": "To allow Dual Inline Package (DIP) integrated circuits to sit across the center without their opposing pins being shorted together."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Interactive Solderless Breadboard Explorer",
+              "description": "Click any breadboard tie point to illuminate all electrically connected internal spring clips in green."
+            }
+          },
+          {
+            "id": "breadboard-power-rails",
+            "order": 2,
+            "title": "Power Distribution Rails, Decoupling & Supply Isolation",
+            "summary": "Distribute stable VCC and Ground across breadboard bus strips and eliminate voltage sags using decoupling capacitors.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "bb-power-rails"
+            ],
+            "prerequisiteLessonIds": [
+              "breadboard-bus-continuity"
+            ],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-bb-bus-gap-check",
+              "title": "Check Power Rail Split Continuity",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Detect power delivery interruptions caused by breadboard bus split gaps.",
+              "prompt": "Write a function `isRailContinuous(hasBridgeJumper, boardIndex)` where `boardIndex` is a column number from 1 to 60. On a split breadboard, indices 1 to 30 are on the left section and 31 to 60 are on the right section. If power is fed at index 1, return `true` if `boardIndex <= 30` OR if `hasBridgeJumper` is true. Test for `boardIndex = 45` with `hasBridgeJumper = false` and `true`. Print the two booleans joined by a comma.",
+              "objectiveId": "bb-power-rails",
+              "starterCode": "function isRailContinuous(hasBridgeJumper, boardIndex) {\n  // Check if target point receives power\n  return false;\n}\n\nconsole.log(isRailContinuous(false, 45) + \",\" + isRailContinuous(true, 45));"
+            },
+            "checkpoint": {
+              "prompt": "Why do some breadboard power rails have an interrupted colored line in the middle?",
+              "answer": "To indicate that the continuous internal bus is split into two isolated halves, allowing two different supply voltages (e.g. 5V and 3.3V) on the same board."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Power Rail Distribution & Bypass Lab",
+              "description": "Wire +5V and GND buses across both sides of the breadboard and observe power rail voltage drops."
+            }
+          }
+        ]
+      },
+      {
+        "id": "bb-module-passives-switches",
+        "order": 2,
+        "title": "Passive Components & Switches",
+        "summary": "Calculate LED current limiting, decode resistor color bands, and eliminate floating CMOS gate noise with pull resistors.",
+        "lessons": [
+          {
+            "id": "breadboard-led-resistors",
+            "order": 3,
+            "title": "LED Current Limiting, Forward Voltage & Resistor Color Codes",
+            "summary": "Size current-limiting resistors using Ohm's Law, understand diode forward voltage drop (Vf), and decode resistor color bands.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "bb-led-resistors"
+            ],
+            "prerequisiteLessonIds": [
+              "breadboard-power-rails"
+            ],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-bb-resistor-sizing",
+              "title": "Calculate Resistor for Green LED on 5V Rail",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Apply Ohm's law to size embedded circuit protection components.",
+              "prompt": "Write a function `sizeLedResistor(vSupply, vForward, targetCurrentMa)` that computes the ideal resistance in ohms rounded to the nearest integer. Formula: `Math.round((vSupply - vForward) / (targetCurrentMa / 1000))`. Compute for a 5.0V supply driving a Green LED (forward voltage 2.2V) at 14mA. Print the resulting integer.",
+              "objectiveId": "bb-led-resistors",
+              "starterCode": "function sizeLedResistor(vSupply, vForward, targetCurrentMa) {\n  // Compute resistor value\n  return 0;\n}\n\nconsole.log(sizeLedResistor(5.0, 2.2, 14));"
+            },
+            "checkpoint": {
+              "prompt": "Why can you not connect an LED directly between 5V and GND without a resistor?",
+              "answer": "Once forward voltage is exceeded, the LED exhibits almost zero resistance, causing catastrophic current surge and instant thermal burnout."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Interactive LED Resistor Sizing Lab",
+              "description": "Experiment with different LED colors (Red, Green, Blue) and resistor values to observe forward voltage and brightness."
+            }
+          },
+          {
+            "id": "breadboard-switch-pullups",
+            "order": 4,
+            "title": "Tactile Pushbuttons, Floating CMOS Gates & Pull-Up/Down Networks",
+            "summary": "Wire momentary pushbuttons with external 10kΩ pull-up/pull-down resistors to guarantee clean digital transitions.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "bb-switch-pullups"
+            ],
+            "prerequisiteLessonIds": [
+              "breadboard-led-resistors"
+            ],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-bb-switch-eval",
+              "title": "Evaluate Pull-Up vs Pull-Down Switch States",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Interpret digital input logic levels across pull-up and pull-down circuit topologies.",
+              "prompt": "Write a function `getSwitchAction(topology, rawReading)` where `topology` is either `'PULLUP'` or `'PULLDOWN'`, and `rawReading` is `0` or `1`. Return `'PRESSED'` or `'RELEASED'`. For `'PULLUP'`, reading `0` is `'PRESSED'`. For `'PULLDOWN'`, reading `1` is `'PRESSED'`. Test with `('PULLUP', 0)` and `('PULLDOWN', 0)`. Print both results separated by a comma.",
+              "objectiveId": "bb-switch-pullups",
+              "starterCode": "function getSwitchAction(topology, rawReading) {\n  // Return 'PRESSED' or 'RELEASED'\n  return \"\";\n}\n\nconsole.log(getSwitchAction('PULLUP', 0) + \",\" + getSwitchAction('PULLDOWN', 0));"
+            },
+            "checkpoint": {
+              "prompt": "Why does an unconnected microcontroller input pin oscillate randomly between 0 and 1?",
+              "answer": "CMOS inputs have high impedance (>100MΩ) and act as sensitive antennas that pick up electromagnetic radiation and static charges unless tied to a rail by a pull resistor."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Pull-Up vs Pull-Down Interactive Switch Lab",
+              "description": "Toggle between Pull-Up and Pull-Down topologies and inspect voltage levels at the microcontroller sensing node."
+            }
+          }
+        ]
+      },
+      {
+        "id": "bb-module-dividers-debug",
+        "order": 3,
+        "title": "Voltage Dividers & Circuit Debugging",
+        "summary": "Construct two-resistor voltage dividers, interface sensors, and troubleshoot circuits with digital multimeters.",
+        "lessons": [
+          {
+            "id": "breadboard-voltage-dividers",
+            "order": 5,
+            "title": "Voltage Divider Networks, Potentiometers & Sensor Interfacing",
+            "summary": "Construct two-resistor voltage dividers, calculate output potential, and integrate resistive sensors (LDRs, thermistors).",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "bb-voltage-dividers"
+            ],
+            "prerequisiteLessonIds": [
+              "breadboard-switch-pullups"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-bb-divider-calc",
+              "title": "Calculate Voltage Divider Output",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Calculate intermediate node voltages in passive resistor divider networks.",
+              "prompt": "Write a function `dividerVoltage(vIn, r1, r2)` that returns the output voltage rounded to 2 decimal places: `Number((vIn * (r2 / (r1 + r2))).toFixed(2))`. Compute the output for `vIn = 5.0, r1 = 10000, r2 = 10000` (equal resistors) and `vIn = 5.0, r1 = 1000, r2 = 2000`. Print both results separated by a comma.",
+              "objectiveId": "bb-voltage-dividers",
+              "starterCode": "function dividerVoltage(vIn, r1, r2) {\n  // Calculate divider voltage\n  return 0;\n}\n\nconsole.log(dividerVoltage(5.0, 10000, 10000) + \",\" + dividerVoltage(5.0, 1000, 2000));"
+            },
+            "checkpoint": {
+              "prompt": "Why is a fixed resistor required when measuring a photoresistor (LDR) with a microcontroller ADC?",
+              "answer": "An ADC measures voltage, not resistance. Placing the LDR in series with a fixed resistor forms a voltage divider that translates changing resistance into measurable changing voltage."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Interactive Voltage Divider & LDR Lab",
+              "description": "Vary R1 and R2 values to measure output voltage dynamically and explore light-dependent resistor curves."
+            }
+          },
+          {
+            "id": "breadboard-troubleshooting",
+            "order": 6,
+            "title": "Circuit Troubleshooting with Multimeters, Continuity & Probe Testing",
+            "summary": "Diagnose short circuits, bad jumpers, and missing grounds using digital multimeter continuity buzzers and voltage probes.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "bb-troubleshooting"
+            ],
+            "prerequisiteLessonIds": [
+              "breadboard-voltage-dividers"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-bb-debug-checklist",
+              "title": "Diagnose Breadboard Fault from Measurements",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Apply systematic troubleshooting logic to isolate physical circuit failures.",
+              "prompt": "Write a function `diagnoseFault(vMeasured, continuityGnd, ledOriented)` where `vMeasured` is a number (measured volts), `continuityGnd` is boolean, and `ledOriented` is boolean. Return `'NO_GROUND'` if continuityGnd is false. Otherwise, return `'VOLTAGE_SAG'` if vMeasured < 4.5. Otherwise, return `'REVERSED_LED'` if ledOriented is false. Otherwise return `'HEALTHY'`. Test with `(5.0, true, true)` and `(3.2, true, true)`. Print both results separated by a comma.",
+              "objectiveId": "bb-troubleshooting",
+              "starterCode": "function diagnoseFault(vMeasured, continuityGnd, ledOriented) {\n  // Return diagnostic outcome string\n  return \"\";\n}\n\nconsole.log(diagnoseFault(5.0, true, true) + \",\" + diagnoseFault(3.2, true, true));"
+            },
+            "checkpoint": {
+              "prompt": "Why must electrical power be disconnected before using a digital multimeter's continuity buzzer mode?",
+              "answer": "Continuity mode sends a small internal test current through the probes. Applying external circuit voltage can damage the meter's internal measurement circuit or blow its protection fuse."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Interactive Virtual Multimeter & Debugger Lab",
+              "description": "Place red and black virtual multimeter probes across breadboard pins to test continuity beep, voltage, and resistance."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
     "id": "js-systems-algorithms",
     "subjectId": "js-programming",
     "title": "JavaScript & Algorithmic Systems",
@@ -1758,374 +3127,6 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             "checkpoint": {
               "prompt": "Why must event listeners be explicitly removed in long-lived applications?",
               "answer": "If listeners are not removed, references to the callback functions (and any outer scope closures they capture) remain pinned in memory, causing insidious memory leaks."
-            }
-          }
-        ]
-      }
-    ]
-  },
-  {
-    "id": "digital-logic-circuits",
-    "subjectId": "digital-circuits",
-    "title": "Digital Logic & Circuit Foundations",
-    "description": "Explore the physical foundations of computing: Ohm's law, RC transient curves, Boolean logic gates, adders, multiplexers, and flip-flops with interactive simulators.",
-    "level": "Beginner",
-    "version": "1.0.0",
-    "prerequisites": [
-      "High school algebra and basic arithmetic.",
-      "No prior electronics or hardware experience required."
-    ],
-    "objectives": [
-      {
-        "id": "circuits-ohms-law",
-        "title": "Calculate voltage drops, currents, and power dissipation across series and parallel resistor networks."
-      },
-      {
-        "id": "circuits-rc-transient",
-        "title": "Analyze capacitor charging, discharging, and RC time constants (tau = R * C)."
-      },
-      {
-        "id": "circuits-basic-gates",
-        "title": "Verify truth tables and operations of basic logic gates: AND, OR, and NOT."
-      },
-      {
-        "id": "circuits-universal-gates",
-        "title": "Synthesize arbitrary Boolean functions using universal NAND and NOR gates and De Morgan's laws."
-      },
-      {
-        "id": "circuits-xor-parity-obj",
-        "title": "Construct Exclusive-OR (XOR) circuits and multi-bit parity generators for error detection."
-      },
-      {
-        "id": "circuits-adders",
-        "title": "Design combinational binary arithmetic adders using Half Adders and Full Adders."
-      },
-      {
-        "id": "circuits-mux-demux",
-        "title": "Route multi-channel data streams using binary Multiplexers (Mux) and Demultiplexers (Demux)."
-      },
-      {
-        "id": "circuits-latches-sequential",
-        "title": "Trace edge-triggered memory storage and feedback loops in SR Latches and D Flip-Flops."
-      }
-    ],
-    "learningOutcomes": [
-      "Analyze DC resistive networks using Ohm's Law and calculate electrical power dissipation.",
-      "Predict transient charging curves and time constants in RC circuits.",
-      "Formulate and minimize Boolean logic expressions using truth tables and De Morgan's laws.",
-      "Synthesize arbitrary logic circuits using universal NAND and NOR gates.",
-      "Construct combinational arithmetic units including Half Adders, Full Adders, and Multiplexers.",
-      "Explain edge-triggered state retention, clock distribution, and memory storage in D Flip-Flops."
-    ],
-    "estimatedDurationMinutes": 300,
-    "publicationStatus": "published",
-    "modules": [
-      {
-        "id": "circuits-electricity-passives",
-        "order": 1,
-        "title": "Electricity fundamentals and passive circuits",
-        "summary": "Ohm's Law, resistor divider networks, capacitors, and RC transient curves.",
-        "lessons": [
-          {
-            "id": "circuits-ohms-law-resistors",
-            "order": 1,
-            "title": "Ohm's Law, Voltage, and Resistor Networks",
-            "summary": "Master voltage, current, and resistance; calculate series/parallel equivalent resistance and dissipated electrical power.",
-            "type": "interactive-simulation",
-            "objectiveIds": [
-              "circuits-ohms-law"
-            ],
-            "prerequisiteLessonIds": [],
-            "estimatedDurationMinutes": 25,
-            "execution": {
-              "language": "javascript",
-              "target": "browser-wasm"
-            },
-            "exercise": {
-              "id": "ex-circ-ohms-series",
-              "title": "Calculate total current and power in series circuit",
-              "difficulty": "Beginner",
-              "expectedOutcome": "Apply Ohm's law and Joule's power formula across series resistors.",
-              "prompt": "Given a 12V DC power source connected to two series resistors R1 = 40 ohms and R2 = 60 ohms, compute the total circuit current in Amperes and total electrical power in Watts. Print: Current: {current} A, Power: {power} W with current formatted to 3 decimals and power to 2 decimals.",
-              "objectiveId": "circuits-ohms-law",
-              "starterCode": "const voltage = 12.0;\nconst r1 = 40.0;\nconst r2 = 60.0;\n// Calculate current and power, then print\n"
-            },
-            "checkpoint": {
-              "prompt": "If you double the voltage across a fixed resistor, by what factor does the dissipated power increase?",
-              "answer": "Power increases by a factor of 4, because electrical power is proportional to voltage squared: P = V^2 / R."
-            },
-            "interactiveDemo": {
-              "kind": "circuit",
-              "title": "DC Voltage Divider & Ohm's Law",
-              "description": "Vary input voltage and resistance values to observe current and node voltages in real time."
-            }
-          },
-          {
-            "id": "circuits-capacitors-rc-transient",
-            "order": 2,
-            "title": "Capacitors, RC Time Constants, and Transient Charging",
-            "summary": "Observe charge storage in capacitors, calculate the RC time constant tau = R * C, and plot exponential transient curves.",
-            "type": "interactive-simulation",
-            "objectiveIds": [
-              "circuits-rc-transient"
-            ],
-            "prerequisiteLessonIds": [
-              "circuits-ohms-law-resistors"
-            ],
-            "estimatedDurationMinutes": 30,
-            "execution": {
-              "language": "javascript",
-              "target": "browser-wasm"
-            },
-            "exercise": {
-              "id": "ex-circ-rc-timing",
-              "title": "Calculate RC time constant and 1-tau voltage",
-              "difficulty": "Beginner",
-              "expectedOutcome": "Compute exponential transient voltage using Math.exp(-1).",
-              "prompt": "For a circuit with supply V0 = 5.0 V, resistance R = 10,000 ohms, and capacitance C = 0.0001 Farads (100 uF), compute the time constant tau (tau = R * C) and the capacitor voltage after exactly 1 tau using V(tau) = V0 * (1 - e^(-1)). Print: Tau: {tau} s, V(tau): {vTau} V with tau formatted to 1 decimal and vTau to 2 decimals.",
-              "objectiveId": "circuits-rc-transient",
-              "starterCode": "const v0 = 5.0;\nconst r = 10000;\nconst c = 0.0001;\n// Calculate tau and voltage at 1 tau\n"
-            },
-            "checkpoint": {
-              "prompt": "Approximately what percentage of maximum voltage does a capacitor attain after elapsed time t = 1 tau?",
-              "answer": "Approximately 63.2% of the applied voltage."
-            },
-            "interactiveDemo": {
-              "kind": "circuit",
-              "title": "RC Transient Charging Curve",
-              "description": "Observe exponential voltage rise and decay curves across capacitor charging cycles."
-            }
-          }
-        ]
-      },
-      {
-        "id": "circuits-boolean-gates",
-        "order": 2,
-        "title": "Digital logic gates and Boolean algebra",
-        "summary": "AND, OR, NOT, universal NAND/NOR synthesis, XOR gates, and parity generators.",
-        "lessons": [
-          {
-            "id": "circuits-logic-gates-basic",
-            "order": 3,
-            "title": "Basic Logic Gates: AND, OR, NOT",
-            "summary": "Construct digital logic systems from fundamental AND, OR, and NOT gates; evaluate composite truth tables.",
-            "type": "interactive-simulation",
-            "objectiveIds": [
-              "circuits-basic-gates"
-            ],
-            "prerequisiteLessonIds": [
-              "circuits-capacitors-rc-transient"
-            ],
-            "estimatedDurationMinutes": 25,
-            "execution": {
-              "language": "javascript",
-              "target": "browser-wasm"
-            },
-            "exercise": {
-              "id": "ex-circ-basic-truth-table",
-              "title": "Generate truth table for composite logic",
-              "difficulty": "Beginner",
-              "expectedOutcome": "Iterate all 4 binary permutations and evaluate composite Boolean logic.",
-              "prompt": "Evaluate the Boolean expression OUT = (A AND B) OR (NOT A) for all four input combinations [0,0], [0,1], [1,0], and [1,1]. Print each row in the format: A B -> OUT (e.g. '0 0 -> 1').",
-              "objectiveId": "circuits-basic-gates",
-              "starterCode": "const inputs = [[0, 0], [0, 1], [1, 0], [1, 1]];\n// Evaluate (A AND B) OR (NOT A) for each input pair\n"
-            },
-            "checkpoint": {
-              "prompt": "What is the output of an OR gate when one input is 1 and the other is unknown?",
-              "answer": "The output is guaranteed to be 1, because true OR anything is always true."
-            },
-            "interactiveDemo": {
-              "kind": "circuit",
-              "title": "Interactive AND, OR, NOT Gates",
-              "description": "Toggle binary input switches 0/1 and verify live output LED states against truth tables."
-            }
-          },
-          {
-            "id": "circuits-universal-nand-nor",
-            "order": 4,
-            "title": "Universal Gates: NAND, NOR, and De Morgan's Laws",
-            "summary": "Synthesize complete logic systems exclusively from NAND or NOR gates using De Morgan's duality theorems.",
-            "type": "interactive-simulation",
-            "objectiveIds": [
-              "circuits-universal-gates"
-            ],
-            "prerequisiteLessonIds": [
-              "circuits-logic-gates-basic"
-            ],
-            "estimatedDurationMinutes": 30,
-            "execution": {
-              "language": "javascript",
-              "target": "browser-wasm"
-            },
-            "exercise": {
-              "id": "ex-circ-nand-synthesis",
-              "title": "Construct NOT and AND using pure NAND gates",
-              "difficulty": "Developing",
-              "expectedOutcome": "Prove universal gate synthesis by assembling NOT and AND out of NAND.",
-              "prompt": "Define nand(a, b) as (!(a && b) ? 1 : 0). Implement nandNot(a) using only nand, and nandAnd(a, b) using only nand and nandNot. Test on (1, 1) and (1, 0) and print: AND(1,1): {res1}, AND(1,0): {res2}.",
-              "objectiveId": "circuits-universal-gates",
-              "starterCode": "const nand = (a, b) => (!(a && b) ? 1 : 0);\n// Implement nandNot and nandAnd\n"
-            },
-            "checkpoint": {
-              "prompt": "Why is NAND called a 'universal' gate?",
-              "answer": "Because any fundamental Boolean operation (NOT, AND, OR, XOR, etc.) and thus any digital computer circuit can be constructed using only NAND gates."
-            },
-            "interactiveDemo": {
-              "kind": "circuit",
-              "title": "NAND Logic Synthesis",
-              "description": "Build inverter and AND equivalents exclusively using two-input NAND gates."
-            }
-          },
-          {
-            "id": "circuits-xor-parity",
-            "order": 5,
-            "title": "Exclusive OR (XOR) and Parity Generators",
-            "summary": "Understand modulo-2 addition with XOR gates, compute bit differences, and generate parity error-detection codes.",
-            "type": "interactive-simulation",
-            "objectiveIds": [
-              "circuits-xor-parity-obj"
-            ],
-            "prerequisiteLessonIds": [
-              "circuits-universal-nand-nor"
-            ],
-            "estimatedDurationMinutes": 30,
-            "execution": {
-              "language": "javascript",
-              "target": "browser-wasm"
-            },
-            "exercise": {
-              "id": "ex-circ-parity-gen",
-              "title": "Implement a 3-input parity generator",
-              "difficulty": "Beginner",
-              "expectedOutcome": "Chain XOR operations to compute bit parity.",
-              "prompt": "Implement evenParity(a, b, c) using bitwise XOR (^). Test with inputs (1, 0, 1) and (1, 1, 1), and print: Parity(1,0,1): {res1}, Parity(1,1,1): {res2}.",
-              "objectiveId": "circuits-xor-parity-obj",
-              "starterCode": "function evenParity(a, b, c) {\n  // Implement 3-input XOR parity\n}\n\n// Print Parity(1,0,1) and Parity(1,1,1)\n"
-            },
-            "checkpoint": {
-              "prompt": "What is the result of evaluating A XOR A for any binary value A?",
-              "answer": "It always equals 0, because both inputs are identical."
-            },
-            "interactiveDemo": {
-              "kind": "circuit",
-              "title": "XOR Gate and Even Parity Checker",
-              "description": "Observe output toggling only when inputs differ; verify even/odd parity bit generation."
-            }
-          }
-        ]
-      },
-      {
-        "id": "circuits-combinational-sequential",
-        "order": 3,
-        "title": "Combinational and sequential logic systems",
-        "summary": "Half adders, full adders, multiplexer data routing, and edge-triggered D Flip-Flops.",
-        "lessons": [
-          {
-            "id": "circuits-half-full-adders",
-            "order": 6,
-            "title": "Binary Adders: Half Adders and Full Adders",
-            "summary": "Build binary arithmetic circuits by combining XOR and AND gates into Half Adders and cascading into Full Adders.",
-            "type": "interactive-simulation",
-            "objectiveIds": [
-              "circuits-adders"
-            ],
-            "prerequisiteLessonIds": [
-              "circuits-xor-parity"
-            ],
-            "estimatedDurationMinutes": 35,
-            "execution": {
-              "language": "javascript",
-              "target": "browser-wasm"
-            },
-            "exercise": {
-              "id": "ex-circ-full-adder",
-              "title": "Implement a 1-bit Full Adder",
-              "difficulty": "Developing",
-              "expectedOutcome": "Compute binary addition sum and carry bits with XOR and majority logic.",
-              "prompt": "Implement fullAdder(a, b, cin) returning an object { sum, cout }. Evaluate with a = 1, b = 1, cin = 1, and print: Sum: {sum}, Cout: {cout}.",
-              "objectiveId": "circuits-adders",
-              "starterCode": "function fullAdder(a, b, cin) {\n  // Implement full adder\n}\n\n// Call with (1, 1, 1) and print Sum and Cout\n"
-            },
-            "checkpoint": {
-              "prompt": "Why can a Half Adder not be used directly to chain multi-bit arithmetic operations?",
-              "answer": "A Half Adder lacks an incoming carry input (Cin); it can only generate a carry, not receive one from a lower bit."
-            },
-            "interactiveDemo": {
-              "kind": "circuit",
-              "title": "1-Bit Full Adder Schematic",
-              "description": "Trace carry propagation and sum bit calculation using XOR, AND, and OR gates."
-            }
-          },
-          {
-            "id": "circuits-multiplexers-demux",
-            "order": 7,
-            "title": "Data Selectors: Multiplexers (Mux) and Demux",
-            "summary": "Route multi-channel data streams using binary Multiplexers (Mux) and Demultiplexers (Demux).",
-            "type": "interactive-simulation",
-            "objectiveIds": [
-              "circuits-mux-demux"
-            ],
-            "prerequisiteLessonIds": [
-              "circuits-half-full-adders"
-            ],
-            "estimatedDurationMinutes": 30,
-            "execution": {
-              "language": "javascript",
-              "target": "browser-wasm"
-            },
-            "exercise": {
-              "id": "ex-circ-mux-selection",
-              "title": "Route data through a 4-to-1 Multiplexer",
-              "difficulty": "Developing",
-              "expectedOutcome": "Decode select lines to route channel data.",
-              "prompt": "Implement mux4to1(d0, d1, d2, d3, s0, s1). When called with data lines (10, 20, 30, 40) and select lines s0 = 1, s1 = 1 (binary address 3), print: Selected: {value}.",
-              "objectiveId": "circuits-mux-demux",
-              "starterCode": "function mux4to1(d0, d1, d2, d3, s0, s1) {\n  // Implement 4-to-1 MUX\n}\n\n// Call with 10, 20, 30, 40 and select lines 1, 1\n"
-            },
-            "checkpoint": {
-              "prompt": "How many select lines are required to construct an 8-to-1 multiplexer?",
-              "answer": "3 select lines are required, because 2^3 = 8."
-            },
-            "interactiveDemo": {
-              "kind": "circuit",
-              "title": "4-to-1 Multiplexer",
-              "description": "Direct data routing across 4 input lines using 2 binary select lines."
-            }
-          },
-          {
-            "id": "circuits-latches-flip-flops",
-            "order": 8,
-            "title": "Sequential Logic: SR Latches and D Flip-Flops",
-            "summary": "Introduce memory with cross-coupled feedback loops, level-sensitive SR latches, and clock-edge triggered D Flip-Flops.",
-            "type": "interactive-simulation",
-            "objectiveIds": [
-              "circuits-latches-sequential"
-            ],
-            "prerequisiteLessonIds": [
-              "circuits-multiplexers-demux"
-            ],
-            "estimatedDurationMinutes": 35,
-            "execution": {
-              "language": "javascript",
-              "target": "browser-wasm"
-            },
-            "exercise": {
-              "id": "ex-circ-dff-simulation",
-              "title": "Model an edge-triggered D Flip-Flop",
-              "difficulty": "Developing",
-              "expectedOutcome": "Detect rising clock edges to capture and hold sequential state.",
-              "prompt": "Implement a DFlipFlop class that stores state q (initially 0). On each call to tick(d, clk), if clk transitioned from 0 to 1 (rising edge), update q = d. Return q. Initialize dff = new DFlipFlop(), call tick(1, 0), tick(1, 1), and tick(0, 0), then print: Stored state Q: {dff.q}.",
-              "objectiveId": "circuits-latches-sequential",
-              "starterCode": "class DFlipFlop {\n  // Implement edge-triggered D Flip-Flop\n}\n\nconst dff = new DFlipFlop();\n// Call tick(1, 0), tick(1, 1), tick(0, 0) and print Stored state Q\n"
-            },
-            "checkpoint": {
-              "prompt": "Why are digital registers triggered on the clock edge rather than clock level?",
-              "answer": "Edge-triggering ensures that state is captured at an exact instantaneous transition, preventing data from racing through multiple sequential stages during the duration of a high pulse."
-            },
-            "interactiveDemo": {
-              "kind": "circuit",
-              "title": "D Flip-Flop Register Cell",
-              "description": "Observe edge-triggered state retention and clock-synchronized memory updates."
             }
           }
         ]
@@ -3577,6 +4578,374 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "kind": "image-lab",
               "title": "Interactive Image & Color Lab",
               "description": "Explore color channel interactions and alpha transparency in procedural layers."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "digital-logic-circuits",
+    "subjectId": "digital-circuits",
+    "title": "Digital Logic & Circuit Foundations",
+    "description": "Explore the physical foundations of computing: Ohm's law, RC transient curves, Boolean logic gates, adders, multiplexers, and flip-flops with interactive simulators.",
+    "level": "Beginner",
+    "version": "1.0.0",
+    "prerequisites": [
+      "High school algebra and basic arithmetic.",
+      "No prior electronics or hardware experience required."
+    ],
+    "objectives": [
+      {
+        "id": "circuits-ohms-law",
+        "title": "Calculate voltage drops, currents, and power dissipation across series and parallel resistor networks."
+      },
+      {
+        "id": "circuits-rc-transient",
+        "title": "Analyze capacitor charging, discharging, and RC time constants (tau = R * C)."
+      },
+      {
+        "id": "circuits-basic-gates",
+        "title": "Verify truth tables and operations of basic logic gates: AND, OR, and NOT."
+      },
+      {
+        "id": "circuits-universal-gates",
+        "title": "Synthesize arbitrary Boolean functions using universal NAND and NOR gates and De Morgan's laws."
+      },
+      {
+        "id": "circuits-xor-parity-obj",
+        "title": "Construct Exclusive-OR (XOR) circuits and multi-bit parity generators for error detection."
+      },
+      {
+        "id": "circuits-adders",
+        "title": "Design combinational binary arithmetic adders using Half Adders and Full Adders."
+      },
+      {
+        "id": "circuits-mux-demux",
+        "title": "Route multi-channel data streams using binary Multiplexers (Mux) and Demultiplexers (Demux)."
+      },
+      {
+        "id": "circuits-latches-sequential",
+        "title": "Trace edge-triggered memory storage and feedback loops in SR Latches and D Flip-Flops."
+      }
+    ],
+    "learningOutcomes": [
+      "Analyze DC resistive networks using Ohm's Law and calculate electrical power dissipation.",
+      "Predict transient charging curves and time constants in RC circuits.",
+      "Formulate and minimize Boolean logic expressions using truth tables and De Morgan's laws.",
+      "Synthesize arbitrary logic circuits using universal NAND and NOR gates.",
+      "Construct combinational arithmetic units including Half Adders, Full Adders, and Multiplexers.",
+      "Explain edge-triggered state retention, clock distribution, and memory storage in D Flip-Flops."
+    ],
+    "estimatedDurationMinutes": 300,
+    "publicationStatus": "published",
+    "modules": [
+      {
+        "id": "circuits-electricity-passives",
+        "order": 1,
+        "title": "Electricity fundamentals and passive circuits",
+        "summary": "Ohm's Law, resistor divider networks, capacitors, and RC transient curves.",
+        "lessons": [
+          {
+            "id": "circuits-ohms-law-resistors",
+            "order": 1,
+            "title": "Ohm's Law, Voltage, and Resistor Networks",
+            "summary": "Master voltage, current, and resistance; calculate series/parallel equivalent resistance and dissipated electrical power.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-ohms-law"
+            ],
+            "prerequisiteLessonIds": [],
+            "estimatedDurationMinutes": 25,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-ohms-series",
+              "title": "Calculate total current and power in series circuit",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Apply Ohm's law and Joule's power formula across series resistors.",
+              "prompt": "Given a 12V DC power source connected to two series resistors R1 = 40 ohms and R2 = 60 ohms, compute the total circuit current in Amperes and total electrical power in Watts. Print: Current: {current} A, Power: {power} W with current formatted to 3 decimals and power to 2 decimals.",
+              "objectiveId": "circuits-ohms-law",
+              "starterCode": "const voltage = 12.0;\nconst r1 = 40.0;\nconst r2 = 60.0;\n// Calculate current and power, then print\n"
+            },
+            "checkpoint": {
+              "prompt": "If you double the voltage across a fixed resistor, by what factor does the dissipated power increase?",
+              "answer": "Power increases by a factor of 4, because electrical power is proportional to voltage squared: P = V^2 / R."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "DC Voltage Divider & Ohm's Law",
+              "description": "Vary input voltage and resistance values to observe current and node voltages in real time."
+            }
+          },
+          {
+            "id": "circuits-capacitors-rc-transient",
+            "order": 2,
+            "title": "Capacitors, RC Time Constants, and Transient Charging",
+            "summary": "Observe charge storage in capacitors, calculate the RC time constant tau = R * C, and plot exponential transient curves.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-rc-transient"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-ohms-law-resistors"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-rc-timing",
+              "title": "Calculate RC time constant and 1-tau voltage",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Compute exponential transient voltage using Math.exp(-1).",
+              "prompt": "For a circuit with supply V0 = 5.0 V, resistance R = 10,000 ohms, and capacitance C = 0.0001 Farads (100 uF), compute the time constant tau (tau = R * C) and the capacitor voltage after exactly 1 tau using V(tau) = V0 * (1 - e^(-1)). Print: Tau: {tau} s, V(tau): {vTau} V with tau formatted to 1 decimal and vTau to 2 decimals.",
+              "objectiveId": "circuits-rc-transient",
+              "starterCode": "const v0 = 5.0;\nconst r = 10000;\nconst c = 0.0001;\n// Calculate tau and voltage at 1 tau\n"
+            },
+            "checkpoint": {
+              "prompt": "Approximately what percentage of maximum voltage does a capacitor attain after elapsed time t = 1 tau?",
+              "answer": "Approximately 63.2% of the applied voltage."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "RC Transient Charging Curve",
+              "description": "Observe exponential voltage rise and decay curves across capacitor charging cycles."
+            }
+          }
+        ]
+      },
+      {
+        "id": "circuits-boolean-gates",
+        "order": 2,
+        "title": "Digital logic gates and Boolean algebra",
+        "summary": "AND, OR, NOT, universal NAND/NOR synthesis, XOR gates, and parity generators.",
+        "lessons": [
+          {
+            "id": "circuits-logic-gates-basic",
+            "order": 3,
+            "title": "Basic Logic Gates: AND, OR, NOT",
+            "summary": "Construct digital logic systems from fundamental AND, OR, and NOT gates; evaluate composite truth tables.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-basic-gates"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-capacitors-rc-transient"
+            ],
+            "estimatedDurationMinutes": 25,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-basic-truth-table",
+              "title": "Generate truth table for composite logic",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Iterate all 4 binary permutations and evaluate composite Boolean logic.",
+              "prompt": "Evaluate the Boolean expression OUT = (A AND B) OR (NOT A) for all four input combinations [0,0], [0,1], [1,0], and [1,1]. Print each row in the format: A B -> OUT (e.g. '0 0 -> 1').",
+              "objectiveId": "circuits-basic-gates",
+              "starterCode": "const inputs = [[0, 0], [0, 1], [1, 0], [1, 1]];\n// Evaluate (A AND B) OR (NOT A) for each input pair\n"
+            },
+            "checkpoint": {
+              "prompt": "What is the output of an OR gate when one input is 1 and the other is unknown?",
+              "answer": "The output is guaranteed to be 1, because true OR anything is always true."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Interactive AND, OR, NOT Gates",
+              "description": "Toggle binary input switches 0/1 and verify live output LED states against truth tables."
+            }
+          },
+          {
+            "id": "circuits-universal-nand-nor",
+            "order": 4,
+            "title": "Universal Gates: NAND, NOR, and De Morgan's Laws",
+            "summary": "Synthesize complete logic systems exclusively from NAND or NOR gates using De Morgan's duality theorems.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-universal-gates"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-logic-gates-basic"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-nand-synthesis",
+              "title": "Construct NOT and AND using pure NAND gates",
+              "difficulty": "Developing",
+              "expectedOutcome": "Prove universal gate synthesis by assembling NOT and AND out of NAND.",
+              "prompt": "Define nand(a, b) as (!(a && b) ? 1 : 0). Implement nandNot(a) using only nand, and nandAnd(a, b) using only nand and nandNot. Test on (1, 1) and (1, 0) and print: AND(1,1): {res1}, AND(1,0): {res2}.",
+              "objectiveId": "circuits-universal-gates",
+              "starterCode": "const nand = (a, b) => (!(a && b) ? 1 : 0);\n// Implement nandNot and nandAnd\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is NAND called a 'universal' gate?",
+              "answer": "Because any fundamental Boolean operation (NOT, AND, OR, XOR, etc.) and thus any digital computer circuit can be constructed using only NAND gates."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "NAND Logic Synthesis",
+              "description": "Build inverter and AND equivalents exclusively using two-input NAND gates."
+            }
+          },
+          {
+            "id": "circuits-xor-parity",
+            "order": 5,
+            "title": "Exclusive OR (XOR) and Parity Generators",
+            "summary": "Understand modulo-2 addition with XOR gates, compute bit differences, and generate parity error-detection codes.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-xor-parity-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-universal-nand-nor"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-parity-gen",
+              "title": "Implement a 3-input parity generator",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Chain XOR operations to compute bit parity.",
+              "prompt": "Implement evenParity(a, b, c) using bitwise XOR (^). Test with inputs (1, 0, 1) and (1, 1, 1), and print: Parity(1,0,1): {res1}, Parity(1,1,1): {res2}.",
+              "objectiveId": "circuits-xor-parity-obj",
+              "starterCode": "function evenParity(a, b, c) {\n  // Implement 3-input XOR parity\n}\n\n// Print Parity(1,0,1) and Parity(1,1,1)\n"
+            },
+            "checkpoint": {
+              "prompt": "What is the result of evaluating A XOR A for any binary value A?",
+              "answer": "It always equals 0, because both inputs are identical."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "XOR Gate and Even Parity Checker",
+              "description": "Observe output toggling only when inputs differ; verify even/odd parity bit generation."
+            }
+          }
+        ]
+      },
+      {
+        "id": "circuits-combinational-sequential",
+        "order": 3,
+        "title": "Combinational and sequential logic systems",
+        "summary": "Half adders, full adders, multiplexer data routing, and edge-triggered D Flip-Flops.",
+        "lessons": [
+          {
+            "id": "circuits-half-full-adders",
+            "order": 6,
+            "title": "Binary Adders: Half Adders and Full Adders",
+            "summary": "Build binary arithmetic circuits by combining XOR and AND gates into Half Adders and cascading into Full Adders.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-adders"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-xor-parity"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-full-adder",
+              "title": "Implement a 1-bit Full Adder",
+              "difficulty": "Developing",
+              "expectedOutcome": "Compute binary addition sum and carry bits with XOR and majority logic.",
+              "prompt": "Implement fullAdder(a, b, cin) returning an object { sum, cout }. Evaluate with a = 1, b = 1, cin = 1, and print: Sum: {sum}, Cout: {cout}.",
+              "objectiveId": "circuits-adders",
+              "starterCode": "function fullAdder(a, b, cin) {\n  // Implement full adder\n}\n\n// Call with (1, 1, 1) and print Sum and Cout\n"
+            },
+            "checkpoint": {
+              "prompt": "Why can a Half Adder not be used directly to chain multi-bit arithmetic operations?",
+              "answer": "A Half Adder lacks an incoming carry input (Cin); it can only generate a carry, not receive one from a lower bit."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "1-Bit Full Adder Schematic",
+              "description": "Trace carry propagation and sum bit calculation using XOR, AND, and OR gates."
+            }
+          },
+          {
+            "id": "circuits-multiplexers-demux",
+            "order": 7,
+            "title": "Data Selectors: Multiplexers (Mux) and Demux",
+            "summary": "Route multi-channel data streams using binary Multiplexers (Mux) and Demultiplexers (Demux).",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-mux-demux"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-half-full-adders"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-mux-selection",
+              "title": "Route data through a 4-to-1 Multiplexer",
+              "difficulty": "Developing",
+              "expectedOutcome": "Decode select lines to route channel data.",
+              "prompt": "Implement mux4to1(d0, d1, d2, d3, s0, s1). When called with data lines (10, 20, 30, 40) and select lines s0 = 1, s1 = 1 (binary address 3), print: Selected: {value}.",
+              "objectiveId": "circuits-mux-demux",
+              "starterCode": "function mux4to1(d0, d1, d2, d3, s0, s1) {\n  // Implement 4-to-1 MUX\n}\n\n// Call with 10, 20, 30, 40 and select lines 1, 1\n"
+            },
+            "checkpoint": {
+              "prompt": "How many select lines are required to construct an 8-to-1 multiplexer?",
+              "answer": "3 select lines are required, because 2^3 = 8."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "4-to-1 Multiplexer",
+              "description": "Direct data routing across 4 input lines using 2 binary select lines."
+            }
+          },
+          {
+            "id": "circuits-latches-flip-flops",
+            "order": 8,
+            "title": "Sequential Logic: SR Latches and D Flip-Flops",
+            "summary": "Introduce memory with cross-coupled feedback loops, level-sensitive SR latches, and clock-edge triggered D Flip-Flops.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-latches-sequential"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-multiplexers-demux"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-dff-simulation",
+              "title": "Model an edge-triggered D Flip-Flop",
+              "difficulty": "Developing",
+              "expectedOutcome": "Detect rising clock edges to capture and hold sequential state.",
+              "prompt": "Implement a DFlipFlop class that stores state q (initially 0). On each call to tick(d, clk), if clk transitioned from 0 to 1 (rising edge), update q = d. Return q. Initialize dff = new DFlipFlop(), call tick(1, 0), tick(1, 1), and tick(0, 0), then print: Stored state Q: {dff.q}.",
+              "objectiveId": "circuits-latches-sequential",
+              "starterCode": "class DFlipFlop {\n  // Implement edge-triggered D Flip-Flop\n}\n\nconst dff = new DFlipFlop();\n// Call tick(1, 0), tick(1, 1), tick(0, 0) and print Stored state Q\n"
+            },
+            "checkpoint": {
+              "prompt": "Why are digital registers triggered on the clock edge rather than clock level?",
+              "answer": "Edge-triggering ensures that state is captured at an exact instantaneous transition, preventing data from racing through multiple sequential stages during the duration of a high pulse."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "D Flip-Flop Register Cell",
+              "description": "Observe edge-triggered state retention and clock-synchronized memory updates."
             }
           }
         ]

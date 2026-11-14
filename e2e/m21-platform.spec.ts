@@ -32,9 +32,9 @@ test.describe("Milestone M21 Architecture & Platform Expansion E2E Suite", () =>
     await page.goto("/#katalyst=paths");
     await expect(page.getByRole("heading", { name: "Build a foundation" })).toBeVisible();
 
-    // Verify all 9 courses visible under "All"
+    // Verify all 14 courses visible under "All"
     const allCards = page.locator(".course-card-unified");
-    await expect(allCards).toHaveCount(9);
+    await expect(allCards).toHaveCount(14);
 
     // Filter by Databases
     await page.getByRole("tab", { name: "Databases" }).click();
@@ -45,46 +45,37 @@ test.describe("Milestone M21 Architecture & Platform Expansion E2E Suite", () =>
     // Filter by Web
     await page.getByRole("tab", { name: "Web" }).click();
     const webCards = page.locator(".course-card-unified");
-    await expect(webCards).toHaveCount(2); // html-css-web & js-systems-algorithms
+    await expect(webCards).toHaveCount(3); // html-css-web, js-systems-algorithms & ai-app-web-dev
 
     // Filter by Hardware
     await page.getByRole("tab", { name: "Hardware" }).click();
     const hwCards = page.locator(".course-card-unified");
-    await expect(hwCards).toHaveCount(1);
-    await expect(hwCards.first()).toContainText("Digital Logic & Circuit Foundations");
+    await expect(hwCards).toHaveCount(4); // digital-logic-circuits, arduino-embedded, esp32-iot-systems & breadboard-electronics
 
     // Filter by AI & Media
     await page.getByRole("tab", { name: "AI & Media" }).click();
     const aiCards = page.locator(".course-card-unified");
-    await expect(aiCards).toHaveCount(2); // prompt-engineering & photo-editing-media
+    await expect(aiCards).toHaveCount(3); // prompt-engineering, photo-editing-media & ai-app-web-dev
 
     // Reset to All
     await page.getByRole("tab", { name: "All" }).click();
-    await expect(page.locator(".course-card-unified")).toHaveCount(9);
+    await expect(page.locator(".course-card-unified")).toHaveCount(14);
   });
 
   // Test 2: Unified Multi-Language Playground Switcher & HTML Live Sandbox Preview
   test("switches runtimes in the unified Playground and renders HTML live sandbox preview", async ({ page }) => {
     await page.goto("/#katalyst=playground");
 
-    // Verify runtime tabs
-    const runtimeBar = page.getByRole("tablist", { name: "Execution Runtimes" });
-    await expect(runtimeBar).toBeVisible();
-    await expect(runtimeBar.getByRole("tab", { name: /C \(C11\)/i })).toBeVisible();
-    await expect(runtimeBar.getByRole("tab", { name: /Python \(3\.12\)/i })).toBeVisible();
-    await expect(runtimeBar.getByRole("tab", { name: /JavaScript \(ES2024\)/i })).toBeVisible();
-    await expect(runtimeBar.getByRole("tab", { name: /SQL \(WASM\)/i })).toBeVisible();
-    await expect(runtimeBar.getByRole("tab", { name: /HTML & CSS/i })).toBeVisible();
-    await expect(runtimeBar.getByRole("tab", { name: /Circuit Simulator/i })).toBeVisible();
-
-    // Switch to SQL Workbench
-    await runtimeBar.getByRole("tab", { name: /SQL \(WASM\)/i }).click();
+    // From Launcher grid, launch SQL Workbench
+    await page.getByText("Launch SQL Workbench").click();
     await expect(page.getByRole("heading", { name: "SQL Query Workbench" })).toBeVisible();
     await expect(page.locator(".c-pane-heading strong", { hasText: "query.sql" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Execute SQL/i })).toBeVisible();
 
-    // Switch to HTML Live Preview
-    await runtimeBar.getByRole("tab", { name: /HTML & CSS/i }).click();
+    // Use runtime dropdown switcher to switch to HTML Live Preview
+    const switcher = page.locator("#runtime-switcher-select");
+    await expect(switcher).toBeVisible();
+    await switcher.selectOption("code:html");
     await expect(page.getByRole("heading", { name: "HTML & CSS Sandbox" })).toBeVisible();
     await expect(page.locator(".c-pane-heading strong", { hasText: "index.html" })).toBeVisible();
 

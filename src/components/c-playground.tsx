@@ -7,9 +7,9 @@ import { cpp } from "@codemirror/lang-cpp";
 import { bracketMatching, foldGutter, HighlightStyle, indentOnInput, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import { EditorView, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
-import { ArrowLeft, Check, Code2, Copy, Cpu, Database, Globe, Laptop, LoaderCircle, Play, RotateCcw, RotateCw, Smartphone, Square, Terminal } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Code2, Copy, Cpu, Database, Globe, Laptop, LayoutGrid, LoaderCircle, Play, RotateCcw, RotateCw, Smartphone, Sparkles, Square, Terminal } from "lucide-react";
 import type { Package, Process, Sandbox, Wasmer } from "@wasmer/sdk/browser";
-import { CircuitSimulator } from "@/components/simulators/circuit-simulator";
+import { CircuitSimulator, type CircuitSimulatorMode } from "@/components/simulators/circuit-simulator";
 import { SimulatorErrorBoundary } from "@/components/simulators/simulator-error-boundary";
 import {
   C_PLAYGROUND_COMPILER_PACKAGE,
@@ -38,12 +38,31 @@ import {
 import { executeProgram } from "@/lib/execution/runner";
 import { pythonStreamParser, sqlStreamParser, htmlStreamParser } from "./code-workspace";
 
-export type PlaygroundLanguage = "c" | "python" | "javascript" | "sql" | "html" | "circuit";
+export type PlaygroundLanguage = "c" | "cpp" | "python" | "javascript" | "sql" | "html" | "circuit";
 
+export const CPP_PLAYGROUND_STORAGE_KEY = "katalyst.cpp.playground.v1";
 export const JS_PLAYGROUND_STORAGE_KEY = "katalyst.js.playground.v1";
 export const SQL_PLAYGROUND_STORAGE_KEY = "katalyst.sql.playground.v1";
 export const HTML_PLAYGROUND_STORAGE_KEY = "katalyst.html.playground.v1";
 export const CIRCUIT_PLAYGROUND_STORAGE_KEY = "katalyst.circuit.playground.v1";
+
+export const defaultCppProgram = `// C++ (C++17) WebAssembly Systems Playground
+#include <iostream>
+#include <vector>
+#include <string>
+#include <numeric>
+
+int main() {
+  std::cout << "KATALYST C++17 Systems Playground\\n";
+  std::vector<int> numbers = {10, 20, 30, 40, 50};
+
+  int sum = std::accumulate(numbers.begin(), numbers.end(), 0);
+  std::cout << "Vector elements count: " << numbers.size() << "\\n";
+  std::cout << "Accumulated sum: " << sum << "\\n";
+
+  return 0;
+}
+`;
 
 export const defaultJsProgram = `// JavaScript (ES2024) Web Worker Playground
 function computeFibonacci(n) {
@@ -176,6 +195,8 @@ function getPlaygroundStorageKey(lang: PlaygroundLanguage): string {
   switch (lang) {
     case "c":
       return C_PLAYGROUND_STORAGE_KEY;
+    case "cpp":
+      return CPP_PLAYGROUND_STORAGE_KEY;
     case "python":
       return PYTHON_PLAYGROUND_STORAGE_KEY;
     case "javascript":
@@ -193,6 +214,8 @@ function getDefaultProgramForLang(lang: PlaygroundLanguage): string {
   switch (lang) {
     case "c":
       return defaultCProgram;
+    case "cpp":
+      return defaultCppProgram;
     case "python":
       return defaultPythonProgram;
     case "javascript":
@@ -209,7 +232,7 @@ function getDefaultProgramForLang(lang: PlaygroundLanguage): string {
 function saveDraftForLang(lang: PlaygroundLanguage, src: string, inp: string): boolean {
   try {
     const key = getPlaygroundStorageKey(lang);
-    if (lang === "c") {
+    if (lang === "c" || lang === "cpp") {
       const record = limitCPlaygroundRecord(src, inp);
       window.localStorage.setItem(key, JSON.stringify(record));
     } else if (lang === "python") {
@@ -252,6 +275,8 @@ export function CPlayground({
   const [playgroundMode, setPlaygroundMode] = useState<"code" | "circuits">(
     initialLanguage === "circuit" ? "circuits" : "code"
   );
+  const [circuitInitialMode, setCircuitInitialMode] = useState<CircuitSimulatorMode>("digital");
+  const [isLauncherOpen, setIsLauncherOpen] = useState<boolean>(!pendingExample && !compact);
   const [source, setSource] = useState(getDefaultProgramForLang(initialLanguage));
   const [stdin, setStdin] = useState("");
   const [storageReady, setStorageReady] = useState(false);
@@ -383,10 +408,10 @@ export function CPlayground({
   }, []);
 
   useEffect(() => {
-    if (activeLanguage === "c" && autoInitialize && compilerState === "idle") {
+    if ((activeLanguage === "c" || activeLanguage === "cpp") && autoInitialize && compilerState === "idle" && !isLauncherOpen) {
       void ensureCompiler().catch(() => undefined);
     }
-  }, [activeLanguage, autoInitialize, compilerState, ensureCompiler]);
+  }, [activeLanguage, autoInitialize, compilerState, ensureCompiler, isLauncherOpen]);
 
   // Handle incoming lesson example
   useEffect(() => {
@@ -416,6 +441,8 @@ export function CPlayground({
     const nextStdin = (pendingExample.sampleInput ?? "").slice(0, stdinLimit);
 
     isSwitchingRef.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsLauncherOpen(false);
     try {
       setActiveLanguage(detectedLang);
       setSource(nextSource);
@@ -460,13 +487,14 @@ export function CPlayground({
 
   // Initialize CodeMirror instance
   useEffect(() => {
+    if (isLauncherOpen) return;
     const host = editorHostRef.current;
     if (!host || editorViewRef.current) return;
-    const initialSource = activeLanguage === "python" ? defaultPythonProgram : defaultCProgram;
+    const initialDoc = source || (activeLanguage === "python" ? defaultPythonProgram : defaultCProgram);
     const editor = new EditorView({
       parent: host,
       state: EditorState.create({
-        doc: initialSource,
+        doc: initialDoc,
         extensions: [
           lineNumbers(),
           highlightActiveLineGutter(),
@@ -493,7 +521,7 @@ export function CPlayground({
       editor.destroy();
       editorViewRef.current = null;
     };
-  }, [activeLanguage, languageCompartment]);
+  }, [activeLanguage, isLauncherOpen, languageCompartment, source]);
 
   // Sync editor content when source state changes externally
   useEffect(() => {
@@ -520,8 +548,19 @@ export function CPlayground({
     compilerPromiseRef.current = null;
   }, []);
 
-  const switchLanguage = (targetLang: PlaygroundLanguage) => {
-    if (targetLang === activeLanguage) return;
+  const switchLanguage = (targetLang: PlaygroundLanguage, circuitMode?: CircuitSimulatorMode) => {
+    setIsLauncherOpen(false);
+    if (circuitMode) {
+      setCircuitInitialMode(circuitMode);
+    }
+    if (targetLang === activeLanguage) {
+      if (targetLang === "circuit") {
+        setPlaygroundMode("circuits");
+      } else {
+        setPlaygroundMode("code");
+      }
+      return;
+    }
     // 1. Save current language draft
     saveCurrentDraft(activeLanguage, source, stdin);
 
@@ -531,7 +570,7 @@ export function CPlayground({
       if (targetLang === "circuit") {
         setPlaygroundMode("circuits");
         setNeedsStdinConfirm(false);
-        setStatus("Digital Circuit Simulator ready.");
+        setStatus("Hardware & Circuit Simulator ready.");
         return;
       }
 
@@ -560,6 +599,12 @@ export function CPlayground({
         setStatus("JavaScript worker ready.");
       } else if (targetLang === "python") {
         setStatus("Python 3.12 runtime ready. Code executes in browser WebAssembly.");
+      } else if (targetLang === "cpp") {
+        setStatus(
+          compilerState === "ready"
+            ? "C++17 compiler ready. Your code stays in this browser."
+            : "C++17 compiler ready to prepare."
+        );
       } else {
         setStatus(
           compilerState === "ready"
@@ -758,13 +803,25 @@ export function CPlayground({
     const controller = new AbortController();
     abortRef.current = controller;
     const isCurrent = () => runIdRef.current === runId;
-    const client = clientRef.current;
-    const compiler = compilerRef.current;
+    let client = clientRef.current;
+    let compiler = compilerRef.current;
+    if (!client || !compiler) {
+      try {
+        compiler = await ensureCompiler();
+        client = clientRef.current;
+      } catch {
+        return;
+      }
+    }
     if (!client || !compiler) return;
+
+    const isCpp = activeLanguage === "cpp";
+    const srcFileName = isCpp ? "main.cpp" : "main.c";
+    const stdFlag = isCpp ? "-std=c++17" : "-std=c11";
 
     setStage("compiling");
     setOutcome("none");
-    setStatus("Compiling your C program locally…");
+    setStatus(isCpp ? "Compiling your C++17 program locally…" : "Compiling your C program locally…");
     setOutput("");
     setStdout("");
     setStderr("");
@@ -774,7 +831,7 @@ export function CPlayground({
     try {
       const sandbox = await client.sandboxes.create({
         packages: [compiler],
-        files: { "main.c": source },
+        files: { [srcFileName]: source },
         network: { mode: "disabled" },
         signal: controller.signal,
       });
@@ -785,7 +842,7 @@ export function CPlayground({
       sandboxRef.current = sandbox;
 
       const compilerName = compiler.entrypoint ?? "clang";
-      const compileProcess = await sandbox.command(compilerName, ["-std=c11", "-O0", "/workspace/main.c", "-o", "/workspace/program.wasm"]).spawn({
+      const compileProcess = await sandbox.command(compilerName, [stdFlag, "-O0", `/workspace/${srcFileName}`, "-o", "/workspace/program.wasm"]).spawn({
         timeoutMs: C_PLAYGROUND_COMPILE_TIMEOUT_MS,
         outputBytes: C_PLAYGROUND_OUTPUT_LIMIT,
         stdin: "closed",
@@ -804,7 +861,13 @@ export function CPlayground({
       if (compiled.reason !== "exited" || compiled.exitCode !== 0) {
         const timedOut = compiled.reason === "timeout";
         setOutcome(timedOut ? "timeout" : "compile-error");
-        setError(timedOut ? "Compilation took longer than 15 seconds. Shorten the example and try again." : "The C compiler could not build this program. Review the compiler messages below.");
+        setError(
+          timedOut
+            ? "Compilation took longer than 15 seconds. Shorten the example and try again."
+            : isCpp
+            ? "The C++ compiler could not build this program. Review the compiler messages below."
+            : "The C compiler could not build this program. Review the compiler messages below."
+        );
         setStatus(timedOut ? "Compilation timed out." : "Compilation failed.");
         return;
       }
@@ -995,89 +1058,371 @@ export function CPlayground({
           : "The C11 compiler is ready. Click Run to prepare and execute your code in this browser.",
       poweredBy: "Powered by Wasmer",
     },
+    cpp: {
+      eyebrow: "C++ SYSTEMS · WORKBENCH",
+      title: "C++17 Workbench",
+      desc: "Write, compile, and run modern ISO C++17 with STL, templates, smart pointers, and RAII in your browser.",
+      badge: "C++ · C++17",
+      filename: "main.cpp",
+      tag: "C++17",
+      engine: "Compiler package: clang/clang · Code is limited to 16 KB, input to 4 KB, output to 64 KB, compilation to 15 seconds, and each run to 8 seconds. Network access is disabled.",
+      notice:
+        compilerState === "ready"
+          ? "C++17 is ready. Your code compiles to WebAssembly and runs in this browser tab; KATALYST does not upload it."
+          : compilerState === "failed"
+          ? "The C++17 compiler could not be prepared. Your lesson is still available; retry setup when ready."
+          : compilerState === "initializing"
+          ? "The C++17 compiler is preparing in the background. You can read and edit while it initializes; Run becomes available when setup finishes."
+          : "The C++17 compiler is ready. Click Run to prepare and execute your code in this browser.",
+      poweredBy: "Powered by Wasmer",
+    },
   }[activeLanguage === "circuit" ? "c" : activeLanguage];
 
   return (
     <section
       className={`c-playground${compact ? " c-playground-compact" : ""}`}
       aria-labelledby="c-playground-title"
-      data-compiler-state={activeLanguage === "c" ? compilerState : "ready"}
+      data-compiler-state={(activeLanguage === "c" || activeLanguage === "cpp") ? compilerState : "ready"}
     >
-      {!compact && (
-        <div className="playground-runtime-bar" role="tablist" aria-label="Execution Runtimes">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={playgroundMode === "code" && activeLanguage === "c"}
-            className={`runtime-tab${playgroundMode === "code" && activeLanguage === "c" ? " active" : ""}`}
-            onClick={() => switchLanguage("c")}
-          >
-            <Code2 size={14} />
-            <span>C (C11)</span>
-            <span className="runtime-badge badge-wasm">WebAssembly</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={playgroundMode === "code" && activeLanguage === "python"}
-            className={`runtime-tab${playgroundMode === "code" && activeLanguage === "python" ? " active" : ""}`}
-            onClick={() => switchLanguage("python")}
-          >
-            <Code2 size={14} />
-            <span>Python (3.12)</span>
-            <span className="runtime-badge badge-wasm">WebAssembly</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={playgroundMode === "code" && activeLanguage === "javascript"}
-            className={`runtime-tab${playgroundMode === "code" && activeLanguage === "javascript" ? " active" : ""}`}
-            onClick={() => switchLanguage("javascript")}
-          >
-            <Code2 size={14} />
-            <span>JavaScript (ES2024)</span>
-            <span className="runtime-badge badge-wasm">Web Worker</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={playgroundMode === "code" && activeLanguage === "sql"}
-            className={`runtime-tab${playgroundMode === "code" && activeLanguage === "sql" ? " active" : ""}`}
-            onClick={() => switchLanguage("sql")}
-          >
-            <Database size={14} />
-            <span>SQL (WASM)</span>
-            <span className="runtime-badge badge-wasm">SQLite WASM</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={playgroundMode === "code" && activeLanguage === "html"}
-            className={`runtime-tab${playgroundMode === "code" && activeLanguage === "html" ? " active" : ""}`}
-            onClick={() => switchLanguage("html")}
-          >
-            <Globe size={14} />
-            <span>HTML &amp; CSS</span>
-            <span className="runtime-badge badge-wasm">Live Preview</span>
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={playgroundMode === "circuits"}
-            className={`runtime-tab${playgroundMode === "circuits" ? " active" : ""}`}
-            onClick={() => switchLanguage("circuit")}
-          >
-            <Cpu size={14} />
-            <span>Circuit Simulator</span>
-            <span className="runtime-badge badge-wasm">Interactive</span>
-          </button>
+      {!compact && !isLauncherOpen && (
+        <div className="playground-runtime-header" role="region" aria-label="Runtime Controls">
+          <div className="runtime-header-left">
+            <button
+              type="button"
+              className="all-labs-btn switch-runtime-btn"
+              onClick={() => setIsLauncherOpen(true)}
+              title="Return to All Labs & Runtimes Grid"
+            >
+              <LayoutGrid size={14} />
+              <span>All Labs</span>
+            </button>
+            <span className="runtime-header-divider">/</span>
+            <span className="runtime-header-title">
+              {playgroundMode === "circuits"
+                ? circuitInitialMode === "arduino"
+                  ? "Arduino Uno Lab (ATmega328P)"
+                  : circuitInitialMode === "esp32"
+                  ? "ESP32 IoT Lab (Dual-Core)"
+                  : circuitInitialMode === "breadboard"
+                  ? "Breadboard Circuit Lab"
+                  : "Digital Logic Gates"
+                : langDetails.title}
+            </span>
+            <span className="runtime-badge badge-wasm">
+              {playgroundMode === "circuits"
+                ? "Simulator"
+                : activeLanguage === "javascript"
+                ? "Web Worker"
+                : activeLanguage === "html"
+                ? "Live Preview"
+                : "WebAssembly"}
+            </span>
+          </div>
+
+          <div className="runtime-header-right">
+            <label htmlFor="runtime-switcher-select" className="sr-only">Switch Runtime or Lab</label>
+            <select
+              id="runtime-switcher-select"
+              className="runtime-select-switcher"
+              value={playgroundMode === "circuits" ? `circuit:${circuitInitialMode}` : `code:${activeLanguage}`}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val.startsWith("circuit:")) {
+                  const m = val.split(":")[1] as CircuitSimulatorMode;
+                  switchLanguage("circuit", m);
+                } else if (val.startsWith("code:")) {
+                  const lang = val.split(":")[1] as PlaygroundLanguage;
+                  switchLanguage(lang);
+                }
+              }}
+            >
+              <optgroup label="Programming Runtimes">
+                <option value="code:c">C (C11 · WASM)</option>
+                <option value="code:cpp">C++ (C++17 · WASM)</option>
+                <option value="code:python">Python (3.12 · WASM)</option>
+                <option value="code:javascript">JavaScript (ES2024)</option>
+                <option value="code:sql">SQL (SQLite WASM)</option>
+                <option value="code:html">HTML &amp; CSS Sandbox</option>
+              </optgroup>
+              <optgroup label="Hardware Labs &amp; Simulators">
+                <option value="circuit:arduino">Arduino Uno Lab</option>
+                <option value="circuit:esp32">ESP32 IoT Lab</option>
+                <option value="circuit:breadboard">Breadboard Circuit Lab</option>
+                <option value="circuit:digital">Digital Logic Gates</option>
+              </optgroup>
+            </select>
+          </div>
         </div>
       )}
 
-      {playgroundMode === "circuits" ? (
+      {isLauncherOpen && !compact ? (
+        <div className="playground-launcher-view">
+          <header className="playground-launcher-header">
+            <span className="eyebrow">
+              <Sparkles size={13} className="text-blue-500" /> EXECUTION ENVIRONMENTS · CLIENT-SIDE ISOLATION
+            </span>
+            <h1 id="c-playground-title">Runtime &amp; Lab Launcher</h1>
+            <p>
+              Choose a local execution environment or simulation workbench. Every compiler, interpreter, and hardware model runs 100% client-side in your browser with zero data egress.
+            </p>
+          </header>
+
+          <div className="playground-launcher-grid">
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("c")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("c")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-blue-500">
+                    <Code2 size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">WebAssembly · Clang</span>
+                </div>
+                <h3>C (C11 · WebAssembly)</h3>
+                <p>
+                  Compile and execute ISO C11 code client-side via clang WebAssembly with real standard I/O (stdin/stdout/stderr), diagnostics, and deterministic memory limits.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch C Workbench</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("cpp")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("cpp")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-indigo-500">
+                    <Code2 size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">WebAssembly · Clang C++17</span>
+                </div>
+                <h3>C++ (C++17 · WebAssembly)</h3>
+                <p>
+                  High-performance systems programming with modern C++17, RAII resource management, templates, smart pointers, and STL algorithms running in browser WebAssembly.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch C++ Workbench</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("python")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("python")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-emerald-500">
+                    <Code2 size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">WebAssembly · Pyodide</span>
+                </div>
+                <h3>Python (3.12 · WebAssembly)</h3>
+                <p>
+                  Run modern Python 3.12 scripts in browser WebAssembly via Pyodide. Supports standard algorithms, interactive input, and Python runtime diagnostics.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch Python Workbench</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("javascript")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("javascript")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-amber-500">
+                    <Code2 size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">Isolated Web Worker</span>
+                </div>
+                <h3>JavaScript (ES2024 · Worker)</h3>
+                <p>
+                  Benchmark algorithms, async pipelines, and modern ECMAScript features inside a sandboxed Web Worker isolated from the main thread.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch JS Workbench</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("sql")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("sql")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-cyan-500">
+                    <Database size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">SQLite WASM · sql.js</span>
+                </div>
+                <h3>SQL (SQLite · WebAssembly)</h3>
+                <p>
+                  Design relational schemas, populate in-memory database tables, and run multi-table joins and analytical queries with live tabular output.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch SQL Workbench</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("html")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("html")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-purple-500">
+                    <Globe size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">Live Isolated Iframe</span>
+                </div>
+                <h3>HTML &amp; CSS (Live Sandbox)</h3>
+                <p>
+                  Frontend web playground featuring instantaneous client-side rendering, desktop and mobile responsive viewport toggles, and live DOM interaction.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch Web Sandbox</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "arduino")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "arduino")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-blue-500">
+                    <Cpu size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">Arduino 5V · 10-bit ADC</span>
+                </div>
+                <h3>Arduino Uno Lab</h3>
+                <p>
+                  Interactive ATmega328P microcontroller simulation with digital I/O pins, 10-bit ADC channels, PWM duty cycles, and real-time generated C++ firmware.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch Arduino Lab</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "esp32")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "esp32")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-teal-500">
+                    <Cpu size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">ESP32 3.3V · 12-bit ADC</span>
+                </div>
+                <h3>ESP32 IoT Lab</h3>
+                <p>
+                  Dual-core Xtensa simulation with 3.3V logic level boundaries, 12-bit ADC attenuation curves, hardware LEDC PWM, and simulated Wi-Fi telemetry clients.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch ESP32 Lab</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "breadboard")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "breadboard")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-amber-500">
+                    <Cpu size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">Solderless Prototyping</span>
+                </div>
+                <h3>Breadboard Circuit Lab</h3>
+                <p>
+                  Solderless breadboard wiring workbench with dual power rails, current-limiting LEDs, tactile pushbuttons with pull-up networks, and digital multimeter probe testing.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch Breadboard Lab</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "digital")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "digital")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-rose-500">
+                    <Cpu size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">Combinational Logic</span>
+                </div>
+                <h3>Digital Logic Gates</h3>
+                <p>
+                  Construct combinational logic circuits using AND, OR, NOT, NAND, NOR, and XOR gates with interactive inputs and automated truth table verification.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch Logic Lab</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : playgroundMode === "circuits" ? (
         <div className="mt-4">
           <SimulatorErrorBoundary fallbackTitle="Circuit Simulator Encountered an Error">
-            <CircuitSimulator />
+            <CircuitSimulator key={circuitInitialMode} initialMode={circuitInitialMode} hideModeSwitcher={true} />
           </SimulatorErrorBoundary>
         </div>
       ) : (
@@ -1136,7 +1481,7 @@ export function CPlayground({
             </div>
           </div>
           <label className="sr-only" htmlFor="c-playground-source">
-            {`${langDetails.tag} source code`}
+            {`${activeLanguage === "c" ? "C" : langDetails.tag} source code`}
           </label>
           <div
             id="c-playground-source"
@@ -1229,7 +1574,7 @@ export function CPlayground({
               <div>
                 <Terminal size={15} />
                 <strong>Terminal</strong>
-                <span>{activeLanguage === "c" ? compilerStatus : `${langDetails.tag} ready`}</span>
+                <span>{(activeLanguage === "c" || activeLanguage === "cpp") ? compilerStatus : `${langDetails.tag} ready`}</span>
               </div>
               {stage === "idle" ? (
                 <div className="c-run-actions">
@@ -1242,10 +1587,10 @@ export function CPlayground({
                     type="button"
                     className="c-run-button"
                     onClick={() => void runProgram(false)}
-                    disabled={activeLanguage === "c" && compilerState === "initializing"}
+                    disabled={(activeLanguage === "c" || activeLanguage === "cpp") && compilerState === "initializing"}
                   >
                     <Play size={14} />
-                    {activeLanguage === "sql" ? "Execute SQL" : "Run code"}
+                    {activeLanguage === "sql" ? "Execute SQL" : activeLanguage === "cpp" ? "Run C++" : "Run code"}
                   </button>
                 </div>
               ) : (

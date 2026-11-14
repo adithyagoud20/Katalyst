@@ -107,4 +107,27 @@ describe("Execution Runner Registry & Interface", () => {
     expect(res.exitCode).toBe(1);
     expect(res.stderr).toContain("ValueError: Sensor reading out of range");
   });
+
+  it("executes C++17 code with standard input and stdout capture", async () => {
+    const res = await executeProgram({
+      language: "cpp",
+      files: [{
+        path: "main.cpp",
+        content: `#include <iostream>
+#include <vector>
+#include <numeric>
+
+int main() {
+    std::vector<int> nums = {1, 2, 3, 4, 5};
+    int total = std::accumulate(nums.begin(), nums.end(), 0);
+    std::cout << "Sum: " << total << std::endl;
+    return 0;
+}`,
+      }],
+    });
+
+    expect(res.ok).toBe(true);
+    expect(res.stdout).toContain("Sum: 15");
+    expect(res.exitCode).toBe(0);
+  });
 });

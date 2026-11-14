@@ -563,6 +563,7 @@ test("keeps the C Playground usable on a phone viewport", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Open navigation" }).click();
   await page.getByRole("button", { name: "Playground", exact: true }).click();
+  await page.getByText("Launch C Workbench").click();
   await expect.poll(() => page.locator(".sidebar").evaluate((element) => element.getBoundingClientRect().right)).toBeLessThanOrEqual(0);
   await expect(page.getByRole("heading", { name: "C Workbench" })).toBeVisible();
   await expect(page.getByLabel("C source code")).toBeVisible();
@@ -579,6 +580,7 @@ test("fits the C Workbench at desktop, laptop, tablet, and mobile widths", async
     await page.goto("/");
     if (viewport.width <= 760) await page.getByRole("button", { name: "Open navigation" }).click();
     await page.getByRole("button", { name: "Playground", exact: true }).click();
+    await page.getByText("Launch C Workbench").click();
     await expect(page.locator(".c-editor-pane")).toBeVisible();
     const layout = await page.evaluate(() => {
       const editor = document.querySelector(".c-editor-pane")!.getBoundingClientRect();
@@ -711,7 +713,7 @@ test("starts the C learning path and records progress independently of the works
   await page.getByRole("button", { name: /mark lesson complete/i }).click();
   await expect(page.getByRole("button", { name: /lesson completed/i })).toBeVisible();
   await page.getByRole("button", { name: "Progress", exact: true }).click();
-  await expect(page.getByText("1 of 91 lessons", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 of 123 lessons", { exact: true })).toBeVisible();
   await page.waitForFunction(() => window.localStorage.getItem("katalyst.learning.v1")?.includes("source-to-output") === true);
   expect(await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"))).toBe(workspaceBefore);
 
@@ -1259,7 +1261,7 @@ test("records real AI request metadata and reports it in the local Progress dash
   await expect(page.locator(".ai-dashboard-section")).toContainText("OpenAI");
   await expect(page.locator(".ai-dashboard-section")).toContainText("18 input tokens reported in 1 request");
   await expect(page.locator(".ai-dashboard-section")).toContainText("6 output tokens reported in 1 request");
-  await expect(page.locator(".dashboard-metrics")).toContainText("0 of 91 lessons");
+  await expect(page.locator(".dashboard-metrics")).toContainText("0 of 123 lessons");
   await expect(page.getByText("Local analytics · not synced")).toBeVisible();
 });
 

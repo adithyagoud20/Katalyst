@@ -81,7 +81,7 @@ import {
   type WorkspaceLayout,
 } from "@/lib/workspace-layout";
 
-import { CPlayground } from "@/components/c-playground";
+import { CPlayground, defaultCppProgram, type PendingExample } from "@/components/c-playground";
 
 const defaultPythonProgram = `# Python Sandbox
 # Write Python code below and click "Run"
@@ -115,10 +115,28 @@ function extractLessonCode(
   if (language === "c") {
     return extractCCode(lesson.content) ?? null;
   }
-  const tag = language === "python" ? "(?:python|py)" : language === "javascript" ? "(?:javascript|js)" : language;
+  const tag = language === "python" ? "(?:python|py)" : language === "javascript" ? "(?:javascript|js)" : language === "cpp" ? "(?:cpp|c\\+\\+)" : language;
   const regex = new RegExp(`(?:^|\\n)(?:~~~|\`\`\`)[ \\t]*${tag}[ \\t]*\\r?\\n([\\s\\S]*?)\\r?\\n(?:~~~|\`\`\`)`, "i");
   const match = regex.exec(lesson.content);
   return match ? match[1].replace(/\r\n/g, "\n").trim() : null;
+}
+
+export function getCourseBadgeText(courseId: string): string {
+  if (courseId === "cpp-programming" || courseId.includes("cpp")) return "C++17";
+  if (courseId.includes("c-programming") || courseId === "c11") return "C11";
+  if (courseId.includes("python")) return "PYTHON 3.12";
+  if (courseId.includes("ai-app") || courseId.includes("ai-web")) return "AI & WEB";
+  if (courseId.includes("arduino")) return "ARDUINO";
+  if (courseId.includes("esp32")) return "ESP32";
+  if (courseId.includes("breadboard")) return "BREADBOARD";
+  if (courseId.includes("js")) return "JAVASCRIPT (ES2024)";
+  if (courseId.includes("sql")) return "SQL";
+  if (courseId.includes("html")) return "HTML/CSS";
+  if (courseId.includes("dsa")) return "DSA";
+  if (courseId.includes("prompt")) return "PROMPTS";
+  if (courseId.includes("photo")) return "COLOR LAB";
+  if (courseId.includes("circuits") || courseId.includes("digital")) return "DIGITAL LOGIC";
+  return "SYSTEMS";
 }
 
 function shortDate(timestamp: number): string {
@@ -227,16 +245,10 @@ export function LearningExperience({
   const [workspacePanel, setWorkspacePanel] = useState<"learn" | "code" | "kat">("learn");
   const [smallWorkspace, setSmallWorkspace] = useState(false);
   const [editorActivity, setEditorActivity] = useState({ source: defaultCProgram, diagnostics: "", output: "" });
-  const [pendingExample, setPendingExample] = useState<{
-    code: string;
-    lessonId: string;
-    lessonTitle: string;
-    requestId: number;
-    sampleInput?: string;
-    language?: "c" | "python";
-  } | null>(null);
+  const [pendingExample, setPendingExample] = useState<PendingExample | null>(null);
   const [layout, setLayout] = useState<WorkspaceLayout>(() => readWorkspaceLayout());
   const [katOpen, setKatOpen] = useState<boolean>(() => layout.katOpen ?? false);
+  const [compilerOpen, setCompilerOpen] = useState<boolean>(true);
   const [katDraftPrompt, setKatDraftPrompt] = useState<string>("");
   const isDraggingRef = useRef<{ index: number; startX: number; startWidths: number[] } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -316,9 +328,10 @@ export function LearningExperience({
   const lessonType: LessonType = lesson ? resolveLessonType(lesson) : "guided-coding";
   const executionConfig = lesson ? resolveLessonExecution(course, lesson) : null;
   const showCodeWorkspace = Boolean(
-    (executionConfig?.language === "c" || executionConfig?.language === "python" || executionConfig?.language === "javascript") &&
+    (executionConfig?.language === "c" || executionConfig?.language === "cpp" || executionConfig?.language === "python" || executionConfig?.language === "javascript") &&
     (lessonType === "guided-coding" || lessonType === "practical-exercise" || lessonType === "assessment" || lesson?.exampleRun)
   );
+  const showCompiler = showCodeWorkspace && compilerOpen;
 
   const [loadedExampleCode, setLoadedExampleCode] = useState<{
     lessonId: string;
@@ -329,7 +342,7 @@ export function LearningExperience({
   const activeLanguage: ExecutionLanguage = executionConfig?.language ?? "c";
 
   const lessonCode = useMemo(() => {
-    const defaultProg = activeLanguage === "python" ? defaultPythonProgram : activeLanguage === "javascript" ? defaultJavaScriptProgram : defaultCProgram;
+    const defaultProg = activeLanguage === "python" ? defaultPythonProgram : activeLanguage === "javascript" ? defaultJavaScriptProgram : activeLanguage === "cpp" ? defaultCppProgram : defaultCProgram;
     if (!lesson) return defaultProg;
     if (loadedExampleCode && loadedExampleCode.lessonId === lesson.id) {
       return loadedExampleCode.code;
@@ -339,7 +352,7 @@ export function LearningExperience({
     }
     const extracted = extractLessonCode(lesson, activeLanguage);
     if (extracted) {
-      return activeLanguage === "c" ? makeRunnableCProgram(extracted) : extracted;
+      return (activeLanguage === "c" || activeLanguage === "cpp") ? makeRunnableCProgram(extracted) : extracted;
     }
     return defaultProg;
   }, [lesson, activeLanguage, loadedExampleCode]);
@@ -389,17 +402,17 @@ export function LearningExperience({
     return courses.filter((c) => {
       switch (selectedCategory) {
         case "Systems":
-          return c.id.includes("c-programming") || c.id.includes("python-programming");
+          return c.id.includes("c-programming") || c.id.includes("cpp") || c.id.includes("python-programming") || c.id.includes("arduino") || c.id.includes("esp32");
         case "Web":
-          return c.id.includes("html") || c.id.includes("js-systems");
+          return c.id.includes("html") || c.id.includes("js-systems") || c.id.includes("ai-app");
         case "Algorithms":
           return c.id.includes("dsa") || c.id.includes("js-systems");
         case "Databases":
           return c.id.includes("sql");
         case "AI & Media":
-          return c.id.includes("prompt") || c.id.includes("photo");
+          return c.id.includes("prompt") || c.id.includes("photo") || c.id.includes("ai-app");
         case "Hardware":
-          return c.id.includes("circuits");
+          return c.id.includes("circuits") || c.id.includes("arduino") || c.id.includes("esp32") || c.id.includes("breadboard");
         default:
           return true;
       }
@@ -717,7 +730,7 @@ export function LearningExperience({
     if (!lesson) return;
     const extracted = extractLessonCode(lesson, activeLanguage);
     if (!extracted) return;
-    const runnable = activeLanguage === "c" ? makeRunnableCProgram(extracted) : extracted;
+    const runnable = (activeLanguage === "c" || activeLanguage === "cpp") ? makeRunnableCProgram(extracted) : extracted;
     setLoadedExampleCode({
       lessonId: lesson.id,
       code: runnable,
@@ -730,7 +743,7 @@ export function LearningExperience({
       lessonTitle: lesson.title,
       requestId: exampleRequestId.current,
       sampleInput: lesson.exampleRun?.sampleInput,
-      language: activeLanguage === "python" ? "python" : "c",
+      language: activeLanguage !== "java" ? activeLanguage : undefined,
     });
     if (smallWorkspace) {
       setWorkspacePanel("code");
@@ -754,7 +767,7 @@ export function LearningExperience({
 
     try {
       const report = await verifyExerciseSubmission({
-        language: activeLanguage === "python" ? "python" : "c",
+        language: activeLanguage,
         code: codeToVerify,
         testCases: lesson.exercise.testCases,
         signal: controller.signal,
@@ -801,22 +814,6 @@ export function LearningExperience({
       {progressIssue && <div className="learning-storage-note" role="status">{progressIssue}</div>}
 
       {showTutorPage && (
-        <header className="learning-page-heading tutor-page-heading">
-          <span className="eyebrow">AI TUTOR · KAT</span>
-          <h1>
-            Learn it in the way<br />
-            <em>that works for you.</em>
-          </h1>
-          <p>Choose a teaching style, then ask a question. Kat uses your selected model provider; replies are kept only in this page session.</p>
-          {!enrolled && (
-            <button className="learning-text-button" onClick={() => onNavigate("paths")}>
-              Explore a course to ask about a specific lesson <ArrowRight size={14} />
-            </button>
-          )}
-        </header>
-      )}
-
-      {showTutorPage && (
         <section className="learning-tutor-host page" aria-label="Kat tutor">
           <KatTutor
             provider={provider}
@@ -846,7 +843,7 @@ export function LearningExperience({
         {section === "playground" && (
           <CPlayground
             pendingExample={pendingExample}
-            autoInitialize
+            autoInitialize={false}
             compact={false}
             onReturnToLesson={(lessonId) => onNavigate("lesson", lessonId)}
           />
@@ -855,110 +852,83 @@ export function LearningExperience({
 
       {section === "home" && (
         <>
+          <div className="home-dashboard-header" style={{ marginBottom: 20 }}>
+            <span className="eyebrow" style={{ color: "var(--accent-primary)", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
+              ENGINEERING DASHBOARD
+            </span>
+            <h1 style={{ fontSize: "clamp(24px, 2.5vw, 32px)", fontWeight: 700, color: "var(--text-primary)", margin: "4px 0 6px", letterSpacing: "-0.03em" }}>
+              Learn by understanding
+            </h1>
+            <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0, maxWidth: 640 }}>
+              Interactive low-level systems programming, embedded labs, and AI development with browser-native WebAssembly.
+            </p>
+          </div>
+
           {activeResumeCourse ? (
             <aside className="home-resume-card home-continue-banner" aria-label="Resume current path">
               <div className="home-resume-content home-continue-info">
-                <span className="home-resume-eyebrow home-course-pill">{activeResumeCourse.course.title}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span className="home-resume-eyebrow home-course-pill">{activeResumeCourse.course.title}</span>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "monospace" }}>
+                    {activeResumeCourse.pathState.completedCount} / {activeResumeCourse.pathState.totalLessons} lessons
+                  </span>
+                </div>
                 <h3 className="home-resume-title home-continue-title">{activeResumeCourse.resumeLesson?.lesson.title ?? activeResumeCourse.course.title}</h3>
                 <span className="home-resume-meta home-continue-meta">
-                  Module: {activeResumeCourse.resumeLesson?.module.title ?? "Overview"} · {activeResumeCourse.pathState.completedCount} of {activeResumeCourse.pathState.totalLessons} lessons completed
+                  Module: {activeResumeCourse.resumeLesson?.module.title ?? "Overview"}
                 </span>
-                <div className="progress-track" role="progressbar" aria-valuenow={activeResumeCourse.pathState.completionPercent} aria-valuemin={0} aria-valuemax={100} style={{ marginTop: 6, maxWidth: 360 }}>
+                <div className="progress-track" role="progressbar" aria-valuenow={activeResumeCourse.pathState.completionPercent} aria-valuemin={0} aria-valuemax={100} style={{ marginTop: 8, maxWidth: 420 }}>
                   <span style={{ width: `${activeResumeCourse.pathState.completionPercent}%` }} />
                 </div>
               </div>
-              <button
-                className="primary-button"
-                onClick={() => {
-                  if (activeResumeCourse.resumeLesson) {
-                    openLesson(activeResumeCourse.resumeLesson.lesson.id, activeResumeCourse.course.id);
-                  } else {
-                    onNavigate("paths");
-                  }
-                }}
-              >
-                <Play size={14} /> Resume lesson <ArrowRight size={14} />
-              </button>
-            </aside>
-          ) : (
-            <div className="home-welcome-banner" aria-label="Welcome banner">
-              <span className="home-course-pill">WELCOME TO KATALYST</span>
-              <p>Explore engineering paths with rigorous theory, browser compilers, and Kat AI tutor.</p>
-            </div>
-          )}
-
-          <section className="learning-hero">
-            <div className="learning-hero-copy">
-              <span className="eyebrow">ENGINEERING FOUNDATIONS</span>
-              <h1>
-                Learn by understanding<br />
-                <em>how the pieces work.</em>
-              </h1>
-              <p>
-                KATALYST is a learning-first engineering platform designed for engineers, computer science students, and self-directed learners who want to build deep, intuitive comprehension of code, memory, and systems.
-              </p>
               <div className="learning-hero-actions">
                 <button
                   className="primary-button"
-                  onClick={continueLearning}
-                >
-                  <Sparkles size={15} />
-                  {enrolled ? "Continue learning" : "Start learning"}
-                  <ArrowRight size={15} />
-                </button>
-                <button
-                  className="secondary-button"
-                  onClick={() => onNavigate("paths")}
-                >
-                  <Compass size={15} />
-                  Browse courses
-                </button>
-                <button
-                  className="secondary-button"
+                  style={{ whiteSpace: "nowrap", flexShrink: 0 }}
                   onClick={() => {
-                    const pyCourse = courses.find((c) => c.id === "python-programming-foundations") ?? courses[1];
-                    if (pyCourse) selectCourse(pyCourse);
-                    onNavigate("paths");
+                    if (activeResumeCourse.resumeLesson) {
+                      openLesson(activeResumeCourse.resumeLesson.lesson.id, activeResumeCourse.course.id);
+                    } else {
+                      onNavigate("paths");
+                    }
                   }}
                 >
-                  Explore Python
+                  <Play size={14} /> Resume lesson <ArrowRight size={14} />
                 </button>
               </div>
-            </div>
-            <div className="learning-hero-art" aria-label="Interactive multi-language engineering sandbox preview">
-              <div className="hero-art-label"><span className="hero-live-dot" /> MULTI-LANGUAGE SANDBOX</div>
-              <div className="hero-code-line"><span className="code-number">01</span><span><b>C11:</b> Wasmer WebAssembly (zero-install, memory-safe)</span></div>
-              <div className="hero-code-line"><span className="code-number">02</span><span><b>Python 3.12:</b> Pyodide client runtime in browser</span></div>
-              <div className="hero-code-line"><span className="code-number">03</span><span><b>Kat:</b> On-demand conversational AI engineering tutor</span></div>
-              <div className="hero-code-line"><span className="code-number">04</span><span><b>Progress:</b> Local-first, private, and snapshot-synced</span></div>
-              <div className="hero-art-footer"><span>learn</span><i /><span>code</span><i /><span>ask Kat</span><span className="hero-output">C &amp; Python ready</span></div>
-            </div>
-          </section>
-
-          <section className="home-how-it-works" aria-label="How KATALYST works">
-            <article className="how-step-card">
-              <span className="step-card-num">STEP 01</span>
-              <h3>Learn the concept</h3>
-              <p>Targeted, rigorous theory covering architecture, memory layout, and systems mechanics. No fluff, no busywork.</p>
-            </article>
-            <article className="how-step-card">
-              <span className="step-card-num">STEP 02</span>
-              <h3>Code in the sandbox</h3>
-              <p>Run real C11 and Python 3.12 programs directly in your browser. Standard input, console output, and instant feedback.</p>
-            </article>
-            <article className="how-step-card">
-              <span className="step-card-num">STEP 03</span>
-              <h3>Review &amp; ask Kat</h3>
-              <p>Test your comprehension with checkpoints, explore progressive hints, or toggle Kat AI tutor whenever you want an explanation.</p>
-            </article>
-          </section>
+            </aside>
+          ) : (
+            <aside className="home-resume-card home-continue-banner" aria-label="Start learning">
+              <div className="home-resume-content home-continue-info">
+                <span className="home-resume-eyebrow home-course-pill">READY TO BUILD</span>
+                <h3 className="home-resume-title home-continue-title">Start your engineering learning path</h3>
+                <p className="home-resume-meta home-continue-meta">Choose a track below to dive into low-level systems, hardware architectures, or full-stack AI development.</p>
+              </div>
+              <div className="learning-hero-actions">
+                <button className="primary-button" onClick={() => onNavigate("paths")}>
+                  <Compass size={14} /> Explore 14 Courses <ArrowRight size={14} />
+                </button>
+              </div>
+            </aside>
+          )}
 
           <div className="learning-section-head">
-            <div><span className="eyebrow">COURSES</span><h2>Available learning paths</h2></div>
-            <button className="learning-text-button" onClick={() => onNavigate("paths")}>All courses <ArrowRight size={14} /></button>
+            <div>
+              <span className="eyebrow">FEATURED TRACKS</span>
+              <h2>Core engineering foundations</h2>
+            </div>
+            <button className="learning-text-button" onClick={() => onNavigate("paths")}>
+              Explore all 14 courses <ArrowRight size={14} />
+            </button>
           </div>
-          <section className="courses-choice-grid" aria-label="Available engineering courses">
-            {courses.map((c) => {
+
+          <section className="courses-choice-grid" aria-label="Featured engineering tracks">
+            {[
+              courses.find((c) => c.id === "c-programming-foundations") ?? courses[0],
+              courses.find((c) => c.id === "cpp-programming") ?? courses[1],
+              courses.find((c) => c.id === "python-programming-foundations") ?? courses[2],
+              courses.find((c) => c.id === "ai-app-web-dev") ?? courses[3],
+            ].filter(Boolean).map((c) => {
               const cState = getPathProgress(progress, c);
               const cLessons = flattenLessons(c);
               const cEnrolled = Boolean(cState.enrollment);
@@ -971,7 +941,7 @@ export function LearningExperience({
                 <article className="course-card-unified" key={c.id}>
                   <div className="course-card-header">
                     <span className="course-lang-tag">
-                      {c.id.includes("python") ? "PYTHON 3.12" : "C11"}
+                      {getCourseBadgeText(c.id)}
                     </span>
                     <span className={`course-level-tag status-${statusClass}`}>
                       {statusText}
@@ -1000,7 +970,7 @@ export function LearningExperience({
                         }
                       }}
                     >
-                      {cEnrolled ? "Continue" : "Start course"}
+                      {cEnrolled ? "Continue" : "Start track"}
                       <ArrowRight size={14} />
                     </button>
                     <button
@@ -1019,7 +989,10 @@ export function LearningExperience({
           </section>
 
           <div className="learning-section-head">
-            <div><span className="eyebrow">YOUR PROGRESS</span><h2>Learning analytics &amp; quick access</h2></div>
+            <div>
+              <span className="eyebrow">YOUR PROGRESS</span>
+              <h2>Learning analytics &amp; quick tools</h2>
+            </div>
           </div>
 
           {learningSummary.mastery && (
@@ -1083,25 +1056,26 @@ export function LearningExperience({
               <span className="stat-subtext">{learningSummary.streak > 0 ? `${learningSummary.streak} day streak` : "Start your streak today"}</span>
             </article>
           </div>
-          <section className="learning-home-grid">
+
+          <section className="learning-home-grid" style={{ marginBottom: 28 }}>
             <article className="home-path-feature">
               <div className="feature-kicker">
-                <span><Lightbulb size={14} /></span>
-                <span>HANDS-ON EXERCISES</span>
+                <span><Terminal size={14} /></span>
+                <span>MULTI-LANGUAGE SANDBOX</span>
               </div>
-              <h3>Practice Lab</h3>
-              <p>Test your knowledge with exercises from {course.title}, progressive hints, starter code, and optional suggested answers.</p>
-              <button className="secondary-button" onClick={() => onNavigate("practice")}>
-                Open Practice Lab <ArrowRight size={14} />
+              <h3>Execution Playground</h3>
+              <p>Run code in C11, C++17, Python 3.12, JavaScript, SQL SQLite WASM, HTML/CSS, or simulate hardware circuits.</p>
+              <button className="primary-button" onClick={() => onNavigate("playground")}>
+                Open Playground <ArrowRight size={14} />
               </button>
             </article>
             <article className="home-next-feature">
-              <span className="eyebrow">LOCAL DASHBOARD</span>
-              <div className="next-feature-icon"><GraduationCap size={18} /></div>
-              <h3>Learning Progress</h3>
-              <p>{learningSummary.lessonsCompleted} of {learningSummary.totalLessons} lessons completed across all paths. Private and stored locally in this browser.</p>
-              <button className="secondary-button" onClick={() => onNavigate("progress")}>
-                View progress analytics <ArrowRight size={14} />
+              <span className="eyebrow">COURSE CATALOG</span>
+              <div className="next-feature-icon"><Compass size={18} /></div>
+              <h3>Explore All 14 Courses</h3>
+              <p>Browse full curriculum across Systems, Algorithms, Web, Databases, AI, and Hardware Engineering tracks.</p>
+              <button className="secondary-button" onClick={() => onNavigate("paths")}>
+                Explore 14 courses <ArrowRight size={14} />
               </button>
             </article>
           </section>
@@ -1205,23 +1179,7 @@ export function LearningExperience({
                   >
                     <div className="course-card-header">
                       <span className="course-lang-tag">
-                        {item.id.includes("python")
-                          ? "PYTHON 3.12"
-                          : item.id.includes("sql")
-                          ? "SQL · WASM"
-                          : item.id.includes("html")
-                          ? "HTML5 & CSS3"
-                          : item.id.includes("dsa")
-                          ? "DATA STRUCTURES"
-                          : item.id.includes("prompt")
-                          ? "APPLIED AI"
-                          : item.id.includes("photo")
-                          ? "COMPUTATIONAL MEDIA"
-                          : item.id.includes("js")
-                          ? "JAVASCRIPT (ES2024)"
-                          : item.id.includes("circuits")
-                          ? "DIGITAL LOGIC"
-                          : "C11"}
+                        {getCourseBadgeText(item.id)}
                       </span>
                       <span className={`course-level-tag status-${statusClass}`}>
                         {statusText}
@@ -1254,6 +1212,20 @@ export function LearningExperience({
               </div>
               <h2>{course.title}</h2>
               <p className="path-description">{course.description}</p>
+
+              <div className="path-primary-action-wrap" style={{ marginTop: 16, marginBottom: 20 }}>
+                <button className="primary-button path-start-button" onClick={startPath} style={{ minHeight: 40, width: "100%", justifyContent: "center" }}>
+                  <Play size={15} />
+                  {enrolled ? "Continue this course" : "Start learning"}
+                  <ArrowRight size={15} />
+                </button>
+                {enrolled && (
+                  <span className="enrollment-confirmation" style={{ display: "block", marginTop: 8, textAlign: "center" }}>
+                    You started this course on {shortDate(enrollment!.enrolledAt)}.
+                  </span>
+                )}
+              </div>
+
               <div className="path-divider" />
               <h3>What you will be able to do</h3>
               <ul className="objective-list">
@@ -1267,16 +1239,6 @@ export function LearningExperience({
                   <li key={item}>{item}</li>
                 ))}
               </ul>
-              <button className="primary-button path-start-button" onClick={startPath}>
-                <Play size={15} />
-                {enrolled ? "Continue this course" : "Start learning"}
-                <ArrowRight size={15} />
-              </button>
-              {enrolled && (
-                <span className="enrollment-confirmation">
-                  You started this course on {shortDate(enrollment!.enrolledAt)}.
-                </span>
-              )}
             </div>
             <div className="path-curriculum">
               <div className="curriculum-heading">
@@ -1430,6 +1392,10 @@ export function LearningExperience({
                 >
                   {c.id.includes("python")
                     ? "Python"
+                    : c.id.includes("ai-app")
+                    ? "AI App Dev"
+                    : c.id.includes("arduino")
+                    ? "Arduino/ESP32"
                     : c.id.includes("js")
                     ? "JavaScript"
                     : c.id.includes("circuit")
@@ -1820,6 +1786,19 @@ export function LearningExperience({
               <span>{String(currentIndex + 1).padStart(2, "0")} / {String(lessonEntries.length).padStart(2, "0")}</span>
             </nav>
             <div className="lesson-topbar-actions">
+              {showCodeWorkspace && (
+                <button
+                  data-testid="toggle-compiler-btn"
+                  type="button"
+                  className={`compiler-toggle-button ${compilerOpen ? "active" : ""}`}
+                  onClick={() => setCompilerOpen((prev) => !prev)}
+                  aria-expanded={compilerOpen}
+                  title={compilerOpen ? "Hide compiler panel" : "Open compiler panel"}
+                >
+                  <Code2 size={15} />
+                  <span>{compilerOpen ? "Hide Compiler" : "Open Compiler"}</span>
+                </button>
+              )}
               <button
                 type="button"
                 className={`kat-toggle-button ${katOpen ? "active" : ""}`}
@@ -1845,7 +1824,7 @@ export function LearningExperience({
               </button>
             </div>
           </header>
-          <div ref={gridRef} className={`learning-workspace-grid${showCodeWorkspace ? "" : " learning-workspace-grid-no-code"}`}>
+          <div ref={gridRef} className={`learning-workspace-grid${showCompiler ? "" : " learning-workspace-grid-no-code"}`}>
             <aside
               id="learning-panel"
               style={
@@ -1853,10 +1832,10 @@ export function LearningExperience({
                   ? {
                       flex: `0 0 ${
                         katOpen
-                          ? showCodeWorkspace
+                          ? showCompiler
                             ? layout.threePanelWidths[0]
                             : layout.twoPanelWidths[0]
-                          : showCodeWorkspace
+                          : showCompiler
                           ? layout.twoPanelWidths[0]
                           : 100
                       }%`,
@@ -2334,20 +2313,20 @@ export function LearningExperience({
               </nav>
             </aside>
 
-            {!smallWorkspace && (showCodeWorkspace || katOpen) && (
+            {!smallWorkspace && (showCompiler || katOpen) && (
               <div
                 role="separator"
                 tabIndex={0}
                 aria-orientation="vertical"
                 aria-label={
-                  katOpen && showCodeWorkspace
+                  katOpen && showCompiler
                     ? "Resize Theory and Code panels"
-                    : katOpen && !showCodeWorkspace
+                    : katOpen && !showCompiler
                     ? "Resize Theory and Kat panels"
                     : "Resize Theory and Code panels"
                 }
                 aria-valuenow={
-                  katOpen && showCodeWorkspace
+                  katOpen && showCompiler
                     ? layout.threePanelWidths[0]
                     : layout.twoPanelWidths[0]
                 }
@@ -2366,6 +2345,7 @@ export function LearningExperience({
                   style={
                     !smallWorkspace
                       ? {
+                          display: compilerOpen ? "flex" : "none",
                           flex: `0 0 ${
                             katOpen
                               ? layout.threePanelWidths[1]
@@ -2376,9 +2356,9 @@ export function LearningExperience({
                   }
                   className={`learning-workspace-panel learning-code-panel${effectiveWorkspacePanel === "code" ? " panel-active" : ""}`}
                   role="tabpanel"
-                  aria-label={`${activeLanguage === "python" ? "Python 3.12" : "C11"} coding workspace`}
-                  aria-hidden={smallWorkspace && effectiveWorkspacePanel !== "code"}
-                  inert={smallWorkspace && effectiveWorkspacePanel !== "code"}
+                  aria-label={`${activeLanguage === "python" ? "Python 3.12" : activeLanguage === "cpp" ? "C++17" : activeLanguage === "javascript" ? "JavaScript" : "C11"} coding workspace`}
+                  aria-hidden={smallWorkspace ? effectiveWorkspacePanel !== "code" : !compilerOpen}
+                  inert={smallWorkspace ? effectiveWorkspacePanel !== "code" : !compilerOpen}
                 >
                   {activeLanguage === "python" || activeLanguage === "javascript" ? (
                     <CodeWorkspace
@@ -2394,13 +2374,13 @@ export function LearningExperience({
                   ) : (
                     <>
                       <div className="workspace-panel-heading code-panel-heading">
-                        <span className="eyebrow"><Terminal size={13} /> CODE · LOCAL C11 SANDBOX</span>
+                        <span className="eyebrow"><Terminal size={13} /> CODE · LOCAL {activeLanguage === "cpp" ? "C++17" : "C11"} SANDBOX</span>
                         <h2>Try the idea yourself</h2>
                         <p>Edit, compile, and inspect output without leaving this lesson.</p>
                       </div>
                       <CPlayground
                         key={`c-playground-${lesson.id}`}
-                        initialLanguage="c"
+                        initialLanguage={activeLanguage === "cpp" ? "cpp" : "c"}
                         pendingExample={
                           pendingExample && pendingExample.lessonId === lesson.id
                             ? pendingExample
@@ -2410,7 +2390,7 @@ export function LearningExperience({
                                 lessonTitle: lesson.title,
                                 requestId: 1,
                                 sampleInput: lessonSampleInput,
-                                language: "c",
+                                language: activeLanguage === "cpp" ? "cpp" : "c",
                               }
                         }
                         autoInitialize
@@ -2422,7 +2402,7 @@ export function LearningExperience({
                   )}
                 </section>
 
-                {!smallWorkspace && katOpen && (
+                {!smallWorkspace && katOpen && showCompiler && (
                   <div
                     role="separator"
                     tabIndex={0}
