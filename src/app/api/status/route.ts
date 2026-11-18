@@ -1,9 +1,6 @@
+import "server-only";
 import { getDefaultModel, isProviderId, providerCatalog, providerIds } from "@/lib/providers/catalog";
-
-function isConfigured(environmentName: string): boolean {
-  const key = process.env[environmentName]?.trim();
-  return Boolean(key && key !== "your_api_key_here");
-}
+import { isServerCloudflareAccountConfigured, isServerProviderConfigured, isServerProviderKeyConfigured } from "@/lib/providers/credentials";
 
 export async function GET() {
   const configuredProvider = isProviderId(process.env.AI_PROVIDER) ? process.env.AI_PROVIDER : "cloudflare";
@@ -12,12 +9,10 @@ export async function GET() {
     ? configuredModel
     : getDefaultModel(configuredProvider);
   const providers = Object.fromEntries(providerIds.map((id) => [id, {
-    configured: id === "cloudflare"
-      ? isConfigured("CLOUDFLARE_API_TOKEN") && /^[a-f\d]{32}$/i.test(process.env.CLOUDFLARE_ACCOUNT_ID ?? "")
-      : isConfigured(providerCatalog[id].keyEnv),
+    configured: isServerProviderConfigured(id),
     ...(id === "cloudflare" ? {
-      tokenConfigured: isConfigured("CLOUDFLARE_API_TOKEN"),
-      accountConfigured: /^[a-f\d]{32}$/i.test(process.env.CLOUDFLARE_ACCOUNT_ID?.trim() ?? ""),
+      tokenConfigured: isServerProviderKeyConfigured("cloudflare"),
+      accountConfigured: isServerCloudflareAccountConfigured(),
     } : {}),
   }]));
 

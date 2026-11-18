@@ -2,7 +2,7 @@
 
 ## Local setup
 
-Use Node.js 20.9+ and npm. Run `npm install`, copy `.env.example` to `.env.local`, configure a provider key if needed, then run `npm run dev`. Guest mode needs no Supabase project. Optional Google accounts need the setup below.
+Use Node.js 20.9+ and npm. Run `npm install`, copy `.env.example` to `.env.local`, configure a provider key if needed, then run `npm run dev`. Guest mode needs no Supabase project. Optional email/password or Google accounts need the setup below.
 
 ## Conventions
 
@@ -21,7 +21,7 @@ Use Node.js 20.9+ and npm. Run `npm install`, copy `.env.example` to `.env.local
 - Keep provider states distinct: configured credentials, successful authentication, catalog discovery, and inference are separate facts.
 - Keep session key drafts in page memory and pass the current value explicitly to model discovery; do not persist keys or silently select a replacement model after refresh.
 - Keep catalog discovery separate from inference. Cloudflare's explicit test action must be user-triggered and use a currently listed model; never call it on page load or refresh.
-- Preserve the lesson's main-page scroll, bounded Kat conversation scroll, reachable in-flow composer, near-bottom-only auto-follow, and compact sidebar rail at desktop/tablet sizes. Keep phone navigation as a labeled overlay drawer. Keep picker outside-pointer and Escape dismissal covered in Playwright.
+- Preserve the lesson's main-page scroll, bounded Kat conversation scroll, reachable in-flow composer, near-bottom-only auto-follow, and compact sidebar rail at desktop/tablet sizes. On phones, collapse the app header after downward movement, reveal it at the top or after a deliberate upward gesture, and ignore short reversals from touch momentum across nested Code/Kat scrollers. Keep phone navigation as a labeled overlay drawer. Keep picker outside-pointer and Escape dismissal covered in Playwright.
 - Keep code surfaces graphite in both Light and Dark appearance themes by using `--surface-code` and `--code-*` tokens; do not apply the code surface tokens to normal content cards.
 - Keep C output channels separate in the view while preserving the merged activity context expected by existing lessons and tutor requests.
 
@@ -37,19 +37,19 @@ Learning progress remains in the separate `katalyst.learning.v1` record. It deri
 
 ## Optional Supabase account setup
 
-1. Create a Supabase project. Under Authentication, configure Google as an OAuth provider. Add the Supabase project's Auth callback URL to the Google OAuth client's allowed redirect URIs.
+1. Create a Supabase project and enable the Auth methods you intend to offer. For Google OAuth, add the Supabase project's Auth callback URL to the Google OAuth client's allowed redirect URIs.
 2. Add the KATALYST callback to Supabase's Auth redirect URL allowlist: `http://127.0.0.1:3000/auth/callback` for the default local server, and the exact production origin's `/auth/callback` for a deployment.
-3. Apply `supabase/migrations/20261110000000_account_persistence.sql` in the Supabase SQL editor or with the Supabase CLI. This creates the profile and account snapshot tables, enables RLS, creates the session-check helper and revision/migration RPC, and adds cascading account deletion.
+3. Apply every file in `supabase/migrations/` in timestamp order to the target project with the Supabase CLI (`supabase link --project-ref <project-ref>` followed by `supabase db push`). This installs account persistence, AI credits and rate limits, admin site content, legal-consent records, the shared daily AI budget, guest-session hardening, and account-action throttling. Never replay the migrations manually against a project whose schema or migration ledger has drifted; compare the live catalog and repair migration history first.
 4. Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` in `.env.local`. The service role key is needed only for permanent account deletion. Restart Next.js.
-5. Open Settings → Account and sign in with Google. On a device with local data, choose **Move guest data**, **Merge this device**, or **Use account copy**. The original device copy is stored under `katalyst.guest-backup.v1`; sign-out restores that copy. No provider BYOK values are part of either snapshot.
+5. Open `/login` to sign in or create an account. Google OAuth and email/password use this same page. Terms and Privacy acceptance is required before sign-in or account creation. Settings → Account contains account status and data controls only. On a device with local data, choose **Move guest data**, **Merge this device**, or **Use account copy**. The original device copy is stored under `katalyst.guest-backup.v1`; sign-out restores that copy. No provider BYOK values are part of either snapshot.
 
 Account sync stores one strict JSON snapshot per Auth user row: workspace (including projects, chats, messages, skills, and provider/model preferences), version-1 learning progress, and version-1 appearance preferences. Account schema and size validation run in the route before the database RPC. Saves use a revision compare-and-swap. A stale revision returns a conflict; the UI preserves both copies and asks the user to restore or merge. Guest migration IDs and snapshot commits are recorded atomically in Postgres, so interrupted retries do not duplicate the migration. The local mirror is written in the original three versioned keys.
 
-To run database ownership tests, install/configure the Supabase CLI and local Supabase stack, then run `supabase test db`. This repository includes a pgTAP test at `supabase/tests/account_ownership.test.sql`; it is not executed by `npm test` and needs a Supabase database. Route and schema tests run under Vitest without a Supabase project. Live Google OAuth requires real Google/Supabase project configuration and is not proved by mocked route tests.
+To run database tests, install/configure the Supabase CLI and local Supabase stack, then run `supabase test db`. The `supabase/tests/` directory contains pgTAP coverage for account ownership, credits, rate limits, site content, legal consent, the global budget, and account-action throttling. These tests are not executed by `npm test`. Route and schema tests run under Vitest without a Supabase project. Live email/password, Google OAuth, and project redirect configuration require a real Supabase project and are not proved by mocked route tests.
 
 ## M15 AI Gateway, Credits, and Brevo Setup
 
-1. Apply `supabase/migrations/20261111000000_ai_gateway_credits.sql` in the Supabase SQL editor to create the credit periods, reservations, usage ledger, guest sessions, and admin tables.
+1. Confirm all ordered migrations are applied to the Supabase project. `20261111000000_ai_gateway_credits.sql`, `20261116000000_ai_request_rate_limits.sql`, and `20261118010000_ai_global_daily_budget.sql` provide the shared credit ledger, burst limiter, and app-wide daily budget; `20261118020000_guest_session_hardening.sql` keeps the related SECURITY DEFINER RPCs server-only.
 2. Configure Cloudflare server credentials in `.env.local`: `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`.
 3. Set your administrative email in `KATALYST_ADMIN_EMAILS` (e.g. `KATALYST_ADMIN_EMAILS=your-email@example.com`).
 4. (Optional) Configure Brevo for transactional email messaging: `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `BREVO_SENDER_NAME`.
@@ -82,7 +82,7 @@ The C playground is split into a client chunk and the compiler package is fetche
 
 - If the selected provider reports setup required, set its server credential in `.env.local` and restart Next.js: Cloudflare requires both `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`; OpenAI, Gemini, and OpenRouter use their respective `*_API_KEY`. Ollama requires a local service instead of a key.
 - If a model is rejected, select an ID enabled for the API account and check current provider access.
-- If Account settings reports the service as unavailable, check the Supabase URL/publishable key, apply the database migration, verify RLS is enabled, and inspect the Google redirect allowlist. Deletion also requires the server-only service role key.
+- If Account settings reports the service as unavailable, check the Supabase URL/publishable key, apply the database migration, verify RLS is enabled, and inspect the enabled Auth methods and redirect allowlist. Deletion also requires the server-only service role key.
 - If guest migration cannot back up local data, browser storage may be full. Export the local workspace backup and make room before retrying; KATALYST will not replace the guest records without first saving the on-device copy.
 - If TypeScript cannot find generated Next.js types, run `npm run dev` once or `npx next typegen`.
 - Project and chat data live in this browser's local storage. Clearing site data removes it.

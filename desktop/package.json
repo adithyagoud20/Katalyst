@@ -1,0 +1,64 @@
+{
+  "name": "katalyst-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A lightweight desktop window for the KATALYST web app.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "node scripts/configure-site-url.mjs && electron-builder --win nsis --linux AppImage deb --publish never",
+    "release": "node scripts/configure-site-url.mjs && electron-builder --win nsis --linux AppImage deb --publish always"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  },
+  "devDependencies": {
+    "electron": "^45.3.3",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "in.katalystco.desktop",
+    "productName": "KATALYST",
+    "asar": true,
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "package.json",
+      "site-config.json",
+      "assets/icon.png",
+      "assets/icon.ico"
+    ],
+    "extraResources": [
+      {
+        "from": "assets",
+        "to": "assets",
+        "filter": ["icon.png", "icon.ico"]
+      }
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "adithyagoud20",
+      "repo": "Katalyst",
+      "releaseType": "release"
+    },
+    "win": {
+      "icon": "assets/icon.ico",
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false
+    },
+    "linux": {
+      "icon": "assets/icon.png",
+      "category": "Education",
+      "target": ["AppImage", "deb"]
+    }
+  }
+}

@@ -149,7 +149,7 @@ describe("Cloudflare Workers AI model discovery", () => {
   it("reports missing and malformed Cloudflare credentials before network access", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    await expect(discoverModels("cloudflare", undefined, { accountId })).rejects.toMatchObject({ status: 503, kind: "configuration", message: expect.stringContaining("CLOUDFLARE_API_TOKEN") });
+    await expect(discoverModels("cloudflare", undefined, { accountId })).rejects.toMatchObject({ status: 503, kind: "configuration", message: expect.stringContaining("Configure server credentials or enter a session key") });
     await expect(discoverModels("cloudflare", "token with spaces", { accountId })).rejects.toMatchObject({ status: 400, kind: "configuration", message: expect.stringContaining("token format is invalid") });
     await expect(discoverModels("cloudflare", "valid-token", { accountId: "invalid" })).rejects.toMatchObject({ status: 400, kind: "configuration", message: expect.stringContaining("32-character") });
     expect(fetchMock).not.toHaveBeenCalled();

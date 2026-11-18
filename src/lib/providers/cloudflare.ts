@@ -155,6 +155,7 @@ export const cloudflareProvider: ModelProvider = {
     if (!isCloudflareModelId(input.model)) throw new ProviderError("Choose a compatible Cloudflare text-generation model from the current model list.", 400, "unsupported-model");
     const body = {
       model: input.model,
+      ...(Number.isInteger(input.maxOutputTokens) && input.maxOutputTokens! > 0 ? { max_tokens: Math.min(input.maxOutputTokens!, 2048) } : {}),
       messages: [
         { role: "system" as const, content: providerInstructions("cloudflare", input.model, input.assistantSurface) },
         ...addWorkspaceContext(input.messages, input.context),

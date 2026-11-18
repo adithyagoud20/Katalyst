@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
 
+async function ensureCourseDetails(page: import("@playwright/test").Page) {
+  const startButton = page.getByRole("button", { name: /start learning|continue this course/i }).first();
+  if (!(await startButton.isVisible().catch(() => false))) {
+    await page.locator(".course-card-unified").first().click();
+  }
+  await expect(startButton).toBeVisible();
+}
+
 test.describe("Milestone M19 Features & Architecture E2E Suite", () => {
   test.beforeEach(async ({ page }) => {
     // Fast mock for Wasmer SDK browser package
@@ -66,6 +74,7 @@ test.describe("Milestone M19 Features & Architecture E2E Suite", () => {
     await expect(page.getByRole("heading", { name: "JavaScript & Algorithmic Systems" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "10 lessons. 4 modules." })).toBeVisible();
 
+    await ensureCourseDetails(page);
     await page.getByRole("button", { name: /start learning|continue this course/i }).click();
     await expect(page.getByRole("heading", { name: "Lexical scope and closures" })).toBeVisible();
   });
@@ -77,6 +86,7 @@ test.describe("Milestone M19 Features & Architecture E2E Suite", () => {
 
     await page.getByRole("button", { name: /JavaScript & Algorithmic Systems/i }).click();
     await expect(page.getByRole("heading", { name: "JavaScript & Algorithmic Systems" })).toBeVisible();
+    await ensureCourseDetails(page);
     await page.getByRole("button", { name: /start learning|continue this course/i }).click();
     await expect(page.getByRole("heading", { name: "Lexical scope and closures" })).toBeVisible();
 
@@ -107,6 +117,7 @@ test.describe("Milestone M19 Features & Architecture E2E Suite", () => {
 
     await page.getByRole("button", { name: /Digital Logic & Circuit Foundations/i }).click();
     await expect(page.getByRole("heading", { name: "Digital Logic & Circuit Foundations" })).toBeVisible();
+    await ensureCourseDetails(page);
     await page.getByRole("button", { name: /start learning|continue this course/i }).click();
     await expect(page.getByRole("heading", { name: /Ohm's Law, Voltage, and Resistor Networks/i })).toBeVisible();
 
@@ -140,6 +151,7 @@ test.describe("Milestone M19 Features & Architecture E2E Suite", () => {
 
     await page.getByRole("button", { name: /C Programming Foundations/i }).click();
     await expect(page.getByRole("heading", { name: "C Programming Foundations" })).toBeVisible();
+    await ensureCourseDetails(page);
     await page.getByRole("button", { name: /start learning|continue this course/i }).click();
     await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
 
@@ -171,6 +183,7 @@ test.describe("Milestone M19 Features & Architecture E2E Suite", () => {
 
     await page.getByRole("button", { name: /JavaScript & Algorithmic Systems/i }).click();
     await expect(page.getByRole("heading", { name: "JavaScript & Algorithmic Systems" })).toBeVisible();
+    await ensureCourseDetails(page);
     await page.getByRole("button", { name: /start learning|continue this course/i }).click();
     await expect(page.getByRole("heading", { name: "Lexical scope and closures" })).toBeVisible();
 

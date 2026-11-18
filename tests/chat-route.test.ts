@@ -34,6 +34,30 @@ describe("POST /api/chat", () => {
     expect(response.status).toBe(400);
   });
 
+  it("rejects Cloudflare browser credentials in shared platform mode", async () => {
+    const response = await POST(chatRequest(
+      { provider: "cloudflare", model: "@cf/google/gemma-4-26b-a4b-it", cloudflareMode: "platform", messages: [{ role: "user", content: "Hello" }] },
+      { [SESSION_KEY_HEADER]: "browser-secret-token", [CLOUDFLARE_ACCOUNT_HEADER]: "0123456789abcdef0123456789abcdef" },
+    ));
+    expect(response.status).toBe(400);
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const body = await response.json();
+    expect(body.error).not.toContain("browser-secret-token");
+    expect(body.error).not.toContain("0123456789abcdef0123456789abcdef");
+  });
+
+  it("does not allow the shared Kat AI allowance from the secondary workspace surface", async () => {
+    const response = await POST(chatRequest({
+      provider: "cloudflare",
+      model: "@cf/acme/model",
+      cloudflareMode: "platform",
+      assistantSurface: "workspace",
+      messages: [{ role: "user", content: "Hello" }],
+    }));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ code: "SHARED_AI_KAT_ONLY" });
+  });
+
   it("offers Ollama as a local initial provider without requiring cloud credentials", async () => {
     process.env.AI_PROVIDER = "ollama";
     const response = await GET();
@@ -50,7 +74,7 @@ describe("POST /api/chat", () => {
   it("shows Gemini setup guidance when its key is missing", async () => {
     const response = await POST(chatRequest({ provider: "gemini", model: "gemini-3.8-flash", assistantSurface: "kat", messages: [{ role: "user", content: "Hello" }] }));
     expect(response.status).toBe(503);
-    expect((await response.json()).error).toContain("GEMINI_API_KEY");
+    expect((await response.json()).error).toContain("Configure server credentials or enter a session key");
   });
 
   it("requires an OpenRouter key even when the free router is selected", async () => {
@@ -72,7 +96,7 @@ describe("POST /api/chat", () => {
     const response = await POST(new Request("http://localhost/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json", [SESSION_KEY_HEADER]: secret, [CLOUDFLARE_ACCOUNT_HEADER]: accountId },
-      body: JSON.stringify({ provider: "cloudflare", model: "@cf/google/gemma-4-26b-a4b-it", messages: [{ role: "user", content: "Hello" }] }),
+      body: JSON.stringify({ provider: "cloudflare", cloudflareMode: "byok", model: "@cf/google/gemma-4-26b-a4b-it", messages: [{ role: "user", content: "Hello" }] }),
     }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ text: "Cloudflare answer", usage: { inputTokens: 7, outputTokens: 4 }, provider: "cloudflare", model: "@cf/google/gemma-4-26b-a4b-it" });
@@ -91,7 +115,7 @@ describe("POST /api/chat", () => {
     const response = await POST(new Request("http://localhost/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json", [SESSION_KEY_HEADER]: secret, [CLOUDFLARE_ACCOUNT_HEADER]: accountId },
-      body: JSON.stringify({ provider: "cloudflare", model: "@cf/acme/dynamic-model", messages: [{ role: "user", content: "Reply only OK." }] }),
+      body: JSON.stringify({ provider: "cloudflare", cloudflareMode: "byok", model: "@cf/acme/dynamic-model", messages: [{ role: "user", content: "Reply only OK." }] }),
     }));
     expect(response.status).toBe(403);
     expect(await response.json()).toMatchObject({ errorKind: "permission", error: expect.not.stringContaining(secret) });

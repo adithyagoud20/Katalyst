@@ -14,6 +14,7 @@ import {
   Clock,
   Code2,
   Compass,
+  Download,
   FolderKanban,
   GraduationCap,
   Lightbulb,
@@ -81,7 +82,9 @@ import {
   type WorkspaceLayout,
 } from "@/lib/workspace-layout";
 
-import { CPlayground, defaultCppProgram, type PendingExample } from "@/components/c-playground";
+import { CPlayground, defaultCppProgram, type PendingExample, type PlaygroundRuntimeSelection } from "@/components/c-playground";
+import { SupermemoryHeroGraphic } from "@/components/supermemory-hero-graphic";
+import type { CloudflareRequestMode } from "@/lib/providers/client-request-headers";
 
 const defaultPythonProgram = `# Python Sandbox
 # Write Python code below and click "Run"
@@ -137,6 +140,19 @@ export function getCourseBadgeText(courseId: string): string {
   if (courseId.includes("photo")) return "COLOR LAB";
   if (courseId.includes("circuits") || courseId.includes("digital")) return "DIGITAL LOGIC";
   return "SYSTEMS";
+}
+
+function getCourseRuntimeText(courseId: string): string {
+  if (courseId === "cpp-programming" || courseId.includes("cpp")) return "C++17 · WebAssembly";
+  if (courseId.includes("c-programming") || courseId === "c11") return "C11 · WebAssembly";
+  if (courseId.includes("python")) return "Python 3.12 · Pyodide";
+  if (courseId.includes("arduino") || courseId.includes("esp32")) return "Embedded simulator · browser";
+  if (courseId.includes("breadboard") || courseId.includes("digital")) return "Circuit simulator · browser";
+  if (courseId.includes("sql")) return "SQL.js · browser database";
+  if (courseId.includes("media") || courseId.includes("photo")) return "Canvas image lab · browser";
+  if (courseId.includes("ai-app") || courseId.includes("ai-web")) return "Browser preview · AI requests via server";
+  if (courseId.includes("prompt")) return "Prompt lab · AI tutor optional";
+  return "Interactive course";
 }
 
 function shortDate(timestamp: number): string {
@@ -199,6 +215,19 @@ type WorkspaceSummary = {
   pinnedConversations: Array<{ title: string; projectName: string; updatedAt: number; pinned: boolean }>;
 };
 
+type CourseCategory = "All" | "Systems" | "Web" | "Algorithms" | "Databases" | "AI & Media" | "Hardware";
+
+function matchesCourseCategory(courseId: string, category: Exclude<CourseCategory, "All">) {
+  switch (category) {
+    case "Systems": return courseId.includes("c-programming") || courseId.includes("cpp") || courseId.includes("python-programming") || courseId.includes("arduino") || courseId.includes("esp32");
+    case "Web": return courseId.includes("html") || courseId.includes("js-systems") || courseId.includes("ai-app");
+    case "Algorithms": return courseId.includes("dsa") || courseId.includes("js-systems");
+    case "Databases": return courseId.includes("sql");
+    case "AI & Media": return courseId.includes("prompt") || courseId.includes("photo") || courseId.includes("ai-app");
+    case "Hardware": return courseId.includes("circuits") || courseId.includes("arduino") || courseId.includes("esp32") || courseId.includes("breadboard");
+  }
+}
+
 export function LearningExperience({
   section,
   onNavigate,
@@ -209,11 +238,14 @@ export function LearningExperience({
   modelName,
   sessionKey,
   cloudflareAccountId,
+  cloudflareMode,
   ollamaBaseUrl,
   configured,
   workspaceSummary,
   skills,
   courses,
+  playgroundSelection,
+  onPlaygroundSelectionChange,
 }: {
   section: LearningSection;
   onNavigate: (section: LearningSection | "workspace", lessonId?: string) => void;
@@ -224,11 +256,14 @@ export function LearningExperience({
   modelName: string;
   sessionKey: string;
   cloudflareAccountId: string;
+  cloudflareMode: CloudflareRequestMode;
   ollamaBaseUrl: string;
   configured: boolean;
   workspaceSummary: WorkspaceSummary;
   skills: WorkspaceSkill[];
   courses: Array<LearningCourseSummary | LearningCourseDetail>;
+  playgroundSelection: PlaygroundRuntimeSelection | null;
+  onPlaygroundSelectionChange: (selection: PlaygroundRuntimeSelection) => void;
 }) {
   const [progress, setProgress] = useState<LearningProgress>(emptyLearningProgress);
   const [progressReady, setProgressReady] = useState(false);
@@ -236,7 +271,8 @@ export function LearningExperience({
   const [aiRequests, setAIRequests] = useState<AIRequestActivity[]>([]);
   const [aiActivityIssue, setAIActivityIssue] = useState("");
   const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id ?? "");
-  const [selectedCategory, setSelectedCategory] = useState<"All" | "Systems" | "Web" | "Algorithms" | "Databases" | "AI & Media" | "Hardware">("All");
+  const [courseDetailOpen, setCourseDetailOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<CourseCategory>("All");
   const course = courses.find((item) => item.id === selectedCourseId) ?? courses[0]!;
   const courseSubject = learningSubjects.find((item) => item.id === course.subjectId);
   const courseMark = (courseSubject?.title ?? course.title).slice(0, 1).toUpperCase();
@@ -369,8 +405,16 @@ export function LearningExperience({
 
   const pathState = useMemo(() => getPathProgress(progress, course), [course, progress]);
   const learningSummary = useMemo(() => getLearningDashboardSummary(progress), [progress]);
-  const activeDaysCount = useMemo(() => new Set(progress.enrollments.flatMap((e) => e.activity.map((a) => new Date(a.at).toDateString()))).size, [progress]);
   const aiSummary = useMemo(() => getAIActivitySummary(aiRequests), [aiRequests]);
+  const exportLearningProgress = () => {
+    const blob = new Blob([JSON.stringify(progress, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `katalyst-learning-progress-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  };
   const enrollment = pathState.enrollment;
   const enrolled = Boolean(enrollment);
   const completedIds = new Set(enrollment?.completedLessons.map((item) => item.lessonId) ?? []);
@@ -399,24 +443,7 @@ export function LearningExperience({
 
   const filteredCourses = useMemo(() => {
     if (selectedCategory === "All") return courses;
-    return courses.filter((c) => {
-      switch (selectedCategory) {
-        case "Systems":
-          return c.id.includes("c-programming") || c.id.includes("cpp") || c.id.includes("python-programming") || c.id.includes("arduino") || c.id.includes("esp32");
-        case "Web":
-          return c.id.includes("html") || c.id.includes("js-systems") || c.id.includes("ai-app");
-        case "Algorithms":
-          return c.id.includes("dsa") || c.id.includes("js-systems");
-        case "Databases":
-          return c.id.includes("sql");
-        case "AI & Media":
-          return c.id.includes("prompt") || c.id.includes("photo") || c.id.includes("ai-app");
-        case "Hardware":
-          return c.id.includes("circuits") || c.id.includes("arduino") || c.id.includes("esp32") || c.id.includes("breadboard");
-        default:
-          return true;
-      }
-    });
+    return courses.filter((item) => matchesCourseCategory(item.id, selectedCategory));
   }, [courses, selectedCategory]);
 
   const currentExerciseStatus: ExerciseProgressStatus = lesson && enrolled
@@ -670,6 +697,7 @@ export function LearningExperience({
 
   const selectCourse = (nextCourse: LearningCourseSummary | LearningCourseDetail) => {
     setSelectedCourseId(nextCourse.id);
+    setCourseDetailOpen(true);
     setActiveLessonId(flattenLessons(nextCourse)[0]?.lesson.id ?? "");
     setTutorLessonId("");
     setLoadedExampleCode(null);
@@ -821,6 +849,7 @@ export function LearningExperience({
             modelName={modelName}
             sessionKey={sessionKey}
             cloudflareAccountId={cloudflareAccountId}
+            cloudflareMode={cloudflareMode}
             ollamaBaseUrl={ollamaBaseUrl}
             configured={configured}
             context={tutorContext}
@@ -840,95 +869,78 @@ export function LearningExperience({
       )}
 
       <div className="learning-playground-host" hidden={section !== "playground"}>
-        {section === "playground" && (
-          <CPlayground
-            pendingExample={pendingExample}
-            autoInitialize={false}
-            compact={false}
-            onReturnToLesson={(lessonId) => onNavigate("lesson", lessonId)}
-          />
-        )}
+        {section === "playground" && <CPlayground
+          pendingExample={pendingExample}
+          autoInitialize={false}
+          compact={false}
+          initialSelection={playgroundSelection}
+          onSelectionChange={onPlaygroundSelectionChange}
+          onReturnToLesson={(lessonId) => onNavigate("lesson", lessonId)}
+        />}
       </div>
 
       {section === "home" && (
         <>
-          <div className="home-dashboard-header" style={{ marginBottom: 20 }}>
-            <span className="eyebrow" style={{ color: "var(--accent-primary)", fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>
-              ENGINEERING DASHBOARD
-            </span>
-            <h1 style={{ fontSize: "clamp(24px, 2.5vw, 32px)", fontWeight: 700, color: "var(--text-primary)", margin: "4px 0 6px", letterSpacing: "-0.03em" }}>
-              Learn by understanding
-            </h1>
-            <p style={{ fontSize: 14, color: "var(--text-secondary)", margin: 0, maxWidth: 640 }}>
-              Interactive low-level systems programming, embedded labs, and AI development with browser-native WebAssembly.
-            </p>
-          </div>
-
-          {activeResumeCourse ? (
-            <aside className="home-resume-card home-continue-banner" aria-label="Resume current path">
-              <div className="home-resume-content home-continue-info">
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span className="home-resume-eyebrow home-course-pill">{activeResumeCourse.course.title}</span>
-                  <span style={{ fontSize: 12, color: "var(--text-muted)", fontFamily: "monospace" }}>
-                    {activeResumeCourse.pathState.completedCount} / {activeResumeCourse.pathState.totalLessons} lessons
-                  </span>
+          <section className="home-lab-hero" aria-labelledby="home-lab-title">
+            <div className="home-lab-copy">
+              <div className="home-runtime-status"><span className="runtime-status-dot" /> Browser-based labs · AI requests routed securely · progress stays yours</div>
+              <span className="eyebrow">KATALYST / INTERACTIVE TECHNICAL STUDIO</span>
+              <h1 id="home-lab-title">Explore how things work.<br /><span>Make ideas tangible.</span></h1>
+              <p>One learning studio for software, embedded devices, circuits, data, AI, and visual media. Build a foundation with clear lessons, test ideas in interactive labs, and bring new disciplines into your practice as you grow.</p>
+              <div className="home-lab-actions">
+                {activeResumeCourse ? (
+                  <button className="primary-button" onClick={() => activeResumeCourse.resumeLesson
+                    ? openLesson(activeResumeCourse.resumeLesson.lesson.id, activeResumeCourse.course.id)
+                    : onNavigate("paths")}>
+                    <Play size={15} /> Resume learning <ArrowRight size={15} />
+                  </button>
+                ) : (
+                  <button className="primary-button" onClick={() => onNavigate("paths")}>
+                    <Compass size={15} /> Start learning <ArrowRight size={15} />
+                  </button>
+                )}
+                <button className="secondary-button" onClick={() => onNavigate("playground")}><Terminal size={15} /> Open Playground</button>
+              </div>
+              {activeResumeCourse && (
+                <div className="home-resume-inline">
+                  <span className="home-mono-label">CONTINUE / {activeResumeCourse.course.title}</span>
+                  <strong>{activeResumeCourse.resumeLesson?.lesson.title ?? "Course overview"}</strong>
+                  <span>{activeResumeCourse.pathState.completedCount} of {activeResumeCourse.pathState.totalLessons} lessons complete</span>
+                  <div className="home-resume-progress" role="progressbar" aria-label="Course progress" aria-valuenow={activeResumeCourse.pathState.completionPercent} aria-valuemin={0} aria-valuemax={100}><i style={{ width: `${activeResumeCourse.pathState.completionPercent}%` }} /></div>
                 </div>
-                <h3 className="home-resume-title home-continue-title">{activeResumeCourse.resumeLesson?.lesson.title ?? activeResumeCourse.course.title}</h3>
-                <span className="home-resume-meta home-continue-meta">
-                  Module: {activeResumeCourse.resumeLesson?.module.title ?? "Overview"}
-                </span>
-                <div className="progress-track" role="progressbar" aria-valuenow={activeResumeCourse.pathState.completionPercent} aria-valuemin={0} aria-valuemax={100} style={{ marginTop: 8, maxWidth: 420 }}>
-                  <span style={{ width: `${activeResumeCourse.pathState.completionPercent}%` }} />
-                </div>
-              </div>
-              <div className="learning-hero-actions">
-                <button
-                  className="primary-button"
-                  style={{ whiteSpace: "nowrap", flexShrink: 0 }}
-                  onClick={() => {
-                    if (activeResumeCourse.resumeLesson) {
-                      openLesson(activeResumeCourse.resumeLesson.lesson.id, activeResumeCourse.course.id);
-                    } else {
-                      onNavigate("paths");
-                    }
-                  }}
-                >
-                  <Play size={14} /> Resume lesson <ArrowRight size={14} />
-                </button>
-              </div>
-            </aside>
-          ) : (
-            <aside className="home-resume-card home-continue-banner" aria-label="Start learning">
-              <div className="home-resume-content home-continue-info">
-                <span className="home-resume-eyebrow home-course-pill">READY TO BUILD</span>
-                <h3 className="home-resume-title home-continue-title">Start your engineering learning path</h3>
-                <p className="home-resume-meta home-continue-meta">Choose a track below to dive into low-level systems, hardware architectures, or full-stack AI development.</p>
-              </div>
-              <div className="learning-hero-actions">
-                <button className="primary-button" onClick={() => onNavigate("paths")}>
-                  <Compass size={14} /> Explore 14 Courses <ArrowRight size={14} />
-                </button>
-              </div>
-            </aside>
-          )}
-
-          <div className="learning-section-head">
-            <div>
-              <span className="eyebrow">FEATURED TRACKS</span>
-              <h2>Core engineering foundations</h2>
+              )}
             </div>
-            <button className="learning-text-button" onClick={() => onNavigate("paths")}>
-              Explore all 14 courses <ArrowRight size={14} />
-            </button>
+            <SupermemoryHeroGraphic />
+          </section>
+
+          <section className="home-discipline-strip" aria-label="Katalyst learning disciplines">
+            <span className="home-mono-label">ONE STUDIO / MANY FIELDS</span>
+            <div>
+              {["Systems & software", "Embedded devices", "Circuits & logic", "Databases & SQL", "AI & prompt design", "Visual media labs"].map((discipline, index) => (
+                <span key={discipline}><i>{String(index + 1).padStart(2, "0")}</i>{discipline}</span>
+              ))}
+            </div>
+            <button className="learning-text-button" onClick={() => onNavigate("paths")}>Browse all disciplines <ArrowRight size={13} /></button>
+          </section>
+
+          <section className="home-starter-guide" aria-label="How to use Katalyst">
+            <article><span>01</span><div><strong>Choose a field</strong><p>Explore software, hardware, circuits, data, AI, or visual media.</p></div></article>
+            <article><span>02</span><div><strong>Learn by building</strong><p>Study a concept, inspect an example, and try the interactive lab.</p></div></article>
+            <article><span>03</span><div><strong>Keep what you learn</strong><p>Track progress locally, ask Kat for guidance, and return when ready.</p></div></article>
+          </section>
+
+          <div className="learning-section-head home-tracks-heading">
+            <div><span className="eyebrow">SELECT A STARTING POINT</span><h2>Featured engineering tracks</h2></div>
+            <button className="learning-text-button" onClick={() => onNavigate("paths")}><span>Explore all 14 courses</span><ArrowRight size={14} /></button>
           </div>
 
           <section className="courses-choice-grid" aria-label="Featured engineering tracks">
             {[
               courses.find((c) => c.id === "c-programming-foundations") ?? courses[0],
-              courses.find((c) => c.id === "cpp-programming") ?? courses[1],
-              courses.find((c) => c.id === "python-programming-foundations") ?? courses[2],
+              courses.find((c) => c.id === "arduino-embedded") ?? courses[1],
+              courses.find((c) => c.id === "sql-databases") ?? courses[2],
               courses.find((c) => c.id === "ai-app-web-dev") ?? courses[3],
-            ].filter(Boolean).map((c) => {
+            ].filter(Boolean).map((c, index) => {
               const cState = getPathProgress(progress, c);
               const cLessons = flattenLessons(c);
               const cEnrolled = Boolean(cState.enrollment);
@@ -938,9 +950,10 @@ export function LearningExperience({
               const statusClass = isComplete ? "completed" : inProgress ? "in-progress" : cEnrolled ? "started" : "not-started";
 
               return (
-                <article className="course-card-unified" key={c.id}>
+                <article className="course-card-unified home-feature-track" key={c.id}>
                   <div className="course-card-header">
-                    <span className="course-lang-tag">
+                    <span className="home-track-number">{String(index + 1).padStart(3, "0")}</span>
+                    <span className="course-lang-tag home-track-badge">
                       {getCourseBadgeText(c.id)}
                     </span>
                     <span className={`course-level-tag status-${statusClass}`}>
@@ -954,10 +967,11 @@ export function LearningExperience({
                     <span><Compass size={13} /> {c.modules.length} modules</span>
                     <span><Clock size={13} /> ~{cLessons.length * 20}m</span>
                   </div>
+                  <span className="course-runtime-badge">{getCourseRuntimeText(c.id)}</span>
                   <div className="progress-track" role="progressbar" aria-valuenow={cState.completionPercent} aria-valuemin={0} aria-valuemax={100}>
                     <span style={{ width: `${cState.completionPercent}%` }} />
                   </div>
-                  <div className="course-card-footer" style={{ marginTop: "auto", display: "flex", gap: "8px" }}>
+                  <div className="course-card-footer home-track-actions" style={{ marginTop: "auto", display: "flex", gap: "8px" }}>
                     <button
                       className="primary-button"
                       style={{ flex: 1 }}
@@ -970,7 +984,7 @@ export function LearningExperience({
                         }
                       }}
                     >
-                      {cEnrolled ? "Continue" : "Start track"}
+                      {cEnrolled ? "Continue track" : "Explore track"}
                       <ArrowRight size={14} />
                     </button>
                     <button
@@ -988,97 +1002,30 @@ export function LearningExperience({
             })}
           </section>
 
-          <div className="learning-section-head">
-            <div>
-              <span className="eyebrow">YOUR PROGRESS</span>
-              <h2>Learning analytics &amp; quick tools</h2>
-            </div>
-          </div>
-
-          {learningSummary.mastery && (
-            <div className="mastery-summary-card mb-4 rounded-xl border border-blue-500/30 bg-[var(--surface-secondary)] p-4 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] pb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/20 text-blue-400 border border-blue-500/40 font-bold text-xs">
-                    XP
-                  </span>
-                  <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-blue-400">Engineering Rank</span>
-                    <h3 className="text-sm font-bold text-[var(--text-primary)]">{learningSummary.mastery.rank}</h3>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 font-mono text-xs">
-                  <span className="rounded bg-blue-500/10 px-2.5 py-1 text-blue-400 font-semibold border border-blue-500/20">
-                    {learningSummary.mastery.totalXp} Total XP
-                  </span>
-                  {learningSummary.mastery.nextRank && (
-                    <span className="text-xs text-[var(--text-muted)]">
-                      Target: {learningSummary.mastery.nextRank} ({learningSummary.mastery.nextRankXp} XP)
-                    </span>
-                  )}
-                </div>
-              </div>
-              {learningSummary.mastery.nextRank && (
-                <div className="mt-3">
-                  <div className="flex justify-between text-[11px] text-[var(--text-secondary)] mb-1">
-                    <span>Rank Progress ({learningSummary.mastery.progressToNextRank}%)</span>
-                    <span>{learningSummary.mastery.totalXp} / {learningSummary.mastery.nextRankXp} XP</span>
-                  </div>
-                  <div className="h-1.5 w-full rounded-full bg-[var(--surface-primary)] border border-[var(--border-subtle)] overflow-hidden">
-                    <div
-                      className="h-full bg-blue-600 transition-all duration-500 rounded-full"
-                      style={{ width: `${learningSummary.mastery.progressToNextRank}%` }}
-                    />
-                  </div>
-                </div>
-              )}
-              <div className="mt-3 flex flex-wrap items-center gap-4 text-[11px] text-[var(--text-muted)]">
-                <span>• +50 XP per verified exercise ({learningSummary.mastery.exerciseXp} XP)</span>
-                <span>• +25 XP per completed lesson ({learningSummary.mastery.lessonXp} XP)</span>
-              </div>
-            </div>
-          )}
-
-          <div className="home-stats-strip" aria-label="Learning metrics">
+          <div className="home-stats-strip" aria-label="Engineering telemetry">
             <article className="stat-card">
-              <span className="stat-label">Lessons Completed</span>
-              <strong className="stat-value">{learningSummary.lessonsCompleted}</strong>
-              <span className="stat-subtext">of {learningSummary.totalLessons} total lessons</span>
+              <span className="stat-label">LESSONS COMPLETED</span>
+              <strong className="stat-value">{learningSummary.lessonsCompleted.toString().padStart(3, "0")}</strong>
+              <span className="stat-subtext">of {learningSummary.totalLessons} lessons</span>
             </article>
             <article className="stat-card">
-              <span className="stat-label">Exercises Attempted</span>
-              <strong className="stat-value">{learningSummary.exercisesCompleted}</strong>
-              <span className="stat-subtext">interactive checks solved</span>
+              <span className="stat-label">EXERCISES VERIFIED</span>
+              <strong className="stat-value">{(learningSummary.mastery?.verifiedExercisesCount ?? 0).toString().padStart(3, "0")}</strong>
+              <span className="stat-subtext">verified checks</span>
             </article>
             <article className="stat-card">
-              <span className="stat-label">Active Days</span>
-              <strong className="stat-value">{activeDaysCount}</strong>
-              <span className="stat-subtext">{learningSummary.streak > 0 ? `${learningSummary.streak} day streak` : "Start your streak today"}</span>
+              <span className="stat-label">EXPERIENCE POINTS</span>
+              <strong className="stat-value">{learningSummary.mastery?.totalXp ?? 0}</strong>
+              <span className="stat-subtext">{learningSummary.mastery?.rank ?? "Cadet Engineer"}</span>
+            </article>
+            <article className="stat-card">
+              <span className="stat-label">LEARNING STREAK</span>
+              <strong className="stat-value">{learningSummary.streak.toString().padStart(2, "0")}<small>d</small></strong>
+              <span className="stat-subtext">consecutive days active</span>
             </article>
           </div>
 
-          <section className="learning-home-grid" style={{ marginBottom: 28 }}>
-            <article className="home-path-feature">
-              <div className="feature-kicker">
-                <span><Terminal size={14} /></span>
-                <span>MULTI-LANGUAGE SANDBOX</span>
-              </div>
-              <h3>Execution Playground</h3>
-              <p>Run code in C11, C++17, Python 3.12, JavaScript, SQL SQLite WASM, HTML/CSS, or simulate hardware circuits.</p>
-              <button className="primary-button" onClick={() => onNavigate("playground")}>
-                Open Playground <ArrowRight size={14} />
-              </button>
-            </article>
-            <article className="home-next-feature">
-              <span className="eyebrow">COURSE CATALOG</span>
-              <div className="next-feature-icon"><Compass size={18} /></div>
-              <h3>Explore All 14 Courses</h3>
-              <p>Browse full curriculum across Systems, Algorithms, Web, Databases, AI, and Hardware Engineering tracks.</p>
-              <button className="secondary-button" onClick={() => onNavigate("paths")}>
-                Explore 14 courses <ArrowRight size={14} />
-              </button>
-            </article>
-          </section>
+          <div className="home-telemetry-footer"><span>LOCAL LEARNING TELEMETRY</span><span>Progress stays in this browser until account sync is configured.</span></div>
 
           <section className="learning-activity-strip">
             <div><span className="eyebrow">RECENT ACTIVITY</span><h2>Your steps, as they happen</h2></div>
@@ -1113,17 +1060,14 @@ export function LearningExperience({
         <>
           <header className="learning-page-heading">
             <span className="eyebrow">EXPLORE LEARNING PATHS</span>
-            <h1>
-              Build a foundation<br />
-              <em>one clear idea at a time.</em>
-            </h1>
-            <p>Focused engineering paths with real lesson content and practice. Choose a path to inspect its modules and start learning.</p>
+            <h1>Build a foundation</h1>
+            <p>Browse 14 learning paths in systems, web, AI, data, and hardware. Open a course to preview lessons and outcomes before you start.</p>
           </header>
           <div
             className="explore-category-filter"
             role="tablist"
             aria-label="Course Categories"
-            style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "20px" }}
+            style={{ display: "flex", gap: "8px", flexWrap: "nowrap", overflowX: "auto", overflowY: "hidden", scrollBehavior: "smooth", marginBottom: "20px" }}
           >
             {(["All", "Systems", "Web", "Algorithms", "Databases", "AI & Media", "Hardware"] as const).map((cat) => (
               <button
@@ -1143,19 +1087,26 @@ export function LearningExperience({
                   cursor: "pointer",
                   transition: "all 0.15s ease",
                 }}
-                onClick={() => setSelectedCategory(cat)}
+                onClick={() => {
+                  setSelectedCategory(cat);
+                  if (courseDetailOpen && cat !== "All") {
+                    const matches = courses.filter((item) => matchesCourseCategory(item.id, cat));
+                    if (matches.length && !matches.some((item) => item.id === selectedCourseId)) selectCourse(matches[0]);
+                  }
+                }}
               >
                 {cat}
               </button>
             ))}
           </div>
 
+          <div className={`path-explore-layout${courseDetailOpen ? " showing-course-detail" : ""}`}>
           {filteredCourses.length > 0 ? (
             <nav className="courses-choice-grid" aria-label="Available courses" style={{ marginBottom: 28 }}>
               {filteredCourses.map((item) => {
                 const itemState = getPathProgress(progress, item);
                 const itemLessons = flattenLessons(item);
-                const isSelected = item.id === course.id;
+                const isSelected = courseDetailOpen && item.id === course.id;
                 const isEnrolled = Boolean(itemState.enrollment);
                 const isComplete = isEnrolled && itemState.completedCount === itemState.totalLessons && itemState.totalLessons > 0;
                 const inProgress = isEnrolled && itemState.completedCount > 0 && !isComplete;
@@ -1201,8 +1152,9 @@ export function LearningExperience({
               No courses found in the {selectedCategory} category.
             </p>
           )}
-          <section className="path-detail-shell">
+          <section className="path-detail-shell" key={course.id}>
             <div className="path-detail-main">
+              <button type="button" className="path-detail-back secondary-button" onClick={() => { setCourseDetailOpen(false); setSelectedCategory("All"); }}><ArrowLeft size={15} /> All courses</button>
               <div className="path-subject-mark">{courseMark}</div>
               <div className="path-label-row">
                 <span>{(courseSubject?.title ?? "COURSE").toUpperCase()}</span>
@@ -1299,6 +1251,7 @@ export function LearningExperience({
               )}
             </div>
           </section>
+          </div>
         </>
       )}
 
@@ -1534,6 +1487,9 @@ export function LearningExperience({
             </h1>
             <p>Progress is based on activity saved in this browser. Lesson completion is always your choice.</p>
             <span className="local-analytics-label"><span />Local analytics · not synced</span>
+            <button type="button" className="secondary-button progress-export-button" onClick={exportLearningProgress}>
+              <Download size={14} /> Export learning progress
+            </button>
           </header>
 
           {learningSummary.mastery && (
@@ -1810,7 +1766,8 @@ export function LearningExperience({
                 <span>{katOpen ? "Hide Kat" : "Ask Kat"}</span>
               </button>
             </div>
-            <div className="learning-workspace-mobile-tabs" role="tablist" aria-label="Learning workspace panels">
+          </header>
+          <div className="learning-workspace-mobile-tabs" role="tablist" aria-label="Learning workspace panels">
               <button type="button" role="tab" aria-selected={effectiveWorkspacePanel === "learn"} aria-controls="learning-panel" onClick={() => setWorkspacePanel("learn")}>
                 <BookOpen size={15} />Learn
               </button>
@@ -1822,23 +1779,16 @@ export function LearningExperience({
               <button type="button" role="tab" aria-selected={effectiveWorkspacePanel === "kat"} aria-controls="kat-panel" onClick={() => setWorkspacePanel("kat")}>
                 <Bot size={15} />Kat
               </button>
-            </div>
-          </header>
-          <div ref={gridRef} className={`learning-workspace-grid${showCompiler ? "" : " learning-workspace-grid-no-code"}`}>
+          </div>
+          <div ref={gridRef} className={`learning-workspace-grid${showCompiler ? "" : " learning-workspace-grid-no-code"}${!showCompiler && !katOpen ? " learning-workspace-wide" : ""}`}>
             <aside
               id="learning-panel"
               style={
                 !smallWorkspace
                   ? {
-                      flex: `0 0 ${
-                        katOpen
-                          ? showCompiler
-                            ? layout.threePanelWidths[0]
-                            : layout.twoPanelWidths[0]
-                          : showCompiler
-                          ? layout.twoPanelWidths[0]
-                          : 100
-                      }%`,
+                      flex: showCompiler
+                        ? "0 0 " + (katOpen ? layout.threePanelWidths[0] : layout.twoPanelWidths[0]) + "%"
+                        : katOpen ? "1 1 0%" : "1 1 100%",
                     }
                   : undefined
               }
@@ -2425,11 +2375,9 @@ export function LearningExperience({
                 !smallWorkspace
                   ? {
                       display: katOpen ? "flex" : "none",
-                      flex: `0 0 ${
-                        showCodeWorkspace
-                          ? layout.threePanelWidths[2]
-                          : layout.twoPanelWidths[1]
-                      }%`,
+                      flex: showCompiler
+                        ? "0 0 " + (showCodeWorkspace ? layout.threePanelWidths[2] : layout.twoPanelWidths[1]) + "%"
+                        : "0 0 min(38vw, 420px)",
                       flexDirection: "column",
                     }
                   : undefined
@@ -2463,6 +2411,7 @@ export function LearningExperience({
                 modelName={modelName}
                 sessionKey={sessionKey}
                 cloudflareAccountId={cloudflareAccountId}
+                cloudflareMode={cloudflareMode}
                 ollamaBaseUrl={ollamaBaseUrl}
                 configured={configured}
                 context={currentTutorContext}

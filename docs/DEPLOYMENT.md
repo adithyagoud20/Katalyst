@@ -18,6 +18,8 @@ This guide details how to deploy KATALYST to production environments and configu
 
 ## 2. Environment Variables Specification
 
+For this MVP, use the Vercel production `*.vercel.app` project alias; a custom domain is not required. Set `NEXT_PUBLIC_SITE_URL` to that exact HTTPS origin in Production. Vercel's `VERCEL_PROJECT_PRODUCTION_URL` can supply the project alias when no custom production host is attached; if a custom host remains connected, this app deliberately rejects it and the explicit `.vercel.app` setting is required. Set the operator contact fields before public launch. These values are public page content, not secrets.
+
 ### A. Shared Cloudflare AI Gateway (Required for Shared AI)
 | Variable | Scope | Description |
 | :--- | :--- | :--- |
@@ -51,9 +53,25 @@ This guide details how to deploy KATALYST to production environments and configu
 | `GEMINI_API_KEY` | Server-only | Server-default API key for Google Gemini BYOK inference. |
 | `OPENROUTER_API_KEY` | Server-only | Server-default API key for OpenRouter BYOK inference. |
 
+### F. Public Canonical Origin and Operator Contact
+| Variable | Scope | Description |
+| :--- | :--- | :--- |
+| `NEXT_PUBLIC_SITE_URL` | Public build-time value | Recommended exact `https://<project>.vercel.app` canonical origin. Required if Vercel's selected production alias is a custom domain. Do not include a path or custom host for the current MVP. |
+| `NEXT_PUBLIC_LEGAL_ENTITY` | Public build-time value | Legal name of the deployment operator, confirmed by the operator and qualified reviewer. |
+| `NEXT_PUBLIC_LEGAL_JURISDICTION` | Public build-time value | Operator's applicable legal jurisdiction, confirmed by the operator and qualified reviewer. |
+| `NEXT_PUBLIC_SUPPORT_EMAIL` | Public build-time value | Monitored support and privacy contact shown on the Privacy and Terms pages. Configure a real inbox first. |
+
 ---
 
 ## 3. Platform Configuration Instructions
+
+### Supabase database migrations
+Apply the ordered migrations to the target Supabase project before deploying code that depends on them:
+```bash
+supabase link --project-ref <your-project-ref>
+supabase db push
+```
+The AI gateway migrations create the atomic credit ledger and shared request-rate limiter. In particular, `20261116000000_ai_request_rate_limits.sql` must be applied before AI chat is enabled; when Supabase is configured but its rate-limit RPC is unavailable, AI requests fail closed with a temporary service error. Run `supabase test db` against a staging project after migration changes.
 
 ### Vercel Deployment
 1. Import the repository into Vercel.
@@ -66,7 +84,9 @@ This guide details how to deploy KATALYST to production environments and configu
    - `SUPABASE_SERVICE_ROLE_KEY` (Environment: Production, Preview)
    - `KATALYST_ADMIN_EMAILS` (Environment: Production, Preview)
    - `GUEST_SESSION_SECRET` (Environment: Production, Preview)
-4. Trigger a deployment. Verify the build command runs `prebuild` (`node scripts/copy-wasmer-browser-runtime.mjs`).
+   - Enable Vercel system environment variables and set `NEXT_PUBLIC_SITE_URL` to the exact production `.vercel.app` origin. `VERCEL_PROJECT_PRODUCTION_URL` is a fallback only when Vercel selects its project alias rather than a custom production host.
+   - `NEXT_PUBLIC_LEGAL_ENTITY`, `NEXT_PUBLIC_LEGAL_JURISDICTION`, and `NEXT_PUBLIC_SUPPORT_EMAIL` (Production only, after operator/legal review)
+4. Trigger a deployment. Verify the build command runs `prebuild` (`node scripts/copy-wasmer-browser-runtime.mjs`). The site-origin resolver fails the production build if it cannot determine a `.vercel.app` project alias.
 
 ### Docker / Standalone Node.js Deployment
 When building and running in a container or standalone Linux server:
@@ -102,14 +122,14 @@ Ensure any reverse proxy (e.g. Nginx, Cloudflare CDN, AWS CloudFront) preserves 
 ### Production Health Check Endpoint (`/api/health`)
 KATALYST exposes a lightweight, secret-free health check endpoint at `/api/health`:
 ```bash
-curl -i https://your-domain.com/api/health
+curl -i https://your-project.vercel.app/api/health
 ```
 Expected response:
 ```json
 {
   "ok": true,
   "status": "healthy",
-  "coursesCount": 4,
+  "coursesCount": 14,
   "services": {
     "cloudflareConfigured": true,
     "supabaseConfigured": true
@@ -127,15 +147,11 @@ In production, session-only BYOK keys and secure HTTP-only cookies (`SameSite=La
 
 1. **Verify Automated Health Check**:
    - Query `GET /api/health`.
-   - Confirm HTTP 200, `status: "healthy"`, and `coursesCount: 4`.
+   - Confirm HTTP 200, `status: "healthy"`, and `coursesCount: 14` for the current published catalog. The endpoint derives this count from the runtime catalog.
    - Verify no secrets, tokens, or private credentials are included in the JSON payload.
-2. **Verify 4-Course Catalog & Discovery**:
+2. **Verify Published Course Catalog & Discovery**:
    - Navigate to Explore Learning Paths.
-   - Confirm all 4 courses are displayed with correct lesson/module counts:
-     - **C Programming Foundations**: 16 lessons, 6 modules.
-     - **Python Programming Foundations**: 19 lessons, 7 modules.
-     - **JavaScript & Algorithmic Systems**: 10 lessons, 4 modules.
-     - **Digital Logic & Circuit Foundations**: 8 lessons, 3 modules.
+   - Confirm all 14 published courses appear and that each selected course shows its own description, outcomes, modules, and lessons.
    - Click into each course and confirm overview, modules, and lessons render without runtime errors.
 3. **Verify Execution Runtimes & Automated Verifiers**:
    - **C**: Open a C lesson, run code, and verify WebAssembly compilation and stdout output.
@@ -149,11 +165,17 @@ In production, session-only BYOK keys and secure HTTP-only cookies (`SameSite=La
 5. **Verify Shared Cloudflare AI & Guest Trial**:
    - Open KATALYST in an incognito window without signing in.
    - Send a prompt to Kat. Confirm inference succeeds using the guest trial allocation.
-   - Inspect network headers: verify no Cloudflare API tokens or account IDs are leaked in request payloads or responses.
+   - In shared platform mode, inspect network headers and responses: neither the server Cloudflare API token nor server Cloudflare account ID should reach the browser. If separately testing explicit BYOK, the user's own Cloudflare token and account ID are intentionally sent to KATALYST's server for that operation and are visible to that user in their browser tools.
 6. **Verify Guest Trial & Quota Limits**:
    - In Settings → Usage & Credits, verify the 50 credit guest trial is displayed.
-   - After quota exhaustion, verify the user is prompted to sign in with Google or provide BYOK keys.
+   - After quota exhaustion, verify the user is prompted to sign in or create an account, or provide a BYOK key.
 7. **Verify Admin Authorization**:
    - Log in with an account matching `KATALYST_ADMIN_EMAILS`.
    - In Settings, verify the **Admin** tab appears with system kill-switch controls, policy limits, and user analytics.
    - Log in with a non-admin account or view as a guest; verify the **Admin** tab is completely absent.
+
+## 6. Public Launch Operations
+
+The code repository cannot complete production ownership, account, or vendor setup. Use the [MVP release checklist](MVP_RELEASE_CHECKLIST.md) as the operator release gate for legal operator details, privacy review, Auth email/OAuth configuration, backups and restore drills, support contact, WAF/monitoring, provider billing alerts, and Search Console. Payments are not implemented; do not present paid plans as available.
+
+The configured Vercel project origin drives canonical URLs, the XML sitemap, robots sitemap declaration, and social metadata. Verify rendered production metadata against the production `.vercel.app` URL; preview deployments must not be promoted or submitted for indexing. App-level AI quotas are not a hard upstream billing cap. BYOK keys entered by a user are visible to that user in browser developer tools, while environment credentials must remain server-only.

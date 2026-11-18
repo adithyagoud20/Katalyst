@@ -407,7 +407,28 @@ M21 verification on 2026-11-13: `npm run lint`, `npm run typecheck`, and `npm te
 
 ## Current state
 
-M6 through M14 are implemented. KATALYST opens on an authored C foundations path with local explicit lesson completion, an integrated lesson/editor/Kat workspace, and a local Progress dashboard. The visual system uses warm neutrals, graphite, and burnt-orange accents in Light, Dark, and System themes; editor and code-block surfaces stay graphite across themes. Settings renders one keyboard-accessible category at a time and reports provider credential, authentication, catalog, and inference states separately. The C11 workbench prepares its existing browser compiler on entry, opens runnable examples, separates output streams, and preserves local drafts. Cloudflare Workers AI is the default hosted provider; OpenAI, Gemini, OpenRouter, and Ollama remain selectable with no automatic fallback. Cloudflare discovery uses the current account catalog, and only its explicit test action makes an inference request from Settings. Kat receives selected route metadata, per-turn provider/model provenance, and bounded lesson/code context only when asked; it has no browser or execution tools, and context-specific actions require the relevant data. The thirteen authored C samples expose verified reference output, but lesson exercises/checkpoints remain ungraded. Assistant responses use the safe CommonMark/GFM renderer. Workspace backups remain schema version 1 and backward-compatible, with optional pinned state in conversation records; learning progress, appearance, AI activity, and playground drafts remain separate records. Optional Google accounts sync workspace, progress, and appearance snapshots after an explicit guest migration choice; conflicts are revision-checked and require an explicit resolution. Session BYOK remains transient and is not synced. Account export and confirmed deletion are available when Supabase is configured. Analytics are metadata-only and bounded to 500 AI requests. Conversation export is a redacted visible transcript, not a public share URL. Tutor modes are prompt guidance rather than deterministic behavior. Imported skills remain untrusted text and scripts are never run. Live Google OAuth requires external credentials and configuration and has not been verified in this checkout. See [Architecture](ARCHITECTURE.md#account-persistence), [Security](SECURITY.md#account-identity-and-cloud-data), [deployment/content recommendation](ARCHITECTURE.md#deployment-and-content-architecture), and [local storage recovery](ARCHITECTURE.md#local-storage-validation-and-recovery).
+KATALYST is a multi-discipline learning studio with 14 published courses, subject-specific browser tools, local progress, optional account sync, and provider-routed AI guidance. Guests can explore without registering. One `/login` page handles email/password, Google OAuth, account creation, and password recovery; Terms and Privacy acceptance is required for sign-in and account creation. Settings shows account status, sync/data controls, and appearance preferences without duplicating authentication forms.
+
+The current interface uses one source-defined KATALYST mark, a high-contrast Light/Dark/System palette, a shared animated Home pipeline spanning the learning fields, and responsive provider/model selectors. Course details and start actions appear alongside the course list. The Playground opens to a launcher and restores the last selected lab; the lesson workspace keeps theory, optional compiler, and Kat controls compact and independently usable. Server-side shared provider credentials stay on the server; explicit learner BYOK credentials are tab-memory only and are sent only in the matching BYOK mode. Existing versioned `katalyst.*` storage formats remain unchanged.
+
+### M22 — MVP interface, account-flow, and launch documentation refinement — 2026-11-16
+
+- [x] Replace selectable logo variants with one reusable source-defined brand mark.
+- [x] Remove the bottom sidebar account/sign-in control; provide a dismissible sign-in prompt at the top for configured guest deployments.
+- [x] Keep authentication on `/login`; reduce Settings account view to identity, sync, export, sign-out, and deletion controls.
+- [x] Present all learning disciplines through one Home pipeline and prevent provider/model controls from overlapping on narrow screens.
+- [x] Publish Terms, Privacy, account-deletion, sitemap, robots, social-preview, and not-found surfaces; identify remaining operator legal details in the deployment guidance.
+- [x] Align design, security, account setup, deployment, product, and change documentation with the implemented behavior.
+- [x] Record final verification results after lint, typecheck, unit tests, browser tests, and production build.
+
+### Verification record — 2026-11-16
+
+- `npm run lint` — passed with no warnings.
+- `npm run typecheck` — passed.
+- `npm test` — passed, 279 tests across 31 files.
+- `npm run test:e2e` — passed, 63 browser tests; one opt-in real C compiler integration test was skipped by the default suite. The focused login and mobile lesson checks also passed.
+- `npm_config_ignore_scripts=true npm run build` — passed with Next.js 16.4.5 and 46 generated static pages. The prebuild hook was skipped to keep the protected curriculum tree untouched.
+- `git diff --check` — passed. `src/data/curriculum/` and `src/lib/execution/` remained unchanged.
 
 ### Verification record — 2026-11-08
 
@@ -496,8 +517,8 @@ M6 through M14 are implemented. KATALYST opens on an authored C foundations path
 
 ## Known limitations
 
-- Google OAuth and database-backed account storage remain optional and require an operator-configured Supabase project. Live OAuth, cloud deployment, and user deletion are not verified by local automated tests.
-- Provider inference routes do not yet provide account-specific rate limiting, usage quotas, or abuse controls. Do not expose an unrestricted public inference service with server keys.
+- Email/password and Google OAuth account storage remain optional and require an operator-configured Supabase project. Live identity-provider setup, cloud deployment, and project-specific deletion behavior require deployment verification.
+- The shared AI gateway has server-enforced quotas and rate limits, but deployments still need to review billing, BYOK exposure, abuse controls, and public-route policy before accepting public traffic. Do not expose an unrestricted inference service with server keys.
 - Guest data remains in localStorage without KATALYST-managed encryption. Signed-in workspace, learning, and preference snapshots use Supabase access controls and managed backups; deletion from active tables does not bypass provider-managed backup retention.
 - Browser localStorage may have lower quota than the account's 9 MB snapshot limit; guest backup duplication can prevent migration when the origin is full.
 - Backups are manual files; browser storage quotas may be lower than the 8 MB import/export limit. Local raw v1 records are recognized, but no automatic storage-engine migration is performed. Version 1 backups reject unsupported versions.

@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — MVP operations, announcement scheduling, and launch media
+
+- Added administrator-managed text announcement banners and scheduled Home launch-video events, backed by a service-role-only Supabase table and authenticated, origin-checked, size-bounded writes.
+- Added active-window filtering, safe text rendering, HTTPS URL validation, dismissible muted playback, audit logging, and browser E2E coverage.
+- Replaced stale custom-host references with Vercel production project-alias handling and made the optional desktop package require its explicit production `.vercel.app` origin at build time.
+- Regenerated rounded browser, PWA, desktop, and social-preview image assets from the final supplied KATALYST PNG; corrected missing icon/preview assets.
+- Added the Vercel-only [MVP release checklist](docs/MVP_RELEASE_CHECKLIST.md) for production setup, user-owned launch steps, legal/security review, and known limitations.
+- Stabilized the mobile app header during nested Code and Kat scrolling: short touch-scroll reversals no longer repeatedly expand and collapse the provider header, while scrolling back to the top or making a deliberate upward gesture still reveals it.
+- Added mobile browser regression coverage for scroll momentum/reversal behavior in both the CodeMirror editor and Kat conversation, and documented the final mobile verification in the MVP release handoff.
+
+## 0.29.0 — Mobile scrolling and launch readiness
+
+- Fixed mobile learning headers to collapse while the content pane scrolls and return when the learner scrolls back to the top.
+- Gave dedicated Arduino, ESP32, breadboard, and digital logic lab surfaces their own touch-friendly vertical scroll area in the full-screen IDE.
+- Let lesson reading content use the available workspace width when both the compiler and Kat panels are closed.
+- Added mobile scroll and board-runtime E2E coverage, a wide lesson regression check, and dimensions validation for the social preview image.
+- Made deployment legal identity, jurisdiction, and monitored support contact configurable and visible as an incomplete launch gate when missing.
+- Added a launch checklist that separates implemented app behavior from external domain, legal, authentication, backup, monitoring, abuse-prevention, billing, and search-console setup.
+
+## 0.28.0 — MVP interface, account, and security refinement
+
+- Replaced multiple logo choices with one reusable KATALYST mark in the shell, public pages, and SVG app icon.
+- Reframed the Home graphic as one animated learning pipeline across software, hardware, circuits, systems, data, AI, and visual media.
+- Removed the bottom sidebar sign-in control, added a dismissible top sign-in prompt for configured guest deployments, and kept all authentication forms on `/login`.
+- Simplified Account settings to account state and data controls; retained email/password, Google OAuth, password recovery, and required Terms and Privacy acceptance on the shared login page.
+- Added the public Terms, Privacy, account deletion, sitemap, robots, social preview, and not-found surfaces, with legal copy that states the current data boundaries and operator contact requirement.
+- Refined responsive topbar behavior to keep provider and model selectors readable without overlapping on mobile.
+- Updated design, security, product, account setup, and deployment documentation to match the current multi-discipline catalog and server-side credential boundaries.
+
 ## 0.27.0 — Milestone M21: Server-Side Curriculum, SQL & HTML/CSS Runtimes, 5 New Courses, Built-In Skills & UI Polish
 
 - **Server-Side Curriculum Architecture & Manifest Split**:

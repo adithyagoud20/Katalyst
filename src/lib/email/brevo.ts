@@ -1,3 +1,5 @@
+import "server-only";
+
 /**
  * Brevo (formerly Sendinblue) Transactional Email Client
  * Provides server-side, consent-aware transactional messaging.

@@ -45,7 +45,6 @@ export const providerCatalog = {
     id: "cloudflare",
     name: "Cloudflare Workers AI",
     apiLabel: "Workers AI OpenAI-compatible Chat Completions API",
-    keyEnv: "CLOUDFLARE_API_TOKEN",
     logo: "C",
     dynamicModels: true,
     models: [] satisfies ModelMetadata[],
@@ -54,7 +53,6 @@ export const providerCatalog = {
     id: "openai",
     name: "OpenAI",
     apiLabel: "Responses API",
-    keyEnv: "OPENAI_API_KEY",
     logo: "O",
     dynamicModels: false,
     models: [
@@ -67,7 +65,6 @@ export const providerCatalog = {
     id: "gemini",
     name: "Gemini",
     apiLabel: "Gemini generateContent API",
-    keyEnv: "GEMINI_API_KEY",
     logo: "G",
     dynamicModels: true,
     models: [] satisfies ModelMetadata[],
@@ -76,7 +73,6 @@ export const providerCatalog = {
     id: "openrouter",
     name: "OpenRouter",
     apiLabel: "OpenRouter Chat Completions API",
-    keyEnv: "OPENROUTER_API_KEY",
     logo: "R",
     dynamicModels: true,
     models: [freeRouterModel],
@@ -85,12 +81,11 @@ export const providerCatalog = {
     id: "ollama",
     name: "Ollama",
     apiLabel: "Ollama local API",
-    keyEnv: "",
     logo: "L",
     dynamicModels: true,
     models: [] satisfies ModelMetadata[],
   },
-} as const satisfies Record<ProviderId, { id: ProviderId; name: string; apiLabel: string; keyEnv: string; logo: string; dynamicModels: boolean; models: readonly ModelMetadata[] }>;
+} as const satisfies Record<ProviderId, { id: ProviderId; name: string; apiLabel: string; logo: string; dynamicModels: boolean; models: readonly ModelMetadata[] }>;
 
 export const providerIds = Object.keys(providerCatalog) as ProviderId[];
 

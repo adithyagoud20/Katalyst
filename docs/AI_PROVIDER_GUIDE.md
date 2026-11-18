@@ -23,7 +23,7 @@ In M15, Cloudflare Workers AI operates as KATALYST's default managed provider. L
 ### Quota and Credit Architecture
 - **AI Credits**: Public usage unit is AI credits rather than raw tokens. Base credit weight is configurable per model in `ai_model_config`.
 - **Monthly User Allowance**: Authenticated learners receive a monthly quota (default 1,000 credits). Quota periods follow the UTC calendar month (first day of month 00:00 UTC to first day of next month 00:00 UTC) and reset cleanly without rollover.
-- **Guest Trial**: Unregistered learners receive a restricted 50-credit trial. When exhausted, the interface prompts the learner to sign in with Google to receive monthly credits. Trials are tracked server-side and protected by salted IP hashing to deter storage-clearing abuse.
+- **Guest Trial**: Unregistered learners receive a restricted 50-credit trial. When exhausted, the interface prompts the learner to sign in or create an account to receive the account allowance. Email/password and Google sign-in share the `/login` page when enabled by the operator. Trials are tracked server-side and protected by salted IP hashing to deter storage-clearing abuse.
 - **BYOK Isolation**: When a user selects a Bring-Your-Own-Key provider (Gemini, OpenAI, OpenRouter, or local Ollama), or enters a personal session Cloudflare key, requests bypass the credit gateway and consume zero shared KATALYST credits. There is no automatic fallback between shared and BYOK tiers.
 - **Emergency Kill Switch & Admin Controls**: Administrators can pause shared AI inference globally, adjust credit weights, change the designated shared model, and monitor live consumption in Settings → Admin.
 

@@ -62,25 +62,43 @@ test.describe("Milestone M21 Architecture & Platform Expansion E2E Suite", () =>
     await expect(page.locator(".course-card-unified")).toHaveCount(14);
   });
 
+  test("shows the full catalog first, then keeps course details aligned with the selected category", async ({ page }) => {
+    await page.goto("/#katalyst=paths");
+    const details = page.locator(".path-detail-shell");
+    await expect(details).toBeHidden();
+    await page.getByRole("tab", { name: "Hardware" }).click();
+    await page.getByRole("button", { name: /Arduino Uno Embedded Systems/i }).click();
+    await expect(details).toBeVisible();
+    await expect(details.getByRole("heading", { name: /Arduino Uno Embedded Systems/i })).toBeVisible();
+
+    await page.getByRole("tab", { name: "Databases" }).click();
+    await expect(details.getByRole("heading", { name: /Relational Databases & SQL Foundations/i })).toBeVisible();
+    await page.getByRole("button", { name: "All courses" }).click();
+    await expect(details).toBeHidden();
+    await expect(page.locator(".course-card-unified")).toHaveCount(14);
+  });
+
   // Test 2: Unified Multi-Language Playground Switcher & HTML Live Sandbox Preview
   test("switches runtimes in the unified Playground and renders HTML live sandbox preview", async ({ page }) => {
     await page.goto("/#katalyst=playground");
 
     // From Launcher grid, launch SQL Workbench
     await page.getByText("Launch SQL Workbench").click();
-    await expect(page.getByRole("heading", { name: "SQL Query Workbench" })).toBeVisible();
+    await expect(page.locator(".ide-file-status code")).toHaveText("query.sql");
     await expect(page.locator(".c-pane-heading strong", { hasText: "query.sql" })).toBeVisible();
-    await expect(page.getByRole("button", { name: /Execute SQL/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
 
     // Use runtime dropdown switcher to switch to HTML Live Preview
     const switcher = page.locator("#runtime-switcher-select");
     await expect(switcher).toBeVisible();
     await switcher.selectOption("code:html");
-    await expect(page.getByRole("heading", { name: "HTML & CSS Sandbox" })).toBeVisible();
+    await expect(page.locator(".ide-file-status code")).toHaveText("index.html");
     await expect(page.locator(".c-pane-heading strong", { hasText: "index.html" })).toBeVisible();
 
     // Verify HTML live sandbox iframe is rendered
     const previewFrame = page.locator("iframe[title='HTML Live Sandbox Preview']");
+    await expect(previewFrame).toBeHidden();
+    await page.getByRole("button", { name: "Output", exact: true }).click();
     await expect(previewFrame).toBeVisible();
 
     // Test Mobile / Desktop viewport toggle

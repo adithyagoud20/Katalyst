@@ -1,3 +1,4 @@
+import "server-only";
 import crypto from "node:crypto";
 import type { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
@@ -6,21 +7,52 @@ import type { GuestCreditStatus, GuestSessionPayload } from "./types";
 
 export const GUEST_COOKIE_NAME = "katalyst_guest_session";
 const GUEST_SESSION_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const developmentSigningSecret = process.env.NODE_ENV === "production"
+  ? null
+  : crypto.randomBytes(32).toString("base64url");
 
 function getSigningSecret(): string {
   const secret = process.env.GUEST_SESSION_SECRET?.trim()
     || process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
-    || "katalyst-server-guest-signing-fallback-secret-2026";
+    || developmentSigningSecret;
+  if (!secret) throw new Error("GUEST_SESSION_SECRET must be configured on the server.");
   return secret;
 }
 
-export function hashClientIp(request: Request | NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const realIp = request.headers.get("x-real-ip");
-  const cfConnectingIp = request.headers.get("cf-connecting-ip");
-  const rawIp = (forwarded ? forwarded.split(",")[0] : cfConnectingIp || realIp || "127.0.0.1").trim();
-  // One-way SHA-256 hash with server salt - never stores or exposes raw IP
+function getTrustedClientIp(request: Request | NextRequest): string | null {
+  const trustedHeader = process.env.KATALYST_TRUSTED_CLIENT_IP_HEADER?.trim().toLowerCase();
+  let rawIp: string | null = null;
+
+  // Vercel owns this header at its edge. Do not trust a caller-supplied
+  // X-Forwarded-For chain on other production hosts unless the operator has
+  // explicitly selected a header that their reverse proxy overwrites.
+  if (process.env.VERCEL === "1") {
+    rawIp = request.headers.get("x-vercel-forwarded-for")?.split(",")[0] ?? null;
+  } else if (process.env.NODE_ENV !== "production") {
+    rawIp = request.headers.get("cf-connecting-ip")
+      || request.headers.get("x-real-ip")
+      || request.headers.get("x-forwarded-for")?.split(",")[0]
+      || null;
+  } else if (trustedHeader && ["cf-connecting-ip", "x-real-ip", "x-forwarded-for"].includes(trustedHeader)) {
+    rawIp = request.headers.get(trustedHeader)?.split(",")[0] ?? null;
+  }
+
+  return rawIp?.trim() || null;
+}
+
+function hashTrustedIp(rawIp: string): string {
   return crypto.createHmac("sha256", getSigningSecret()).update(`ip-salt:${rawIp}`).digest("hex");
+}
+
+export function hashClientIp(request: Request | NextRequest): string {
+  // Keep a stable fallback for database records, but never use it to merge
+  // guest identities or rate-limit visitors when the proxy address is absent.
+  return hashTrustedIp(getTrustedClientIp(request) || "no-trusted-client-ip");
+}
+
+export function getTrustedClientIpRateLimitHash(request: Request | NextRequest): string | null {
+  const rawIp = getTrustedClientIp(request);
+  return rawIp ? hashTrustedIp(rawIp) : null;
 }
 
 export function signGuestSession(guestId: string, createdAt: number, expiresAt: number): string {
@@ -58,9 +90,9 @@ function getAdminClient() {
 }
 
 /**
- * Ensures or loads a server-side guest identity with trial tracking.
- * If the cookie was deleted, checks whether an existing trial exists for the IP hash
- * within the last 30 days to prevent infinite free credit resets.
+ * Ensures or loads a server-side guest identity with trial tracking. A valid,
+ * signed cookie is the quota identity; IP hashes are used only for a separate
+ * generous burst limit and never merge visitors on shared networks.
  */
 export async function getOrCreateGuestIdentity(
   request: Request | NextRequest,
@@ -74,22 +106,6 @@ export async function getOrCreateGuestIdentity(
   const expiresAtIso = new Date(now + GUEST_SESSION_MAX_AGE_MS).toISOString();
 
   let targetGuestId = verified?.guestId;
-
-  // Anti-abuse: If no verified cookie is present, check if this IP hash recently created a trial
-  if (!targetGuestId && admin) {
-    const { data: existingByIp } = await admin
-      .from("ai_guest_sessions")
-      .select("guest_id,expires_at")
-      .eq("ip_hash", ipHash)
-      .gt("expires_at", new Date(now).toISOString())
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (existingByIp?.guest_id) {
-      targetGuestId = existingByIp.guest_id;
-    }
-  }
 
   if (!targetGuestId) {
     targetGuestId = crypto.randomUUID();

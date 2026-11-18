@@ -1,5 +1,29 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+
+async function ensureCourseDetails(page: import("@playwright/test").Page) {
+  const startButton = page.getByRole("button", { name: /start learning|continue this course/i }).first();
+  if (!(await startButton.isVisible().catch(() => false))) {
+    await page.locator(".course-card-unified").first().click();
+  }
+  await expect(startButton).toBeVisible();
+}
+
+async function expectMobileHeaderToStayCollapsedDuringScrollNoise(page: Page, scroller: Locator) {
+  const topbar = page.locator(".topbar");
+  await expect.poll(() => scroller.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  await scroller.evaluate((element) => { element.scrollTop = 80; });
+  await expect(topbar).toHaveClass(/topbar-collapsed/);
+
+  for (const position of [86, 80, 87, 81, 88]) {
+    await scroller.evaluate((element, nextPosition) => { element.scrollTop = nextPosition; }, position);
+    await page.waitForTimeout(25);
+    await expect(topbar).toHaveClass(/topbar-collapsed/);
+  }
+
+  await scroller.evaluate((element) => { element.scrollTop = 0; });
+  await expect(topbar).not.toHaveClass(/topbar-collapsed/);
+}
 
 async function openWorkspace(page: import("@playwright/test").Page) {
   if (await page.getByRole("button", { name: "Open navigation" }).isVisible()) {
@@ -10,7 +34,7 @@ async function openWorkspace(page: import("@playwright/test").Page) {
 
 async function openSettingsCategory(page: import("@playwright/test").Page, category: string) {
   await page.getByRole("button", { name: "Open settings", exact: true }).click();
-  const targetCategory = category === "AI Providers" || category === "Models" ? "AI & Models" : category;
+  const targetCategory = category === "AI Providers" || category === "Models" ? "AI Models & BYOK" : category === "Workspace" ? "Workspace Data" : category;
   await page.getByRole("tab", { name: targetCategory, exact: true }).click();
 }
 
@@ -44,11 +68,18 @@ export class Wasmer {
       command: (_program, args) => ({ spawn: async () => {
         const compiling = Array.isArray(args);
         const mode = window.__cPlaygroundOutcome;
+        let releaseInput;
+        const inputReceived = new Promise((resolve) => { releaseInput = resolve; });
         return {
-          stdin: { write: async () => {}, close: async () => {} },
-          wait: async () => compiling && mode === "compile-error"
-            ? { reason: "exited", exitCode: 1, stdout: output(), stderr: output("main.c:1: error: expected ';'") }
-            : { reason: "exited", exitCode: !compiling && mode === "runtime-error" ? 7 : 0, stdout: output(!compiling && mode === "runtime-error" ? "mock program output" : ""), stderr: output(!compiling && mode === "runtime-error" ? "mock runtime stderr" : "") },
+          stdin: { write: async (value) => { window.__capturedTerminalInput = value; releaseInput(); }, close: async () => { releaseInput(); } },
+          stdout: null,
+          stderr: null,
+          wait: async () => {
+            if (!compiling && window.__mockWaitForInput) await inputReceived;
+            return compiling && mode === "compile-error"
+              ? { reason: "exited", exitCode: 1, stdout: output(), stderr: output("main.c:1: error: expected ';'") }
+              : { reason: "exited", exitCode: !compiling && mode === "runtime-error" ? 7 : 0, stdout: output(!compiling && mode === "runtime-error" ? "mock program output" : !compiling && window.__mockWaitForInput ? "mock interactive output" : ""), stderr: output(!compiling && mode === "runtime-error" ? "mock runtime stderr" : "") };
+          },
           kill: async () => {},
         };
       } }),
@@ -69,7 +100,7 @@ test("workspace explains provider setup when no key is configured", async ({ pag
   await page.route("**/api/chat", (route) => route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ error: "Add OPENAI_API_KEY to your local .env.local file to connect OpenAI." }) }));
   await page.goto("/");
   await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
-  await expect(page.getByRole("heading", { name: /learn by understanding/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /explore how things work/i })).toBeVisible();
   await openWorkspace(page);
   await page.screenshot({ path: "work/katalyst-desktop.png", fullPage: true });
   await expect(page.getByRole("heading", { name: /make room for/i })).toBeVisible();
@@ -140,8 +171,9 @@ test("configures Cloudflare with a session token and account ID, then sends the 
   await page.goto("/");
   await openWorkspace(page);
   await page.locator(".provider-selector").click();
-  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "Cloudflare Workers AI" }).click();
+  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "Kat AI" }).click();
   await openSettingsCategory(page, "AI Providers");
+  await page.getByRole("radio", { name: /Bring your own key/ }).check();
   await page.getByLabel("Cloudflare account ID").fill(accountId);
   await page.getByLabel("Cloudflare Workers AI session API key").fill("tab-cloudflare-secret");
   const settingsCard = page.locator(".settings-card").filter({ hasText: "Cloudflare Workers AI" });
@@ -190,6 +222,7 @@ test("explains empty and filtered Cloudflare catalogs in Settings and the model 
   await page.goto("/");
   await openSettingsCategory(page, "AI Providers");
   const card = page.locator(".settings-card").filter({ hasText: "Cloudflare Workers AI" });
+  await page.getByRole("radio", { name: /Bring your own key/ }).check();
   await page.getByLabel("Cloudflare account ID").fill("0123456789abcdef0123456789abcdef");
   await page.getByLabel("Cloudflare Workers AI session API key").fill("mock-cloudflare-token");
   const refresh = card.getByRole("button", { name: "Save & refresh models" });
@@ -342,7 +375,7 @@ test("collapses and restores navigation preference and uses the KATALYST breadcr
   await page.getByRole("button", { name: "Open settings", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
   await page.getByRole("button", { name: "KATALYST", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /learn by understanding/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /explore how things work/i })).toBeVisible();
 });
 
 test("keeps a fully collapsed, accessible icon rail at desktop and tablet widths", async ({ page }) => {
@@ -359,8 +392,8 @@ test("keeps a fully collapsed, accessible icon rail at desktop and tablet widths
     await expect(sidebar.getByRole("button", { name: "Workspace", exact: true })).toHaveAttribute("title", "Workspace");
     await expect(sidebar.locator(".section-heading").first()).toBeHidden();
     await expect(sidebar.locator(".provider-state")).toBeHidden();
-    await expect(sidebar.locator(".account-entry > span:nth-child(2)")).toBeHidden();
-    await expect(sidebar.locator(".account-entry > .avatar")).toBeVisible();
+    await expect(sidebar.locator(".sidebar-legal-links")).toBeHidden();
+    await expect(sidebar.locator("a[href='/login']")).toHaveCount(0);
     await expect(sidebar.locator(".brand-mark")).toBeHidden();
     await expect(sidebar.locator('.nav-item[aria-current="page"]')).toBeVisible();
     if (width === 800) {
@@ -383,6 +416,7 @@ test("keeps the editor and rendered lesson code dark in both appearance themes",
   await page.getByRole("button", { name: "Open settings", exact: true }).click();
   await page.getByRole("button", { name: "Light", exact: true }).click();
   await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   await expect(page.getByLabel("C source code")).toBeVisible();
 
@@ -399,12 +433,13 @@ test("keeps the editor and rendered lesson code dark in both appearance themes",
   await page.getByRole("button", { name: "Open settings", exact: true }).click();
   await page.getByRole("button", { name: "Dark", exact: true }).click();
   await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning|continue this course/i }).click();
-  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(18, 21, 25)");
-  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(241, 245, 249)");
-  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(18, 21, 25)");
-  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(241, 245, 249)");
-  await expect.poll(() => codeBlock.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(18, 21, 25)");
+  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(24, 24, 29)");
+  await expect.poll(() => editor.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(228, 228, 231)");
+  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(24, 24, 29)");
+  await expect.poll(() => terminal.evaluate((element) => getComputedStyle(element).color)).toBe("rgb(228, 228, 231)");
+  await expect.poll(() => codeBlock.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe("rgb(24, 24, 29)");
   const dimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
   expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
 });
@@ -414,17 +449,19 @@ test("shows expected example output without horizontal page overflow in both the
   await page.goto("/");
   await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
   await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
+  await page.getByRole("button", { name: /C Programming Foundations/i }).click();
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   const expectedOutput = page.locator(".lesson-example-run");
   await expect(expectedOutput).toContainText("Hello, C!");
 
-  for (const [theme, expectedBackground] of [["Light", "rgb(37, 99, 235)"], ["Dark", "rgb(59, 130, 246)"]] as const) {
+  for (const [theme, expectedBackground] of [["Light", "rgb(37, 99, 235)"], ["Dark", "rgb(37, 99, 235)"]] as const) {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.getByRole("button", { name: "Open settings", exact: true }).click();
     await page.getByRole("button", { name: theme, exact: true }).click();
     await page.getByRole("button", { name: "Learning Home", exact: true }).click();
     await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", theme.toLowerCase());
-    const primary = page.locator(".learning-hero-actions .primary-button");
+    const primary = page.locator(".home-lab-actions .primary-button");
     const colors = await primary.evaluate((element) => {
       const parse = (value: string) => value.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [0, 0, 0];
       const linear = (value: number) => { const channel = value / 255; return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4; };
@@ -501,6 +538,7 @@ test("verifies dark mode contrast, readability, and absence of legacy green tone
   await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
   await checkContrastAndLegibility("Explore");
 
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning|continue this course/i }).first().click();
   await checkContrastAndLegibility("Lesson Workspace");
 
@@ -543,17 +581,17 @@ test("renders one settings category and preserves category selection across app 
   await expect(page.getByRole("heading", { name: "Appearance" })).toBeVisible();
   await expect(page.locator(".settings-card")).toHaveCount(1);
 
-  await page.getByRole("tab", { name: "AI & Models" }).click();
+  await page.getByRole("tab", { name: "AI Models & BYOK" }).click();
   await expect(page.getByRole("heading", { name: "AI & Models" })).toBeVisible();
-  await expect(page.locator(".settings-section-nav")).toHaveCSS("position", "static");
+  await expect(page.locator(".settings-section-nav")).toHaveCSS("position", "sticky");
 
   await page.getByRole("tab", { name: "Usage & Credits" }).click();
   await expect(page.getByRole("heading", { name: "Usage & Credits" })).toBeVisible();
-  await page.getByRole("tab", { name: "Workspace" }).click();
+  await page.getByRole("tab", { name: "Workspace Data" }).click();
   await expect(page.getByRole("heading", { name: "Workspace", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Learning Home" }).click();
   await page.getByRole("button", { name: "Settings", exact: true }).click();
-  await expect(page.getByRole("tab", { name: "Workspace" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "Workspace Data" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { name: "Workspace backup" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Appearance" })).toHaveCount(0);
 });
@@ -565,16 +603,21 @@ test("keeps the C Playground usable on a phone viewport", async ({ page }) => {
   await page.getByRole("button", { name: "Playground", exact: true }).click();
   await page.getByText("Launch C Workbench").click();
   await expect.poll(() => page.locator(".sidebar").evaluate((element) => element.getBoundingClientRect().right)).toBeLessThanOrEqual(0);
-  await expect(page.getByRole("heading", { name: "C Workbench" })).toBeVisible();
+  await expect(page.locator(".app-shell")).toHaveClass(/app-shell-ide/);
+  await expect(page.locator(".playground-runtime-header")).toBeVisible();
   await expect(page.getByLabel("C source code")).toBeVisible();
-  await expect(page.getByLabel("Program input stdin · one line at a time")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Run code" })).toBeVisible();
+  await expect(page.locator("#c-playground-stdin")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
+  await expect(page.locator(".c-output-pane")).toBeHidden();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".c-output-pane")).toBeVisible();
+  await expect(page.getByLabel("Terminal standard input")).toBeVisible();
   const dimensions = await page.evaluate(() => ({ body: document.documentElement.scrollWidth, viewport: window.innerWidth }));
   expect(dimensions.body).toBeLessThanOrEqual(dimensions.viewport);
   await page.screenshot({ path: "work/katalyst-mobile-playground.png", fullPage: true });
 });
 
-test("fits the C Workbench at desktop, laptop, tablet, and mobile widths", async ({ page }) => {
+test("fits the full-screen C IDE at desktop, laptop, tablet, and mobile widths", async ({ page }) => {
   for (const viewport of [{ width: 1440, height: 900 }, { width: 1280, height: 800 }, { width: 768, height: 900 }, { width: 375, height: 812 }]) {
     await page.setViewportSize(viewport);
     await page.goto("/");
@@ -582,18 +625,20 @@ test("fits the C Workbench at desktop, laptop, tablet, and mobile widths", async
     await page.getByRole("button", { name: "Playground", exact: true }).click();
     await page.getByText("Launch C Workbench").click();
     await expect(page.locator(".c-editor-pane")).toBeVisible();
+    await expect(page.locator(".c-output-pane")).toBeHidden();
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    await expect(page.locator(".c-output-pane")).toBeVisible();
     const layout = await page.evaluate(() => {
       const editor = document.querySelector(".c-editor-pane")!.getBoundingClientRect();
       const terminal = document.querySelector(".c-output-pane")!.getBoundingClientRect();
       return { editorX: editor.x, editorY: editor.y, editorWidth: editor.width, editorBottom: editor.bottom, terminalX: terminal.x, terminalY: terminal.y, terminalWidth: terminal.width, viewportWidth: window.innerWidth, pageWidth: document.documentElement.scrollWidth };
     });
     expect(layout.pageWidth).toBeLessThanOrEqual(layout.viewportWidth);
-    if (viewport.width > 860) {
-      expect(layout.editorWidth).toBeGreaterThan(layout.terminalWidth);
-      expect(layout.editorX).toBeLessThan(layout.terminalX);
-      expect(Math.abs(layout.editorY - layout.terminalY)).toBeLessThan(12);
+    if (viewport.width > 767) {
+      expect(layout.terminalX).toBeGreaterThanOrEqual(layout.editorX + layout.editorWidth - 2);
+      expect(layout.terminalWidth).toBeGreaterThanOrEqual(300);
     } else {
-      expect(layout.terminalY).toBeGreaterThan(layout.editorBottom - 10);
+      expect(layout.terminalY).toBeGreaterThanOrEqual(layout.editorBottom - 2);
     }
   }
 });
@@ -611,7 +656,7 @@ test("selects Ollama, discovers a local model, and sends a local generation requ
   await page.goto("/");
   await openWorkspace(page);
   await page.locator(".provider-selector").click();
-  await page.getByRole("button", { name: /Ollama Local setup/ }).click();
+  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "Ollama" }).click();
   await openSettingsCategory(page, "AI Providers");
   await page.locator(".settings-card").filter({ hasText: "Ollama" }).getByRole("button", { name: "Save & refresh models" }).click();
   await expect(page.locator(".settings-card").filter({ hasText: "Ollama" })).toContainText("1 supported model");
@@ -635,7 +680,7 @@ const markdownProviderCases = [
   { provider: "ollama", name: "Ollama", model: "qwen2.5:7b", displayModel: "qwen2.5:7b" },
 ] as const;
 
-const assistantMarkdownReply = "# Provider response\n\n**Bold** and *italic*.\n\n1. First\n   - Nested\n\n| Item | State |\n| --- | --- |\n| Markdown | rendered |\n\n```ts\nconst answer = 42;\n// A deliberately long code line to check that the code panel scrolls horizontally on small screens without stretching the page.\n```\n\n[Safe link](https://example.com)";
+const assistantMarkdownReply = "# Provider response\n\n**Bold** and *italic*.\n\n1. First\n   - Nested\n\n| Item | State |\n| --- | --- |\n| Markdown | rendered |\n\n```ts\nconst answer = 42;\n// A deliberately long code line to check that the code panel scrolls horizontally on small screens without stretching the page.\n```\n\n[Safe link](https://example.com)\n\n<script>window.__katalystMarkdownXssProbe = true;</script>\n<img src=x onerror=\"window.__katalystMarkdownXssProbe = true\">";
 
 for (const { provider, name, model, displayModel } of markdownProviderCases) {
   test(`renders ${name} Markdown responses with code and tables`, async ({ page }) => {
@@ -674,6 +719,8 @@ for (const { provider, name, model, displayModel } of markdownProviderCases) {
     await expect(page.locator(".message.user p")).toHaveText("Please format **this** answer.");
     const response = page.locator(".message.assistant .assistant-markdown");
     await expect(response.getByRole("heading", { name: "Provider response" })).toBeVisible();
+    await expect(response.locator("script, img")).toHaveCount(0);
+    expect(await page.evaluate(() => (window as Window & { __katalystMarkdownXssProbe?: boolean }).__katalystMarkdownXssProbe)).toBeUndefined();
     await expect(response.locator("strong")).toHaveText("Bold");
     await expect(response.locator("table")).toBeVisible();
     await expect(response.locator(".markdown-code-language")).toHaveText("ts");
@@ -699,13 +746,14 @@ for (const { provider, name, model, displayModel } of markdownProviderCases) {
 test("starts the C learning path and records progress independently of the workspace", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
-  await expect(page.getByRole("heading", { name: /learn by understanding/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /explore how things work/i })).toBeVisible();
   await expect(page.getByText(/your activity will appear here/i)).toBeVisible();
 
   const workspaceBefore = await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"));
   await page.getByRole("button", { name: "My Learning", exact: true }).click();
   await expect(page.getByRole("heading", { name: /your learning starts when you do/i })).toBeVisible();
   await page.getByRole("button", { name: "Explore courses", exact: true }).click();
+  await ensureCourseDetails(page);
   await expect(page.getByRole("heading", { name: "C Programming Foundations" })).toBeVisible();
   await page.getByRole("button", { name: /start learning/i }).click();
   await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
@@ -717,6 +765,17 @@ test("starts the C learning path and records progress independently of the works
   await page.waitForFunction(() => window.localStorage.getItem("katalyst.learning.v1")?.includes("source-to-output") === true);
   expect(await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"))).toBe(workspaceBefore);
 
+  const progressDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export learning progress" }).click();
+  const progressDownload = await progressDownloadPromise;
+  expect(progressDownload.suggestedFilename()).toMatch(/^katalyst-learning-progress-\d{4}-\d{2}-\d{2}\.json$/);
+  const progressFile = await progressDownload.path();
+  expect(progressFile).not.toBeNull();
+  const exportedProgress = JSON.parse(await readFile(progressFile!, "utf8")) as { version: number; enrollments: Array<{ completedLessons: Array<unknown> }> };
+  expect(exportedProgress.version).toBe(1);
+  expect(exportedProgress.enrollments).toHaveLength(1);
+  expect(exportedProgress.enrollments[0]?.completedLessons).toHaveLength(1);
+
   await page.reload();
   await page.getByRole("button", { name: "My Learning", exact: true }).click();
   await expect(page.locator(".my-learning-row")).toContainText("1 of 16 lessons complete");
@@ -727,6 +786,7 @@ test("keeps the integrated lesson workspace and Practice Lab within a phone view
   await page.goto("/");
   await page.getByRole("button", { name: "Open navigation" }).click();
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await ensureCourseDetails(page);
   await expect(page.getByText("16 LESSONS", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "16 lessons. 6 modules." })).toBeVisible();
   const courseDimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
@@ -739,10 +799,28 @@ test("keeps the integrated lesson workspace and Practice Lab within a phone view
   await page.getByRole("tab", { name: "Code" }).click();
   await expect(page.getByRole("tab", { name: "Code" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("C source code")).toBeVisible();
+  const codeScroller = page.locator(".learning-code-panel.panel-active");
+  await codeScroller.evaluate((element) => {
+    const spacer = document.createElement("div");
+    spacer.setAttribute("aria-hidden", "true");
+    spacer.dataset.mobileScrollTestSpacer = "";
+    spacer.style.cssText = "height: 1200px; flex: none;";
+    element.append(spacer);
+  });
+  await expectMobileHeaderToStayCollapsedDuringScrollNoise(page, codeScroller);
   await page.getByRole("tab", { name: "Kat" }).click();
   await expect(page.getByRole("tab", { name: "Kat" })).toHaveAttribute("aria-selected", "true");
   const lessonComposer = page.getByRole("region", { name: "AI Tutor Kat" }).locator(".tutor-composer");
   await expect(lessonComposer).toBeVisible();
+  const katScroller = page.locator(".learning-kat-panel.panel-active .tutor-scroll-region");
+  await katScroller.evaluate((element) => {
+    const spacer = document.createElement("div");
+    spacer.setAttribute("aria-hidden", "true");
+    spacer.dataset.mobileScrollTestSpacer = "";
+    spacer.style.cssText = "height: 1200px; flex: none;";
+    element.append(spacer);
+  });
+  await expectMobileHeaderToStayCollapsedDuringScrollNoise(page, katScroller);
   const composerBounds = await lessonComposer.evaluate((element) => ({ top: element.getBoundingClientRect().top, bottom: element.getBoundingClientRect().bottom, viewport: window.innerHeight }));
   expect(composerBounds.top).toBeGreaterThanOrEqual(0);
   expect(composerBounds.bottom).toBeLessThanOrEqual(composerBounds.viewport);
@@ -764,6 +842,7 @@ test("keeps the integrated lesson workspace and Practice Lab within a phone view
 test("navigates the expanded course and renders exercise metadata and starter code", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await ensureCourseDetails(page);
   await expect(page.getByRole("heading", { name: "16 lessons. 6 modules." })).toBeVisible();
   await page.getByRole("button", { name: /start learning/i }).click();
   const pagination = page.getByRole("navigation", { name: "Lesson navigation" });
@@ -783,6 +862,7 @@ test("switches lesson panels before the three columns become too narrow", async 
   await page.setViewportSize({ width: 1440, height: 850 });
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
   for (const width of [1200, 1120, 1024]) {
@@ -806,6 +886,7 @@ test("routes lesson, code, and tutor-style context through integrated Kat withou
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   await page.getByRole("button", { name: "Ask Kat", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Kat", exact: true })).toBeVisible();
@@ -877,10 +958,11 @@ test("keeps Kat's composer below the message scroller and preserves an upward re
   });
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   await page.getByRole("button", { name: "Ask Kat", exact: true }).click();
   const tutor = page.getByRole("region", { name: "AI Tutor Kat" });
-  const conversation = tutor.locator(".tutor-conversation");
+  const conversation = tutor.locator(".tutor-scroll-region");
   const input = tutor.getByRole("textbox", { name: "Ask Kat a question" });
 
   await input.fill("First question");
@@ -892,7 +974,7 @@ test("keeps Kat's composer below the message scroller and preserves an upward re
   await input.press("Enter");
   await expect(tutor.locator(".tutor-message.assistant")).toHaveCount(1);
   await expect.poll(() => conversation.evaluate((element) => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThanOrEqual(2);
-  const messageBounds = await tutor.locator(".tutor-message.assistant").last().evaluate((element) => ({ bottom: element.getBoundingClientRect().bottom, conversationBottom: element.parentElement!.getBoundingClientRect().bottom }));
+  const messageBounds = await tutor.locator(".tutor-message.assistant").last().evaluate((element) => ({ bottom: element.getBoundingClientRect().bottom, conversationBottom: document.querySelector(".tutor-scroll-region")!.getBoundingClientRect().bottom }));
   expect(messageBounds.bottom).toBeLessThanOrEqual(messageBounds.conversationBottom);
   const flowBounds = await conversation.evaluate((element) => ({ bottom: element.getBoundingClientRect().bottom, composerTop: element.parentElement!.querySelector(".tutor-composer")!.getBoundingClientRect().top }));
   expect(flowBounds.bottom).toBeLessThanOrEqual(flowBounds.composerTop);
@@ -908,6 +990,7 @@ test("keeps Kat's composer below the message scroller and preserves an upward re
 test("loads lesson examples in the integrated editor and preserves drafts across learning views", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   await expect(page.getByRole("heading", { name: "Try the idea yourself" })).toBeVisible();
   await page.getByRole("button", { name: /load lesson example/i }).click();
@@ -930,6 +1013,7 @@ test("initializes the compiler in the background and retries a failed setup", as
   await page.goto("/?failCompilerFirst=1");
   await page.getByRole("button", { name: "Open navigation" }).click();
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   await expect(page.locator(".c-playground")).toHaveAttribute("data-compiler-state", "failed");
   await expect(page.locator(".c-playground-notice")).toContainText("The C11 compiler could not be prepared.");
@@ -947,6 +1031,7 @@ test("initializes the compiler in the background and retries a failed setup", as
 test("shows compile and runtime failures clearly and reuses the prepared compiler", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   const runButton = page.getByRole("button", { name: "Run code" });
   await expect(runButton).toBeEnabled();
@@ -975,7 +1060,7 @@ test("shows compile and runtime failures clearly and reuses the prepared compile
   expect(cache.namespace).toBe("katalyst-c-playground");
 });
 
-test("compiles and runs a C program with stdin in the browser sandbox", async ({ page }) => {
+test("compiles C and C++17 programs with live stdin in the browser sandbox", async ({ page }) => {
   test.skip(process.env.RUN_C_PLAYGROUND_INTEGRATION !== "1", "first use downloads a large compiler package; run with RUN_C_PLAYGROUND_INTEGRATION=1");
   test.setTimeout(360_000);
   await page.unroute("**/vendor/wasmer-sdk/dist/index.js");
@@ -984,17 +1069,38 @@ test("compiles and runs a C program with stdin in the browser sandbox", async ({
   page.on("requestfailed", (request) => browserErrors.push(`${request.url()}: ${request.failure()?.errorText ?? "request failed"}`));
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
   await expect(page.locator(".c-playground")).toHaveAttribute("data-compiler-state", "ready", { timeout: 330_000 });
-  await page.getByLabel("C source code").fill("#include <stdio.h>\nint main(void) { int value = getchar(); printf(\"Read: %c\\n\", value); return 0; }\n");
-  await page.getByLabel("Program input stdin · one line at a time").fill("K\n");
-  await page.getByRole("button", { name: "Run code" }).click();
+  await page.getByLabel("C source code").fill("#include <stdio.h>\nint main(void) { int value = 0; scanf(\"%c\", &value); printf(\"Read: %c\\n\", value); return 0; }\n");
+  await page.getByRole("button", { name: "Run code", exact: true }).click();
+  const terminalInput = page.getByLabel("Terminal standard input");
+  await expect(terminalInput).toBeEnabled({ timeout: 330_000 });
+  await terminalInput.fill("K");
+  await terminalInput.press("Enter");
   const runResult = await Promise.race([
     page.locator(".c-playground-error").waitFor({ state: "visible", timeout: 330_000 }).then(async () => ({ error: await page.locator(".c-playground-error").innerText() })),
     page.locator(".c-console-output").getByText("Read: K").waitFor({ state: "visible", timeout: 330_000 }).then(() => ({ output: "Read: K" })),
   ]);
   if ("error" in runResult) throw new Error(`C compiler integration failed: ${runResult.error}\n${browserErrors.join("\n")}`);
+  await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
+  await page.getByRole("button", { name: "Playground", exact: true }).click();
+  await page.getByText("Launch C++ Workbench").click();
+  await expect(page.locator("#runtime-switcher-select")).toHaveValue("code:cpp", { timeout: 10_000 });
+  const cppEditor = page.getByLabel("C++ source code");
+  await expect(cppEditor).toContainText("doubleValue");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  const cppInput = page.getByLabel("Terminal standard input");
+  try {
+    await expect(cppInput).toBeEnabled({ timeout: 15_000 });
+  } catch {
+    const cppError = await page.locator(".c-playground-error").innerText().catch(() => "");
+    throw new Error(`C++17 terminal input did not become available: ${cppError || "no compiler/runtime error was rendered"}\n${browserErrors.join("\n")}`);
+  }
+  await cppInput.fill("21");
+  await cppInput.press("Enter");
+  await expect(page.locator(".c-console-output")).toContainText("Twice: 42", { timeout: 10_000 });
   await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
   const widths = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
   expect(widths.document).toBeLessThanOrEqual(widths.viewport);
@@ -1088,7 +1194,7 @@ test("exports a secret-free workspace and restores it through validated settings
   await openSettingsCategory(page, "AI Providers");
   await page.getByLabel("OpenAI session API key").fill("secret-session-key-not-exported");
   await page.locator(".settings-card").filter({ has: page.getByRole("heading", { name: "OpenAI", exact: true }) }).getByRole("button", { name: "Save for this tab" }).click();
-  await page.getByRole("tab", { name: "Workspace" }).click();
+  await page.getByRole("tab", { name: "Workspace Data" }).click();
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Export workspace" }).click();
   const download = await downloadPromise;
@@ -1156,7 +1262,8 @@ test("shows available skill discovery and exports imported skill Markdown", asyn
 test("persists the selected theme and keeps guest access clear when Supabase is not configured", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
-  await expect(page.getByRole("button", { name: "Guest account settings" })).toBeVisible();
+  await expect(page.locator(".sidebar-legal-links a[href='/login']")).toHaveCount(0);
+  await expect(page.locator(".account-entry")).toHaveCount(0);
   await page.getByRole("button", { name: "Open settings" }).click();
   await expect(page.getByRole("heading", { name: "Appearance" })).toBeVisible();
 
@@ -1174,17 +1281,20 @@ test("persists the selected theme and keeps guest access clear when Supabase is 
   await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "light");
   await page.getByRole("button", { name: "System", exact: true }).click();
   await expect(page.locator(".app-shell")).toHaveAttribute("data-theme", "system");
-  await page.getByRole("tab", { name: "Account" }).click();
+  await page.getByRole("tab", { name: "Account & Profile" }).click();
   const accountCard = page.locator(".account-settings-card");
   await expect(accountCard).toBeVisible();
-  const hasGoogleButton = (await accountCard.getByRole("button", { name: /continue with google/i }).count()) > 0;
-  if (hasGoogleButton) {
+  await expect(accountCard.locator("input[type='email']")).toHaveCount(0);
+  await expect(accountCard.locator("form")).toHaveCount(0);
+  const hasSignInLink = (await accountCard.getByRole("link", { name: "Open the sign-in page" }).count()) > 0;
+  if (hasSignInLink) {
     await expect(accountCard).toContainText("Guest · this browser only");
     await expect(accountCard).toContainText("You can keep using KATALYST without registering.");
+    await expect(accountCard.getByRole("link", { name: "Open the sign-in page" })).toHaveAttribute("href", "/login");
   } else {
     await expect(accountCard).toContainText("Account service not configured");
-    await expect(accountCard).toContainText("configure the Supabase URL and publishable key");
-    await expect(accountCard.getByRole("button", { name: /continue with google/i })).toHaveCount(0);
+    await expect(accountCard).toContainText("Account sign-in and sync are not configured for this deployment");
+    await expect(accountCard.getByRole("link", { name: "Open the sign-in page" })).toHaveCount(0);
   }
 });
 
@@ -1265,10 +1375,47 @@ test("records real AI request metadata and reports it in the local Progress dash
   await expect(page.getByText("Local analytics · not synced")).toBeVisible();
 });
 
+test("keeps the provider and admin-managed Kat model in a separate mobile header row", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/");
+  await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
+  const provider = page.locator(".topbar .provider-selector");
+  const model = page.locator(".topbar .model-managed-label");
+  await expect(provider).toBeVisible();
+  await expect(model).toBeVisible();
+  const boxes = await page.evaluate(() => {
+    const bounds = (selector: string) => {
+      const rect = document.querySelector(selector)!.getBoundingClientRect();
+      return { x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom, width: rect.width };
+    };
+    return {
+      viewport: window.innerWidth,
+      document: document.documentElement.scrollWidth,
+      breadcrumbs: bounds(".topbar .breadcrumbs"),
+      actions: bounds(".topbar-actions"),
+      provider: bounds(".topbar .provider-selector"),
+      model: bounds(".topbar .model-managed-label"),
+    };
+  });
+  expect(boxes.document).toBeLessThanOrEqual(boxes.viewport);
+  expect(boxes.actions.y).toBeGreaterThan(boxes.breadcrumbs.bottom - 1);
+  expect(boxes.provider.width).toBeGreaterThan(100);
+  expect(boxes.provider.right).toBeLessThanOrEqual(boxes.model.x);
+  expect(boxes.model.right).toBeLessThanOrEqual(boxes.viewport);
+
+  const signInPrompt = page.getByRole("region", { name: "Optional account sign-in" });
+  if (await signInPrompt.isVisible().catch(() => false)) {
+    await expect(signInPrompt.getByRole("link", { name: "Sign in or create account" })).toHaveAttribute("href", "/login");
+    await signInPrompt.getByRole("button", { name: "Dismiss sign-in prompt" }).click();
+    await expect(signInPrompt).toHaveCount(0);
+  }
+});
+
 test("supports independent panel scrolling and layout in the desktop lesson workspace", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
   await expect(page.locator(".c-source-editor-host .cm-editor")).toBeVisible();
@@ -1322,6 +1469,7 @@ test("navigates Python Programming Foundations course and verifies 2-panel layou
   await expect(page.getByRole("heading", { name: "Python Programming Foundations" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "19 lessons. 7 modules." })).toBeVisible();
 
+  await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   await expect(page.getByRole("heading", { name: "From script to interpreter" })).toBeVisible();
 

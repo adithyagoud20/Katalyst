@@ -4,7 +4,7 @@ export type ChatMessage = { role: "user" | "assistant"; content: string };
 export type ProviderUsage = { inputTokens?: number; outputTokens?: number; costUsd?: number };
 export type GenerateResult = { text: string; usage?: ProviderUsage };
 export type AssistantSurface = "workspace" | "kat";
-export type GenerateInput = { model: string; messages: ChatMessage[]; context?: string; assistantSurface?: AssistantSurface; apiKey?: string; cloudflareAccountId?: string; ollamaBaseUrl?: string; signal?: AbortSignal };
+export type GenerateInput = { model: string; messages: ChatMessage[]; context?: string; assistantSurface?: AssistantSurface; apiKey?: string; cloudflareAccountId?: string; ollamaBaseUrl?: string; maxOutputTokens?: number; signal?: AbortSignal };
 export type ProviderErrorKind = "configuration" | "authentication" | "permission" | "account" | "rate-limit" | "network" | "timeout" | "invalid-response" | "unsupported-model" | "provider";
 
 export class ProviderError extends Error {

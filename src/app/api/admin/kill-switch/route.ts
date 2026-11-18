@@ -1,7 +1,9 @@
+import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseConfig } from "@/lib/supabase/config";
+import { sameOriginMutation } from "@/lib/account-server";
 import { requireAdminUser, recordAdminAuditLog } from "@/lib/ai-gateway/admin";
 import { getAiSystemConfig, invalidateConfigCache } from "@/lib/ai-gateway/config";
 
@@ -15,26 +17,35 @@ function getAdminClient() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!sameOriginMutation(request)) {
+    return NextResponse.json({ error: "This admin change must come from the KATALYST site." }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
   const adminAuth = await requireAdminUser();
   if (!adminAuth.ok) {
     return NextResponse.json({ error: adminAuth.error }, { status: adminAuth.status });
   }
 
+  const maxBodyBytes = 1024;
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (declaredLength > maxBodyBytes) return NextResponse.json({ error: "Admin request payload is too large." }, { status: 413, headers: { "Cache-Control": "no-store" } });
+
   let body: unknown;
   try {
-    body = await request.json();
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > maxBodyBytes) return NextResponse.json({ error: "Admin request payload is too large." }, { status: 413, headers: { "Cache-Control": "no-store" } });
+    body = JSON.parse(rawBody);
   } catch {
-    return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
 
-  const parsed = z.object({ active: z.boolean() }).safeParse(body);
+  const parsed = z.object({ active: z.boolean() }).strict().safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Active state boolean required." }, { status: 400 });
+    return NextResponse.json({ error: "Active state boolean required." }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
 
   const admin = getAdminClient();
   if (!admin) {
-    return NextResponse.json({ error: "Database service unavailable." }, { status: 503 });
+    return NextResponse.json({ error: "Database service unavailable." }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 
   const previousSystem = await getAiSystemConfig();
@@ -59,5 +70,5 @@ export async function POST(request: NextRequest) {
     ipAddress: request.headers.get("x-forwarded-for")?.split(",")[0] || null,
   });
 
-  return NextResponse.json({ success: true, killSwitchActive: parsed.data.active });
+  return NextResponse.json({ success: true, killSwitchActive: parsed.data.active }, { headers: { "Cache-Control": "no-store" } });
 }

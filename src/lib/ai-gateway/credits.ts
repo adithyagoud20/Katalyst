@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import type { ReservationResult, SettlementResult, UserCreditStatus, AIModelConfig } from "./types";
@@ -212,7 +213,7 @@ export async function reserveCredits(params: {
       return {
         ok: false,
         errorCode: "GUEST_TRIAL_EXHAUSTED",
-        errorMessage: row.error_message || "Guest trial exhausted. Sign in with Google to continue using KATALYST shared AI.",
+        errorMessage: row.error_message || "Guest trial exhausted. Sign in or create an account to continue using KATALYST shared AI.",
         requiresSignIn: true,
         creditsRemaining: 0,
       };
@@ -252,7 +253,7 @@ export async function reserveCredits(params: {
         return {
           ok: false,
           errorCode: "GUEST_TRIAL_EXHAUSTED",
-          errorMessage: "Guest trial exhausted. Sign in with Google to continue using KATALYST shared AI.",
+          errorMessage: "Guest trial exhausted. Sign in or create an account to continue using KATALYST shared AI.",
           requiresSignIn: true,
           creditsRemaining: Math.max(0, available),
         };

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CheckCircle, Shield, RefreshCw, Power } from "lucide-react";
 import type { AdminAnalyticsData } from "@/lib/ai-gateway/admin";
 import type { AISystemConfig, AICreditPolicies } from "@/lib/ai-gateway/types";
+import { SiteContentAdminPanel } from "@/components/site-content-admin-panel";
 
 export function AdminPanel() {
   const [loading, setLoading] = useState(true);
@@ -194,6 +195,8 @@ export function AdminPanel() {
       {error && <p className="inline-error" role="alert">{error}</p>}
       {successMessage && <p className="inline-success" role="status"><CheckCircle size={14} /> {successMessage}</p>}
 
+      <SiteContentAdminPanel />
+
       {/* Emergency Kill Switch Banner */}
       <section className={`admin-emergency-banner ${system?.killSwitchActive ? "banner-active" : ""}`}>
         <div className="banner-info">
@@ -339,48 +342,50 @@ export function AdminPanel() {
           {/* Model Weights */}
           <section className="admin-form-group">
             <h3>Available Model Credit Weights</h3>
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Model ID</th>
-                  <th>Enabled</th>
-                  <th>Credit Weight Multiplier</th>
-                </tr>
-              </thead>
-              <tbody>
-                {models.map((m, idx) => (
-                  <tr key={m.model_id}>
-                    <td><code>{m.model_id}</code></td>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={m.enabled}
-                        onChange={(e) => {
-                          const updated = [...models];
-                          updated[idx] = { ...updated[idx], enabled: e.target.checked };
-                          setModels(updated);
-                        }}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0.1"
-                        max="20"
-                        value={m.credit_weight}
-                        onChange={(e) => {
-                          const updated = [...models];
-                          updated[idx] = { ...updated[idx], credit_weight: Number(e.target.value) };
-                          setModels(updated);
-                        }}
-                        style={{ width: "90px" }}
-                      />
-                    </td>
+            <div className="admin-table-wrapper">
+              <table className="admin-table">
+                <thead>
+                  <tr>
+                    <th>Model ID</th>
+                    <th>Enabled</th>
+                    <th>Credit Weight Multiplier</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {models.map((m, idx) => (
+                    <tr key={m.model_id}>
+                      <td><code>{m.model_id}</code></td>
+                      <td>
+                        <input
+                          type="checkbox"
+                          checked={m.enabled}
+                          onChange={(e) => {
+                            const updated = [...models];
+                            updated[idx] = { ...updated[idx], enabled: e.target.checked };
+                            setModels(updated);
+                          }}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0.1"
+                          max="20"
+                          value={m.credit_weight}
+                          onChange={(e) => {
+                            const updated = [...models];
+                            updated[idx] = { ...updated[idx], credit_weight: Number(e.target.value) };
+                            setModels(updated);
+                          }}
+                          style={{ width: "90px" }}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </section>
 
           <div className="account-actions">
@@ -395,24 +400,26 @@ export function AdminPanel() {
       {users.length > 0 && (
         <section className="admin-users-section">
           <h3>Registered Learner Balances</h3>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>User / Email</th>
-                <th>Remaining Credits</th>
-                <th>Used Credits</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.slice(0, 15).map((u) => (
-                <tr key={u.id}>
-                  <td><strong>{u.displayName || u.email}</strong><br /><small>{u.email}</small></td>
-                  <td>{u.creditsRemaining.toFixed(1)}</td>
-                  <td>{u.creditsUsed.toFixed(1)}</td>
+          <div className="admin-table-wrapper">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>User / Email</th>
+                  <th>Remaining Credits</th>
+                  <th>Used Credits</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {users.slice(0, 15).map((u) => (
+                  <tr key={u.id}>
+                    <td><strong>{u.displayName || u.email}</strong><br /><small>{u.email}</small></td>
+                    <td>{u.creditsRemaining.toFixed(1)}</td>
+                  <td>{u.creditsUsed.toFixed(1)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </article>

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import Link from "next/link";
 import { ArrowUp, Bot, BookOpen, Code2, Lightbulb, MessageSquareText, Plus, RotateCcw, Settings2, Square, Terminal, Trash2, WandSparkles } from "lucide-react";
 import { AssistantMarkdown } from "@/components/assistant-markdown";
 import { BrandMark } from "@/components/brand-mark";
-import { CLOUDFLARE_ACCOUNT_HEADER, OLLAMA_URL_HEADER, SESSION_KEY_HEADER } from "@/lib/providers/constants";
+import { getProviderRequestHeaders, type CloudflareRequestMode } from "@/lib/providers/client-request-headers";
 import { providerCatalog, type ProviderId } from "@/lib/providers/catalog";
 import { trackAIRequestFinish, trackAIRequestStart } from "@/lib/ai-activity";
 import { boundTutorHistory, composeTutorReference, composeTutorSkillContext, tutorModes, type TutorMessage, type TutorMode, type TutorWorkspaceActivity } from "@/lib/tutor-request";
@@ -47,6 +48,7 @@ type Props = {
   modelName: string;
   sessionKey: string;
   cloudflareAccountId: string;
+  cloudflareMode: CloudflareRequestMode;
   ollamaBaseUrl: string;
   configured: boolean;
   context?: TutorLessonContext;
@@ -77,6 +79,7 @@ export function KatTutor({
   modelName,
   sessionKey,
   cloudflareAccountId,
+  cloudflareMode,
   ollamaBaseUrl,
   configured,
   context,
@@ -226,11 +229,9 @@ export function KatTutor({
         signal: controller.signal,
         headers: {
           "Content-Type": "application/json",
-          ...(sessionKey.trim() ? { [SESSION_KEY_HEADER]: sessionKey.trim() } : {}),
-          ...(provider === "cloudflare" && cloudflareAccountId.trim() ? { [CLOUDFLARE_ACCOUNT_HEADER]: cloudflareAccountId.trim() } : {}),
-          ...(provider === "ollama" ? { [OLLAMA_URL_HEADER]: ollamaBaseUrl } : {}),
+          ...getProviderRequestHeaders({ provider, sessionKey, cloudflareMode, cloudflareAccountId, ollamaBaseUrl }),
         },
-        body: JSON.stringify({ provider, model, assistantSurface: "kat", messages: nextMessages, context: lessonContext }),
+        body: JSON.stringify({ provider, model, ...(provider === "cloudflare" ? { cloudflareMode } : {}), assistantSurface: "kat", messages: nextMessages, context: lessonContext }),
       });
       const result = await response.json() as {
         text?: string;
@@ -305,9 +306,7 @@ export function KatTutor({
     <div className="tutor-heading">
       <div className="tutor-avatar"><Bot size={19} /></div>
       <div className="tutor-heading-info">
-        <span className="eyebrow">YOUR LEARNING COMPANION</span>
         <h2>Kat</h2>
-        <p>{isClient && activeConversation ? activeConversation.title : (context ? `${context.module.title} · ${context.lesson.title}` : "A tutor for your engineering questions")}</p>
       </div>
       <div className="tutor-heading-actions">
         <button type="button" className="c-small-action" onClick={handleNewConversation} title="Start a new conversation" aria-label="New chat">
@@ -324,8 +323,12 @@ export function KatTutor({
           </button>
         )}
       </div>
-      <span className="tutor-provider">{providerCatalog[provider].name}{modelName ? ` · ${modelName}` : ""}</span>
+      <span className="tutor-provider">{provider === "cloudflare" && cloudflareMode === "platform" ? "Kat AI" : providerCatalog[provider].name}{modelName ? ` · ${modelName}` : ""}</span>
     </div>
+    <div ref={conversationRef} className="tutor-scroll-region" onScroll={(event) => {
+      const element = event.currentTarget;
+      followConversationRef.current = element.scrollHeight - element.scrollTop - element.clientHeight <= 72;
+    }}>
     {showHistoryMenu && (
       <div className="tutor-history-dropdown" role="menu" aria-label="Past conversations">
         <div className="tutor-history-dropdown-header">
@@ -383,12 +386,9 @@ export function KatTutor({
     {availableWorkspaceActions.length > 0 && <div className="tutor-action-list" aria-label="Ask Kat about your workspace">
       {availableWorkspaceActions.map(({ label, icon: Icon, prompt }) => <button key={label} type="button" className="tutor-action" disabled={!configured || !model || pending} onClick={() => void ask(prompt)} title={label}><Icon size={14} />{label}</button>)}
     </div>}
-    {!configured && <div className="tutor-setup" role="status"><span>{provider === "ollama" ? "Load an installed local model" : provider === "cloudflare" ? "Add a Cloudflare account ID and API token" : `Add a ${providerCatalog[provider].name} API key`} to ask Kat. Credentials are configured in Settings.</span><button className="secondary-button" type="button" onClick={onOpenSettings}><Settings2 size={14} /> Open Settings</button></div>}
-    <div ref={conversationRef} className="tutor-conversation" aria-live="polite" onScroll={(event) => {
-      const element = event.currentTarget;
-      followConversationRef.current = element.scrollHeight - element.scrollTop - element.clientHeight <= 72;
-    }}>
-      {!messages.length ? <div className="tutor-empty"><BrandMark className="mini-brand" /><p>{context ? "Choose an action above or ask a question. Kat uses this lesson only when it helps." : "What are you working through? Kat can explain a concept, ask guiding questions, or help you practice."}</p></div> : messages.map((message, index) => <article key={`${index}-${message.role}`} className={`tutor-message ${message.role}`}><span className="tutor-message-label">{message.role === "assistant" ? "Kat" : "You"}</span>{message.role === "assistant" ? <AssistantMarkdown content={message.content} /> : <p>{message.content}</p>}{message.role === "assistant" && message.responseProvider && message.responseModel && <div className="tutor-response-route" aria-label={`Response from ${providerCatalog[message.responseProvider].name}, model ${message.responseModel}`}>Via {providerCatalog[message.responseProvider].name} · {message.responseModel}</div>}{message.role === "user" && message.appliedSkills?.length ? <div className="tutor-applied-skills" aria-label="Skills applied to this Kat request">Skills used: {message.appliedSkills.map((skill) => skill.name).join(", ")}</div> : null}{message.role === "user" && message.omittedSkills?.length ? <div className="tutor-omitted-skills">Not included: {message.omittedSkills.map((skill) => `${skill.name} (${skill.reason === "prompt-limit" ? "prompt limit" : "duplicate instructions"})`).join(", ")}</div> : null}</article>)}
+    {!configured && <div className="tutor-setup" role="status"><span>{provider === "ollama" ? "Load an installed local model" : provider === "cloudflare" && cloudflareMode === "platform" ? "Kat AI is temporarily unavailable. Try again later or set up a personal provider in Settings." : provider === "cloudflare" ? "Choose your personal Cloudflare access in Settings" : `Add a ${providerCatalog[provider].name} API key`} to ask Kat.</span><button className="secondary-button" type="button" onClick={onOpenSettings}><Settings2 size={14} /> Open Settings</button></div>}
+    <div className="tutor-conversation" aria-live="polite">
+      {!messages.length ? <div className="tutor-empty"><BrandMark className="mini-brand" /><p>{context ? "Choose an action above or ask a question. Kat uses this lesson only when it helps." : "What are you working through? Kat can explain a concept, ask guiding questions, or help you practice."}</p></div> : messages.map((message, index) => <article key={`${index}-${message.role}`} className={`tutor-message ${message.role}`}><span className="tutor-message-label">{message.role === "assistant" ? "Kat" : "You"}</span>{message.role === "assistant" ? <AssistantMarkdown content={message.content} /> : <p>{message.content}</p>}{message.role === "assistant" && message.responseProvider && message.responseModel && <div className="tutor-response-route" aria-label={`Response from ${message.responseProvider === "cloudflare" && cloudflareMode === "platform" ? "Kat AI" : providerCatalog[message.responseProvider].name}, model ${message.responseModel}`}>Via {message.responseProvider === "cloudflare" && cloudflareMode === "platform" ? "Kat AI" : providerCatalog[message.responseProvider].name} · {message.responseModel}</div>}{message.role === "user" && message.appliedSkills?.length ? <div className="tutor-applied-skills" aria-label="Skills applied to this Kat request">Skills used: {message.appliedSkills.map((skill) => skill.name).join(", ")}</div> : null}{message.role === "user" && message.omittedSkills?.length ? <div className="tutor-omitted-skills">Not included: {message.omittedSkills.map((skill) => `${skill.name} (${skill.reason === "prompt-limit" ? "prompt limit" : "duplicate instructions"})`).join(", ")}</div> : null}</article>)}
       {pending && <div className="tutor-pending" role="status"><span className="pending-dot" /> Kat is thinking…</div>}
     </div>
     {quotaError && <div className="quota-exhausted-banner" role="alert">
@@ -396,7 +396,7 @@ export function KatTutor({
       <p>{quotaError.message}</p>
       <div className="banner-actions">
         {quotaError.requiresSignIn ? (
-          <button type="button" className="primary-button" onClick={onOpenSettings}>Sign In with Google</button>
+          <Link className="primary-button" href="/login">Sign in or create an account</Link>
         ) : (
           <button type="button" className="secondary-button" onClick={onOpenSettings}>Configure BYOK Providers</button>
         )}
@@ -416,6 +416,7 @@ export function KatTutor({
         </div>
       </div>
     )}
+    </div>
     <form className="tutor-composer" onSubmit={send}>
       <textarea
         ref={composerInputRef}
@@ -454,6 +455,6 @@ export function KatTutor({
         </button>
       )}
     </form>
-    <p className="tutor-footnote">Kat has no web-browsing or code-execution tools and does not claim to run code. Replies are model-generated; check technical details against trusted references. Conversations are saved to this browser and synced to your account when signed in. Guest conversations belong to this browser.</p>
+    <p className="tutor-footnote">AI responses are learning aids and may be inaccurate. Verify important details.</p>
   </section>;
 }

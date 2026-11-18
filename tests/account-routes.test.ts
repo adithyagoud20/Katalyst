@@ -6,12 +6,13 @@ import { GET as getSnapshot, PUT as putSnapshot } from "@/app/api/account/snapsh
 import { GET as exportAccount } from "@/app/api/account/export/route";
 import { POST as deleteAccount } from "@/app/api/account/delete/route";
 
-const { requireAccountUser, createAdminClient } = vi.hoisted(() => ({ requireAccountUser: vi.fn(), createAdminClient: vi.fn() }));
+const { requireAccountUser, createAdminClient, allowAccountDeletionAttempt } = vi.hoisted(() => ({ requireAccountUser: vi.fn(), createAdminClient: vi.fn(), allowAccountDeletionAttempt: vi.fn() }));
 vi.mock("@/lib/account-server", () => ({
   requireAccountUser,
   sameOriginMutation: (request: NextRequest) => request.headers.get("origin") === request.nextUrl.origin,
 }));
 vi.mock("@supabase/supabase-js", () => ({ createClient: createAdminClient }));
+vi.mock("@/lib/account-action-limit", () => ({ allowAccountDeletionAttempt }));
 
 function request(body: unknown) {
   return new NextRequest("http://localhost/api/account/snapshot", {
@@ -35,10 +36,11 @@ describe("account persistence route authorization", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    allowAccountDeletionAttempt.mockResolvedValue(true);
     rpc.mockResolvedValue({ data: [{ status: "saved", revision: 1, updated_at: "2026-11-10T00:00:00.000Z" }], error: null });
     requireAccountUser.mockResolvedValue({
       ok: true,
-      user: { id: "authenticated-user", email: "learner@example.test", user_metadata: {} },
+      user: { id: "authenticated-user", email: "learner@example.test", user_metadata: {}, last_sign_in_at: new Date().toISOString() },
       supabase: { rpc, auth: { signOut: vi.fn().mockResolvedValue({ error: null }) }, from: vi.fn(() => ({ select: vi.fn(() => ({ maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }) })) })) },
     });
     createAdminClient.mockReturnValue({ auth: { admin: { deleteUser: vi.fn().mockResolvedValue({ error: null }) } } });
@@ -113,5 +115,25 @@ describe("account persistence route authorization", () => {
     expect(response.status).toBe(200);
     expect(deleteUser).toHaveBeenCalledWith("authenticated-user");
     expect(deleteUser).not.toHaveBeenCalledWith("another-user");
+  });
+
+  it("requires recent authentication before permanently deleting an account", async () => {
+    requireAccountUser.mockResolvedValueOnce({
+      ok: true,
+      user: { id: "authenticated-user", email: "learner@example.test", last_sign_in_at: new Date(Date.now() - 11 * 60_000).toISOString() },
+      supabase: { auth: { signOut: vi.fn() } },
+    });
+    const response = await deleteAccount(request({ confirmation: "delete my account" }));
+    expect(response.status).toBe(403);
+    expect(createAdminClient).not.toHaveBeenCalled();
+  });
+
+  it("rate-limits repeated permanent deletion attempts", async () => {
+    allowAccountDeletionAttempt.mockResolvedValue(false);
+    const response = await deleteAccount(request({ confirmation: "delete my account" }));
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("900");
+    expect(allowAccountDeletionAttempt).toHaveBeenCalledWith("authenticated-user");
+    expect(createAdminClient).not.toHaveBeenCalled();
   });
 });

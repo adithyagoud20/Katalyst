@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import type { AISystemConfig, AIModelConfig, AICreditPolicies } from "./types";

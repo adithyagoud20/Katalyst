@@ -2,13 +2,13 @@
 
 ## Overview
 
-KATALYST is a Next.js App Router learning application with an authored curriculum and separate progress domain, plus a secondary AI workspace. Guest mode remains local-first. Optional Google identity and account snapshot persistence use Supabase Auth/Postgres behind server-verified route handlers; provider calls continue through the existing isolated adapters.
+KATALYST is a Next.js App Router technical learning studio with a published multi-discipline course catalog, a separate progress domain, and a secondary AI workspace. Guest mode remains local-first. Optional email/password or Google identity and account snapshot persistence use Supabase Auth/Postgres behind server-verified route handlers; provider calls continue through isolated adapters.
 
 ```text
 Browser UI
   ├── localStorage: existing workspace + separate learning, preference, and AI activity records
   ├── page memory: session API keys and transient Kat tutor turns
-  ├── Supabase browser Auth client: Google OAuth PKCE and cookie session
+  ├── Supabase browser Auth client: email/password, Google OAuth PKCE, and cookie session
   ├── GET /api/status: readiness booleans + initial configuration
   ├── GET /api/models: provider catalog, discovered using env/session credentials
   ├── POST /api/chat: validated provider/model/messages/context/assistant surface
@@ -52,10 +52,10 @@ Browser UI
 
 ## Product shell, theme, and settings
 
-The shared palette is defined in `src/app/globals.css` through light/dark semantic tokens for graphite text, warm neutral surfaces, borders, burnt-orange actions, and amber emphasis. The same token sets are applied for explicit Light/Dark/System preferences. `src/components/brand-mark.tsx` is the reusable geometric symbol used by the sidebar, learning empty states, assistant marks, and the SVG application icon. Appearance preferences remain in their existing separate local record; the redesign does not change workspace or learning data schemas.
+The shared palette is defined in `src/app/globals.css` through high-contrast Light/Dark/System semantic tokens. Dark mode uses an obsidian canvas, graphite panels, hairline borders, crisp white body text, and sky-blue/indigo accents. Geist and JetBrains Mono provide the interface and technical-label typography. `src/components/brand-mark.tsx` reuses the final user-supplied K mark from `public/brand/katalyst.png` across the interface; rounded PNG variants supply the app icons. The Home pipeline graphic connects all published learning fields. Appearance preferences remain in their existing separate local record; the redesign does not change workspace or learning data schemas.
 
 Settings in `src/components/workspace.tsx` is a keyboard-accessible tabset. It organizes application preferences into distinct categories:
-- **Account**: Supabase authentication status, Google sign-in/out, account snapshot sync, data export, and deletion.
+- **Account**: Supabase authentication status, email/password or Google sign-in/out (on the single `/login` page), account snapshot sync, data export, and deletion.
 - **Appearance**: Theme selection (System, Light, Dark) and density settings.
 - **AI & Models**: Provider selection, model catalog picker, transient BYOK key inputs, and connection status.
 - **Usage & Credits**: Real-time shared AI gateway status, active model, remaining credit balance meter, zero-credit BYOK policy notice, and recent AI request activity log.
@@ -120,7 +120,7 @@ Requests to shared AI undergo an 11-step pipeline:
 10. **Failure & Cancellation Recovery**: If inference aborts, times out, or fails upstream, the reserved credits are released immediately so learners are never unfairly docked.
 11. **Telemetry & Client Headers**: Returns the generated response alongside updated credit balance and quota status.
 
-Authenticated learners receive 1,000 credits per UTC calendar month (first day of month 00:00 UTC to first day of next month 00:00 UTC) without rollover. Unregistered guests receive a 50-credit restricted trial. To mitigate trial-reset abuse from clearing browser storage, guest sessions are cryptographically signed and coupled with salted one-way IP hashing. When quotas are exhausted, structured error payloads (`GUEST_TRIAL_EXHAUSTED`, `MONTHLY_QUOTA_EXHAUSTED`) guide the user to sign in with Google or select a BYOK provider.
+Authenticated learners receive 1,000 credits per UTC calendar month (first day of month 00:00 UTC to first day of next month 00:00 UTC) without rollover. Unregistered guests receive a 50-credit restricted trial. To mitigate trial-reset abuse from clearing browser storage, guest sessions are cryptographically signed and coupled with salted one-way IP hashing. When quotas are exhausted, structured error payloads (`GUEST_TRIAL_EXHAUSTED`, `MONTHLY_QUOTA_EXHAUSTED`) guide the user to sign in or create an account through the single `/login` page, or select a BYOK provider.
 
 BYOK providers (Gemini, OpenAI, OpenRouter, and local Ollama) bypass shared credit reservation and settlement entirely. BYOK usage consumes zero KATALYST credits and never automatically triggers Cloudflare inference.
 
@@ -229,7 +229,7 @@ M8 keeps local product state in independent versioned records. `katalyst.workspa
 
 Theme and density are validated in `katalyst.preferences.v1`. AI requests are recorded best-effort in `katalyst.ai-activity.v1`, capped at 500 entries, and contain only request ID, timestamp, provider, model, outcome, and provider-reported input/output token counts. Storage errors never block a model request. No prompts, responses, key material, or estimated costs are recorded. Progress dashboards derive lesson events from `katalyst.learning.v1`, project/conversation summaries from the current workspace, and AI summaries from the bounded activity record. AI activity remains local; after an explicit account choice, workspace, learning progress, and appearance are account-synced as one snapshot, but these remain separate local records. No historical events are inferred before tracking exists.
 
-Settings groups appearance, provider connection/setup, model selection, learning, workspace backup, privacy, and optional Account controls. When Supabase is not configured, guest use continues and the account panel explains setup. A signed-in user sees the account email/stable Auth ID, snapshot sync state, migration/conflict choices, export, sign-out, and confirmed deletion. A configured environment key or session key means a provider request can be attempted; it does not establish catalog/inference success. Session provider keys and Cloudflare account IDs stay in component memory.
+Settings groups appearance, provider connection/setup, model selection, learning, workspace backup, privacy, and optional Account controls. Authentication forms live only on `/login`; Account settings show account status, sync and migration choices, export, sign-out, and confirmed deletion. When Supabase is not configured, guest use continues and the account panel explains setup. A configured environment key or session key means a provider request can be attempted; it does not establish catalog/inference success. Session provider keys and Cloudflare account IDs stay in component memory.
 
 ## Deployment and content architecture
 
@@ -245,7 +245,7 @@ The current execution split is:
 
 ## Client performance and request behavior
 
-The lesson's C playground is code-split from the learning page and shown with a small loading state while its chunk loads. This avoids including CodeMirror in routes that do not open a lesson/playground; compiler initialization still begins when the playground is mounted for a lesson. Wasmer's compiler payload is not bundled and retains its browser-profile cache. The curriculum currently contains one small path and is loaded as local static module data; avoid turning lesson reads into repeated network calls. Provider catalog discovery uses the existing bounded in-memory cache and explicit refresh; changing provider only loads an uncached catalog when credentials are configured. There is no database polling or per-page analytics request. For the M8 production build, route-manifest JavaScript assets totaled about 556 KB raw (167 KiB with gzip); the separate playground chunk was 441 KB raw (139 KiB with gzip). These sizes describe this build's JavaScript assets, not the large compiler download, which is fetched separately. Re-measure after major dependency or client-component changes.
+The lesson's playground components are code-split from routes that do not open them and shown with a small loading state while their chunks load. Wasmer's compiler payload is not bundled and retains its browser-profile cache. The published course catalog currently contains 14 courses; full lesson detail is delivered through the validated lesson endpoint when needed. Provider catalog discovery uses the existing bounded in-memory cache and explicit refresh; changing provider only loads an uncached catalog when credentials are configured. There is no database polling or per-page analytics request. Previously recorded bundle measurements are historical and should not be treated as current; re-measure after major dependency or client-component changes.
 
 ## Decisions
 

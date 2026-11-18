@@ -160,8 +160,9 @@ describe("C Playground inputs, compiler infrastructure and execution limits", ()
       expect(HTML_PLAYGROUND_STORAGE_KEY).toBe("katalyst.html.playground.v1");
       expect(CIRCUIT_PLAYGROUND_STORAGE_KEY).toBe("katalyst.circuit.playground.v1");
 
-      expect(defaultCppProgram).toContain("std::cout");
-      expect(defaultCppProgram).toContain("std::vector");
+      expect(defaultCppProgram).toContain("template <typename T>");
+      expect(defaultCppProgram).toContain("scanf");
+      expect(defaultCppProgram).toContain("printf");
       expect(defaultJsProgram).toContain("computeFibonacci");
       expect(defaultSqlProgram).toContain("CREATE TABLE engineers");
       expect(defaultHtmlProgram).toContain("<!DOCTYPE html>");

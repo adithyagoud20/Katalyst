@@ -1,5 +1,13 @@
 import { expect, test } from "@playwright/test";
 
+async function ensureCourseDetails(page: import("@playwright/test").Page) {
+  const startButton = page.getByRole("button", { name: /start learning|continue this course/i }).first();
+  if (!(await startButton.isVisible().catch(() => false))) {
+    await page.locator(".course-card-unified").first().click();
+  }
+  await expect(startButton).toBeVisible();
+}
+
 test.describe("Milestone M22 Featured Courses, Lazy Playground, Compiler Toggle & UI Polish", () => {
   test.beforeEach(async ({ page }) => {
     // Fast mock for Wasmer SDK browser package
@@ -7,15 +15,27 @@ test.describe("Milestone M22 Featured Courses, Lazy Playground, Compiler Toggle 
       await route.fulfill({
         status: 200,
         contentType: "text/javascript",
-        body: `export class Wasmer {
+        body: `const output = (value = "") => ({ text: () => value, truncated: false });
+        export class Wasmer {
           constructor() {
             this.packages = { load: async () => ({ entrypoint: "clang" }) };
             this.sandboxes = { create: async () => ({
-              command: () => ({ spawn: async () => ({
-                stdin: { write: async () => {}, close: async () => {} },
-                wait: async () => ({ reason: "exited", exitCode: 0, stdout: { text: () => "mock C output" }, stderr: { text: () => "" } }),
-                kill: async () => {},
-              }) }),
+              command: (program, args) => ({ spawn: async () => {
+                const compiling = Array.isArray(args);
+                if (compiling) window.__capturedCompilerInvocation = { program, args };
+                let releaseInput;
+                const inputReceived = new Promise((resolve) => { releaseInput = resolve; });
+                return {
+                  stdin: { write: async (value) => { window.__capturedTerminalInput = value; releaseInput(); }, close: async () => { releaseInput(); } },
+                  stdout: null,
+                  stderr: null,
+                  wait: async () => {
+                    if (!compiling && window.__mockWaitForInput) await inputReceived;
+                    return { reason: "exited", exitCode: 0, stdout: output(!compiling && window.__mockWaitForInput ? "mock interactive output" : "mock C output"), stderr: output() };
+                  },
+                  kill: async () => {},
+                };
+              } }),
               fs: { readFile: async () => new Uint8Array([1]) },
               installPackage: async () => {},
               close: async () => {},
@@ -51,7 +71,7 @@ test.describe("Milestone M22 Featured Courses, Lazy Playground, Compiler Toggle 
 
     // Launch Python Workbench
     await page.getByText("Launch Python Workbench").click();
-    await expect(page.getByRole("heading", { name: "Python Workbench" })).toBeVisible();
+    await expect(page.locator(".app-shell")).toHaveClass(/app-shell-ide/);
     await expect(page.locator(".c-pane-heading strong", { hasText: "main.py" })).toBeVisible();
 
     // Verify Switch Runtime button exists and returns to Launcher
@@ -66,6 +86,34 @@ test.describe("Milestone M22 Featured Courses, Lazy Playground, Compiler Toggle 
     await expect(page.getByRole("button", { name: "Arduino Uno", exact: true })).toBeVisible();
   });
 
+  test("restores the selected circuit lab when returning to Playground from another app view", async ({ page }) => {
+    await page.goto("/#katalyst=playground");
+    await page.getByText("Launch Arduino Lab").click();
+    await expect(page.getByRole("heading", { name: /Arduino Uno Lab/i })).toBeVisible();
+    await page.evaluate(() => {
+      window.history.pushState({}, "", "#katalyst=home");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    });
+    await page.getByRole("button", { name: "Playground", exact: true }).click();
+    await expect(page.getByRole("heading", { name: /Arduino Uno Lab/i })).toBeVisible();
+  });
+
+  test("uses one source-defined logo and one animated pipeline for every learning field", async ({ page }) => {
+    await page.goto("/#katalyst=home");
+    await expect(page.getByRole("heading", { name: /explore how things work/i })).toBeVisible();
+    await expect(page.locator(".home-domain-switcher")).toHaveCount(0);
+    const constellation = page.locator(".track-constellation");
+    await expect(constellation).toBeVisible();
+    await expect(constellation).toContainText("Software");
+    await expect(constellation).toContainText("Circuits");
+    await expect(constellation).toContainText("Data");
+    await expect(constellation).toContainText("Visual media");
+    await expect(page.locator(".pipeline-signal")).toHaveCount(2);
+    await page.getByRole("button", { name: "Open settings", exact: true }).click();
+    await expect(page.locator(".brand-logo-picker")).toHaveCount(0);
+    await expect(page.getByRole("tab", { name: "Appearance", exact: true })).toBeVisible();
+  });
+
   // Test 2: Compiler Toggle in Programming Lessons (Expands Theory to Full-Width)
   test("toggles compiler workspace visibility in programming lessons", async ({ page }) => {
     await page.goto("/#katalyst=paths");
@@ -73,6 +121,7 @@ test.describe("Milestone M22 Featured Courses, Lazy Playground, Compiler Toggle 
 
     await page.getByRole("button", { name: /C Programming Foundations/i }).click();
     await expect(page.getByRole("heading", { name: "C Programming Foundations" })).toBeVisible();
+    await ensureCourseDetails(page);
     await page.getByRole("button", { name: /start learning|continue this course/i }).click();
     await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
 
@@ -129,8 +178,8 @@ test.describe("Milestone M22 Featured Courses, Lazy Playground, Compiler Toggle 
     await expect(page.getByText("Arduino Sketch Lifecycle, Setup/Loop & Pin Mapping")).toBeVisible();
   });
 
-  // Test 4: Dark Mode Account Chip Contrast & Settings Table Width
-  test("renders high-contrast user account chip in dark mode and full-width settings tables", async ({ page }) => {
+  // Settings remains full width without a redundant bottom account/sign-in control.
+  test("removes the bottom account control and keeps full-width settings tables", async ({ page }) => {
     await page.goto("/#katalyst=paths");
     await page.getByRole("button", { name: "Open settings", exact: true }).click();
 
@@ -145,10 +194,143 @@ test.describe("Milestone M22 Featured Courses, Lazy Playground, Compiler Toggle 
       document.documentElement.setAttribute("data-theme", "dark");
     });
 
-    // Verify Dark Mode account chip styling
-    const accountEntry = page.locator(".sidebar-footer.account-entry");
-    await expect(accountEntry).toBeVisible();
-    await expect(accountEntry).toHaveCSS("background-color", "rgb(24, 24, 27)");
-    await expect(accountEntry).toHaveCSS("color", "rgb(248, 250, 252)");
+    await expect(page.locator(".sidebar .account-entry")).toHaveCount(0);
+    await expect(page.locator(".sidebar-legal-links a[href='/login']")).toHaveCount(0);
+    const card = page.locator(".settings-card").first();
+    await expect(card).toHaveCSS("color", "rgb(250, 250, 250)");
+  });
+
+  test("starts with a full-height editor and opens a side-by-side output pane on run", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/#katalyst=playground");
+    await page.getByText("Launch Python Workbench").click();
+
+    const editor = await page.locator(".c-editor-pane").boundingBox();
+    expect(editor?.height).toBeGreaterThan(300);
+    await expect(page.locator(".c-output-pane")).toBeHidden();
+    await page.getByRole("button", { name: "Output", exact: true }).click();
+    await expect(page.locator(".c-output-pane")).toBeVisible();
+    const terminal = await page.locator(".c-output-pane").boundingBox();
+    const editorAfterRun = await page.locator(".c-editor-pane").boundingBox();
+    expect(terminal).not.toBeNull();
+    expect(terminal!.x).toBeGreaterThanOrEqual(editorAfterRun!.x + editorAfterRun!.width - 2);
+  });
+
+  test("uses the full lesson reading width after closing both side panels", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/#katalyst=lesson&course=c-programming-foundations&lesson=source-to-output");
+    await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
+
+    const compilerToggle = page.getByTestId("toggle-compiler-btn");
+    await expect(compilerToggle).toHaveAttribute("aria-expanded", "true");
+    await compilerToggle.press("Space");
+    await expect(compilerToggle).toHaveAttribute("aria-expanded", "false");
+    const katToggle = page.locator(".lesson-topbar-actions .kat-toggle-button");
+    if (await katToggle.getAttribute("aria-expanded") === "true") await katToggle.press("Space");
+    await expect(katToggle).toHaveAttribute("aria-expanded", "false");
+
+    const workspace = page.locator(".learning-workspace-grid");
+    await expect(workspace).toHaveClass(/learning-workspace-wide/);
+    const widths = await page.evaluate(() => {
+      const panel = document.querySelector<HTMLElement>(".learning-panel");
+      const article = document.querySelector<HTMLElement>(".lesson-panel-content");
+      return { panel: panel?.getBoundingClientRect().width ?? 0, article: article?.getBoundingClientRect().width ?? 0 };
+    });
+    expect(widths.panel).toBeGreaterThan(1000);
+    expect(widths.article).toBeGreaterThan(widths.panel * 0.9);
+  });
+
+  test("keeps the mobile IDE header compact and the editor viewport locked", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/#katalyst=playground");
+    await page.getByText("Launch Python Workbench").click();
+
+    const mainPanel = page.locator(".main-panel-playground");
+    await expect(mainPanel).toHaveCSS("overflow", "hidden");
+    await expect(page.locator(".topbar")).toBeHidden();
+    await expect(page.locator(".playground-runtime-header")).toBeVisible();
+    await expect(page.locator(".c-output-pane")).toBeHidden();
+    const editor = await page.locator(".c-editor-pane").boundingBox();
+    expect(editor?.height).toBeGreaterThan(500);
+    await page.getByRole("button", { name: "Output", exact: true }).click();
+    await expect(page.locator(".c-output-pane")).toBeVisible();
+  });
+
+  test("accepts C++ stdin in the interactive terminal while the program is running", async ({ page }) => {
+    await page.goto("/#katalyst=playground");
+    await page.getByText("Launch C++ Workbench").click();
+    expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(true);
+
+    const editor = page.locator(".cm-content").first();
+    await editor.fill("#include <iostream>\nint main() { int value; std::cin >> value; std::cout << value; }");
+    await expect(page.locator(".c-stdin-label")).toHaveCount(0);
+    await expect(page.locator("#c-playground-stdin")).toHaveCount(0);
+    await page.evaluate(() => { (window as Window & { __mockWaitForInput?: boolean }).__mockWaitForInput = true; });
+    await page.getByRole("button", { name: "Run", exact: true }).click();
+    const terminalInput = page.getByLabel("Terminal standard input");
+    await expect(terminalInput).toBeEnabled();
+    const compilerInvocation = await page.evaluate(() => (window as Window & { __capturedCompilerInvocation?: { program: string; args: string[] } }).__capturedCompilerInvocation);
+    expect(compilerInvocation?.program).toBe("clang");
+    expect(compilerInvocation?.args).toContain("--driver-mode=g++");
+    expect(compilerInvocation?.args).toContain("-x");
+    expect(compilerInvocation?.args).toContain("c++");
+    expect(compilerInvocation?.args).toContain("-std=c++17");
+    await terminalInput.fill("42");
+    await terminalInput.press("Enter");
+    await expect(page.locator(".c-console-output")).toContainText("mock interactive output");
+    const sent = await page.evaluate(() => (window as Window & { __capturedTerminalInput?: string }).__capturedTerminalInput);
+    expect(sent).toBe("42\n");
+  });
+
+  test("shows dedicated board guides and the selected board pin references", async ({ page }) => {
+    await page.goto("/#katalyst=playground");
+    await page.getByText("Launch Arduino Lab").click();
+    await expect(page.getByTestId("board-anatomy")).toBeVisible();
+    await page.getByRole("button", { name: "Analog inputs", exact: true }).click();
+    await expect(page.locator(".board-part-detail")).toContainText("10-bit ADC");
+    await page.getByText("Open representative pin reference (20 entries)").click();
+    await expect(page.locator(".board-pin-map")).toContainText("D13");
+    await expect(page.locator(".board-target-fixed")).toContainText("Arduino Uno");
+
+    await page.locator(".switch-runtime-btn").click();
+    await page.getByText("Launch ESP32 Lab").click();
+    await expect(page.getByTestId("board-anatomy")).toBeVisible();
+    await expect(page.locator(".board-part-detail")).toContainText("GPIO18");
+    await expect(page.locator(".board-part-detail")).toContainText("GPIO34");
+    await page.getByText(/Open representative pin reference/).click();
+    await expect(page.locator(".board-pin-map")).toContainText("boot strapping pin");
+  });
+
+  test("runs editable Arduino sketches and reports serial output from the simulated board", async ({ page }) => {
+    await page.goto("/#katalyst=playground");
+    await page.getByText("Launch Arduino Lab").click();
+    const sketch = page.getByRole("textbox", { name: "Arduino Uno firmware sketch editor" });
+    await expect(sketch).toBeVisible();
+    await page.getByRole("button", { name: "Run sketch" }).click();
+    await expect(page.getByLabel("Serial monitor output")).toContainText("LED on");
+    await expect(page.getByRole("status").filter({ hasText: "Completed" })).toBeVisible();
+
+    await page.getByRole("combobox", { name: "Sketch preset" }).selectOption("sensor");
+    await page.getByRole("button", { name: "Run sketch" }).click();
+    await expect(page.getByLabel("Serial monitor output")).toContainText("ADC: 512");
+
+    await sketch.fill(`const int LED_PIN = 13;
+void setup() { pinMode(LED_PIN, OUTPUT); }
+void loop() { if (Serial.available() > 0) { int command = Serial.read(); if (command == '1') digitalWrite(LED_PIN, HIGH); } }`);
+    await page.getByRole("textbox", { name: "Serial input before run" }).fill("1");
+    await page.getByRole("button", { name: "Run sketch" }).click();
+    await expect(page.getByRole("button", { name: /Pin D13 \(Red LED\)/ })).toContainText("HIGH (1)");
+  });
+
+  test("renders a human sitemap and exposes the crawler XML separately", async ({ page }) => {
+    await page.goto("/sitemap");
+    await expect(page.getByRole("heading", { name: "Find your way around KATALYST." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Published learning paths/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Privacy notice" })).toHaveAttribute("href", "/privacy");
+    await expect(page.getByRole("link", { name: /View the XML sitemap/ })).toHaveAttribute("href", "/sitemap.xml");
+
+    const xmlResponse = await page.request.get("/sitemap.xml");
+    expect(xmlResponse.ok()).toBeTruthy();
+    expect(xmlResponse.headers()["content-type"]).toContain("xml");
   });
 });

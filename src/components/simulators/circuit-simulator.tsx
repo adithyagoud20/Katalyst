@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Cpu, Zap, Code } from "lucide-react";
+import { getHardwareSketchPreset, runHardwareSketch, type HardwareSketchPreset } from "@/lib/hardware-sketch-interpreter";
 
 export type CircuitSimulatorMode = "digital" | "analog" | "breadboard" | "arduino" | "esp32";
 
@@ -24,6 +25,11 @@ export function CircuitSimulator({
   const [mcuTarget, setMcuTarget] = useState<"arduino" | "esp32">(
     initialMode === "esp32" ? "esp32" : "arduino"
   );
+  const [sketchPreset, setSketchPreset] = useState<HardwareSketchPreset>("blink");
+  const [sketchSource, setSketchSource] = useState(() => getHardwareSketchPreset(initialMode === "esp32" ? "esp32" : "arduino", "blink"));
+  const [serialInput, setSerialInput] = useState("");
+  const [sketchOutput, setSketchOutput] = useState("Choose Run sketch to execute the supported firmware subset.");
+  const [sketchStatus, setSketchStatus] = useState("Ready");
 
   // Digital state
   const [selectedGate, setSelectedGate] = useState<"AND" | "OR" | "NOT" | "NAND" | "NOR" | "XOR">(initialGate);
@@ -37,8 +43,10 @@ export function CircuitSimulator({
   const [pinD13, setPinD13] = useState<boolean>(true); // Red LED
   const [pinD12, setPinD12] = useState<boolean>(false); // Green LED
   const [pinD11, setPinD11] = useState<boolean>(false); // Blue LED
+  const [simulatedPwm, setSimulatedPwm] = useState<Record<string, number>>({});
   const [buttonPressed, setButtonPressed] = useState<boolean>(false); // Digital Input D2
   const [analogValue, setAnalogValue] = useState<number>(512); // 10-bit: 0-1023 or 12-bit: 0-4095
+  const [selectedBoardPart, setSelectedBoardPart] = useState("controller");
 
   // Digital evaluation
   const evaluateGate = (gate: string, a: number, b: number): number => {
@@ -101,44 +109,70 @@ export function CircuitSimulator({
   const ledForwardV = 2.0; // typical red/green LED drop
   const ledResistorR = 330; // 330 ohms
   const ledCurrentMa = (mcuVcc - ledForwardV) > 0 ? ((mcuVcc - ledForwardV) / ledResistorR) * 1000 : 0;
+  const outputPinLabels = mcuTarget === "arduino" ? ["D13", "D12", "D11"] : ["GPIO18", "GPIO19", "GPIO23"];
+  const buttonPinLabel = mcuTarget === "arduino" ? "D2" : "GPIO25";
+  const sensorPinLabel = mcuTarget === "arduino" ? "A0" : "GPIO34";
+  const boardParts = mcuTarget === "arduino"
+    ? [
+        { id: "controller", label: "ATmega328P", detail: "The main 8-bit AVR microcontroller runs the sketch at 16 MHz and provides the board’s digital and analog I/O." },
+        { id: "power", label: "Power & regulator", detail: "USB or VIN supplies the board. The regulator provides the 5 V logic rail; keep GPIO signals within the board’s electrical limits." },
+        { id: "usb", label: "USB & serial", detail: "The USB interface powers the board and bridges serial data between the computer and the ATmega328P bootloader." },
+        { id: "gpio", label: "Digital I/O", detail: "D13, D12, and D11 drive the three simulated LEDs through 330 Ω resistors. D2 reads the simulated pushbutton." },
+        { id: "analog", label: "Analog inputs", detail: "A0 is sampled by the Uno’s 10-bit ADC. Its nominal input range is 0–5 V when the board is powered at 5 V." },
+      ]
+    : [
+        { id: "controller", label: "ESP32-WROOM-32", detail: "The module contains a dual-core Xtensa LX6 processor, Wi-Fi/Bluetooth radio, and SPI flash. This lab models pin states; it does not connect to radios or physical hardware." },
+        { id: "power", label: "Power & regulator", detail: "The DevKit regulator supplies 3.3 V logic. Never apply 5 V directly to an ESP32 GPIO pin." },
+        { id: "usb", label: "USB & serial", detail: "A board-specific USB-to-UART bridge powers the DevKit and supports serial programming. Connector and bridge vary by board revision." },
+        { id: "gpio", label: "Digital I/O", detail: "GPIO18, GPIO19, and GPIO23 are used for the simulated LEDs; GPIO25 reads the simulated pushbutton. GPIO12 is avoided because it is a boot strapping pin." },
+        { id: "analog", label: "Analog inputs", detail: "GPIO34 is an input-only ADC1 pin and is used for the sensor. Its input voltage must stay at or below the 3.3 V logic rail." },
+      ];
+  const selectedPart = boardParts.find((part) => part.id === selectedBoardPart) ?? boardParts[0];
+  const pinFor = (label: string) => label.match(/\d+/)?.[0];
+  const outputDuty = (label: string) => {
+    const pin = pinFor(label);
+    return pin ? simulatedPwm[pin] : undefined;
+  };
+  const boardPinMap: [string, string][] = mcuTarget === "arduino"
+    ? [
+        ["D0 / RX", "UART receive; shared with USB serial"], ["D1 / TX", "UART transmit; shared with USB serial"], ["D2", "Digital input; external interrupt"], ["D3 ~", "PWM output; external interrupt"],
+        ["D4", "Digital I/O"], ["D5 ~", "PWM output"], ["D6 ~", "PWM output"], ["D7", "Digital I/O"], ["D8", "Digital I/O"], ["D9 ~", "PWM output"],
+        ["D10 ~", "PWM / SPI SS"], ["D11 ~", "PWM / SPI MOSI"], ["D12", "SPI MISO"], ["D13", "SPI SCK / onboard LED"],
+        ["A0–A5", "10-bit analog inputs; also usable as digital pins"], ["VIN", "External board supply input"], ["5V", "Regulated 5 V rail"], ["3V3", "3.3 V output rail"], ["GND", "Ground reference"], ["RESET", "Restart the microcontroller"],
+      ]
+    : [
+        ["GPIO0", "Boot strapping pin; used by download mode"], ["GPIO1 / TX0", "UART0 transmit; shared with serial console"], ["GPIO2", "Boot strapping pin; board LED on some revisions"], ["GPIO3 / RX0", "UART0 receive; shared with serial console"],
+        ["GPIO4", "Digital I/O; touch-capable"], ["GPIO5", "Digital I/O; boot strapping pin"], ["GPIO12", "Boot strapping pin; avoid forcing high at reset"], ["GPIO13", "Digital I/O; touch-capable"],
+        ["GPIO14", "Digital I/O; touch-capable"], ["GPIO15", "Boot strapping pin; touch-capable"], ["GPIO16", "Digital I/O"], ["GPIO17", "Digital I/O"],
+        ["GPIO18", "Digital I/O; simulated red LED"], ["GPIO19", "Digital I/O; simulated green LED"], ["GPIO21", "Common I²C SDA assignment"], ["GPIO22", "Common I²C SCL assignment"],
+        ["GPIO23", "Digital I/O; simulated blue LED"], ["GPIO25 / DAC1", "Digital I/O; simulated pushbutton input"], ["GPIO26 / DAC2", "Digital I/O / DAC output"], ["GPIO27", "Digital I/O; touch-capable"],
+        ["GPIO32–33", "Digital I/O; ADC1 / touch-capable"], ["GPIO34–39", "Input-only pins; GPIO34 is the simulated ADC1 sensor input"],
+        ["3V3", "Regulated 3.3 V rail"], ["VIN / 5V", "DevKit supply input; regulator depends on board"], ["GND", "Ground reference"], ["EN", "Enable/reset the module"],
+      ];
 
-  // Generated Arduino/ESP32 C++ firmware
-  const firmwareSnippet = `// ${mcuTarget === "arduino" ? "Arduino Uno (5V)" : "ESP32 DevKit (3.3V)"} Firmware
-const int LED_RED = 13;
-const int LED_GREEN = 12;
-const int LED_BLUE = 11;
-const int BUTTON_PIN = 2;
-const int SENSOR_PIN = ${mcuTarget === "arduino" ? "A0" : "34"};
-
-void setup() {
-  Serial.begin(115200);
-  pinMode(LED_RED, OUTPUT);
-  pinMode(LED_GREEN, OUTPUT);
-  pinMode(LED_BLUE, OUTPUT);
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-}
-
-void loop() {
-  // GPIO Outputs: Red=${pinD13 ? "HIGH" : "LOW"}, Green=${pinD12 ? "HIGH" : "LOW"}, Blue=${pinD11 ? "HIGH" : "LOW"}
-  digitalWrite(LED_RED, ${pinD13 ? "HIGH" : "LOW"});
-  digitalWrite(LED_GREEN, ${pinD12 ? "HIGH" : "LOW"});
-  digitalWrite(LED_BLUE, ${pinD11 ? "HIGH" : "LOW"});
-
-  // Read Digital Input (Button: ${buttonPressed ? "PRESSED / LOW" : "RELEASED / HIGH"})
-  bool pressed = (digitalRead(BUTTON_PIN) == LOW);
-
-  // Read ADC Voltage (${clampedAdc}/${maxAdc} -> ${sensorVoltage.toFixed(2)}V)
-  int rawADC = analogRead(SENSOR_PIN);
-  float volts = (rawADC / ${(maxAdc).toFixed(1)}f) * ${mcuVcc.toFixed(1)}f;
-  
-  Serial.print("Sensor Volts: ");
-  Serial.println(volts);
-  delay(100);
-}`;
+  const runSketch = () => {
+    try {
+      const result = runHardwareSketch(sketchSource, { target: mcuTarget, analogValue: clampedAdc, buttonPressed, serialInput, cycles: 4 });
+      const levelFor = (label: string) => {
+        const pin = pinFor(label);
+        return pin ? (result.digitalPins[pin] ?? (result.pwmPins[pin] ? 1 : 0)) > 0 : false;
+      };
+      setSimulatedPwm(result.pwmPins);
+      setPinD13(levelFor(outputPinLabels[0]));
+      setPinD12(levelFor(outputPinLabels[1]));
+      setPinD11(levelFor(outputPinLabels[2]));
+      const serialText = result.serial || "(no serial output)";
+      setSketchOutput(`${serialText}${serialText.endsWith("\n") ? "" : "\n"}\n${result.cycles} loop cycles · ${result.elapsedMs.toFixed(0)} ms simulated`);
+      setSketchStatus(`Completed · ${result.elapsedMs.toFixed(0)} ms simulated`);
+    } catch (error) {
+      setSketchStatus("Sketch error");
+      setSketchOutput(error instanceof Error ? error.message : "The sketch could not be interpreted.");
+    }
+  };
 
   return (
     <div
-      className={`rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-5 text-[var(--text-primary)] shadow-sm ${className}`}
+      className={`circuit-simulator-root rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] p-5 text-[var(--text-primary)] shadow-sm ${className}`}
       data-testid="circuit-simulator"
     >
       {/* Header & Mode Switcher */}
@@ -163,7 +197,7 @@ void loop() {
               ? initialMode === "arduino"
                 ? "Virtual Arduino Uno ATmega328P 5V breadboard prototyping, GPIO registers, and real-time C++ firmware."
                 : initialMode === "esp32"
-                ? "Virtual ESP32 DevKit 3.3V dual-core prototyping, GPIO bootstrap constraints, and FreeRTOS firmware."
+                ? "ESP32 DevKit learning model for 3.3 V GPIO, ADC input, boot pins, and generated Arduino-style firmware; radio and physical I/O are not connected."
                 : initialMode === "breadboard"
                 ? "Virtual solderless breadboard prototyping with power rails (5V / 3.3V), LEDs, and sensor dividers."
                 : "Explore digital logic gates, interactive truth tables, and Boolean output states."
@@ -278,8 +312,8 @@ void loop() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-            <div className="md:col-span-2 rounded-lg border border-[var(--border-subtle)] bg-[#0d1117] p-5">
-              <div className="flex items-center justify-between text-xs text-zinc-400 mb-4">
+            <div className="md:col-span-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-5">
+              <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-4">
                 <span>Interactive Schematic</span>
                 <span className="font-mono">Output: {digitalOutput === 1 ? "HIGH (1)" : "LOW (0)"}</span>
               </div>
@@ -292,7 +326,7 @@ void loop() {
                     className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-bold transition-all border ${
                       inputA === 1
                         ? "bg-emerald-600 text-white border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.35)]"
-                        : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                        : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border-[var(--border-strong)]"
                     }`}
                   >
                     <span>Input A:</span>
@@ -306,7 +340,7 @@ void loop() {
                       className={`flex items-center gap-2 rounded px-3 py-1.5 text-xs font-mono font-bold transition-all border ${
                         inputB === 1
                           ? "bg-emerald-600 text-white border-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.35)]"
-                          : "bg-zinc-800 text-zinc-400 border-zinc-700"
+                          : "bg-[var(--surface-tertiary)] text-[var(--text-secondary)] border-[var(--border-strong)]"
                       }`}
                     >
                       <span>Input B:</span>
@@ -324,7 +358,7 @@ void loop() {
                     className={`flex h-12 w-12 items-center justify-center rounded-full font-mono font-bold text-sm border transition-all ${
                       digitalOutput === 1
                         ? "bg-emerald-500 text-white border-emerald-400 shadow-[0_0_18px_rgba(16,185,129,0.6)]"
-                        : "bg-zinc-900 text-zinc-600 border-zinc-800"
+                        : "bg-[var(--surface-tertiary)] text-[var(--text-muted)] border-[var(--border-subtle)]"
                     }`}
                   >
                     {digitalOutput}
@@ -426,22 +460,22 @@ void loop() {
               </div>
             </div>
 
-            <div className="md:col-span-2 rounded-lg border border-[var(--border-subtle)] bg-[#0d1117] p-4 flex flex-col justify-between">
-              <div className="grid grid-cols-3 gap-2 border-b border-zinc-800 pb-3 text-center">
+            <div className="md:col-span-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4 flex flex-col justify-between">
+              <div className="grid grid-cols-3 gap-2 border-b border-[var(--border-subtle)] pb-3 text-center">
                 <div>
-                  <span className="block text-[10px] text-zinc-400 uppercase">Current (I)</span>
+                  <span className="block text-[10px] text-[var(--text-secondary)] uppercase">Current (I)</span>
                   <span className="font-mono text-sm font-bold text-emerald-400">
                     {(currentAmps * 1000).toFixed(2)} mA
                   </span>
                 </div>
                 <div>
-                  <span className="block text-[10px] text-zinc-400 uppercase">Power (P)</span>
+                  <span className="block text-[10px] text-[var(--text-secondary)] uppercase">Power (P)</span>
                   <span className="font-mono text-sm font-bold text-amber-400">
                     {(powerWatts * 1000).toFixed(1)} mW
                   </span>
                 </div>
                 <div>
-                  <span className="block text-[10px] text-zinc-400 uppercase">Time Constant (τ)</span>
+                  <span className="block text-[10px] text-[var(--text-secondary)] uppercase">Time Constant (τ)</span>
                   <span className="font-mono text-sm font-bold text-cyan-400">
                     {(tauSeconds * 1000).toFixed(1)} ms
                   </span>
@@ -449,11 +483,11 @@ void loop() {
               </div>
 
               <div className="my-3">
-                <div className="text-xs text-zinc-400 mb-1 flex justify-between">
+                <div className="text-xs text-[var(--text-secondary)] mb-1 flex justify-between">
                   <span>Capacitor Voltage Transient: V(t) = V₀(1 - e^&#123;-t/τ&#125;)</span>
                   <span className="font-mono text-blue-400">RC Charge Curve</span>
                 </div>
-                <div className="relative h-32 w-full border border-zinc-800 rounded bg-zinc-950 p-2 flex items-center justify-center">
+                <div className="relative h-32 w-full border border-[var(--border-subtle)] rounded bg-[var(--surface-tertiary)] p-2 flex items-center justify-center">
                   <svg viewBox="0 0 280 100" className="w-full h-full overflow-visible">
                     <line x1="0" y1="20" x2="280" y2="20" stroke="#21262d" strokeDasharray="3 3" />
                     <line x1="0" y1="50" x2="280" y2="50" stroke="#21262d" strokeDasharray="3 3" />
@@ -468,7 +502,7 @@ void loop() {
                   </svg>
                 </div>
               </div>
-              <div className="mt-2 text-[11px] text-zinc-400 flex justify-between font-mono">
+              <div className="mt-2 text-[11px] text-[var(--text-secondary)] flex justify-between font-mono">
                 <span>t = 0s (0V)</span>
                 <span>t = 1τ (63.2%)</span>
                 <span>t = 5τ ({voltage.toFixed(1)}V)</span>
@@ -485,11 +519,17 @@ void loop() {
           <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--surface-secondary)] p-3 rounded-lg border border-[var(--border-subtle)]">
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Target Board:</span>
+              {hideModeSwitcher && (initialMode === "arduino" || initialMode === "esp32") ? (
+                <span className="board-target-fixed">{mcuTarget === "arduino" ? "Arduino Uno · 5 V" : "ESP32-WROOM-32 DevKit · 3.3 V"}</span>
+              ) : <>
               <button
                 type="button"
                 onClick={() => {
                   setMcuTarget("arduino");
                   if (analogValue > 1023) setAnalogValue(512);
+                  setSketchSource(getHardwareSketchPreset("arduino", sketchPreset));
+                  setSketchOutput("Arduino Uno selected. Run the sketch to update the board.");
+                  setSketchStatus("Ready");
                 }}
                 className={`px-3 py-1 rounded text-xs font-medium transition-colors border ${
                   mcuTarget === "arduino"
@@ -501,7 +541,12 @@ void loop() {
               </button>
               <button
                 type="button"
-                onClick={() => setMcuTarget("esp32")}
+                onClick={() => {
+                  setMcuTarget("esp32");
+                  setSketchSource(getHardwareSketchPreset("esp32", sketchPreset));
+                  setSketchOutput("ESP32 DevKit selected. Run the sketch to update the board.");
+                  setSketchStatus("Ready");
+                }}
                 className={`px-3 py-1 rounded text-xs font-medium transition-colors border ${
                   mcuTarget === "esp32"
                     ? "bg-blue-600 text-white border-blue-500 font-semibold"
@@ -510,20 +555,73 @@ void loop() {
               >
                 ESP32 (3.3V · 12-bit ADC)
               </button>
+              </>}
             </div>
             <div className="flex items-center gap-3 text-xs font-mono">
-              <span className="text-zinc-400">VCC: <strong className="text-blue-400">{mcuVcc.toFixed(1)}V</strong></span>
-              <span className="text-zinc-400">ADC Res: <strong className="text-blue-400">{maxAdc === 1023 ? "10-bit (0-1023)" : "12-bit (0-4095)"}</strong></span>
-              <span className="text-zinc-400">LED Current: <strong className="text-emerald-400">{ledCurrentMa.toFixed(1)} mA</strong></span>
+              <span className="text-[var(--text-secondary)]">VCC: <strong className="text-[var(--accent-text)]">{mcuVcc.toFixed(1)}V</strong></span>
+              <span className="text-[var(--text-secondary)]">ADC Res: <strong className="text-[var(--accent-text)]">{maxAdc === 1023 ? "10-bit (0-1023)" : "12-bit (0-4095)"}</strong></span>
+              <span className="text-[var(--text-secondary)]">LED Current: <strong className="text-[var(--text-positive)]">{ledCurrentMa.toFixed(1)} mA</strong></span>
             </div>
           </div>
+
+          <section className="board-learning-panel" aria-label="Interactive development board anatomy guide" data-testid="board-anatomy">
+            <header className="board-learning-heading">
+              <div><span className="eyebrow">BOARD ANATOMY</span><h4>{mcuTarget === "arduino" ? "Arduino Uno · ATmega328P" : "ESP32-WROOM-32 DevKit"}</h4><p>Inspect the main board sections, then open the reference pin map. The drawing is illustrative; board revisions can differ.</p></div>
+              <span className="board-illustration-tag">ISOMETRIC GUIDE · NOT TO SCALE</span>
+            </header>
+            <div className="board-learning-content">
+              <div className={`board-figure-art ${mcuTarget}`} role="img" aria-label={`${mcuTarget === "arduino" ? "Illustrative Arduino Uno" : "Illustrative ESP32 DevKit"} showing controller, USB interface, power section, and I/O headers`}>
+                <svg viewBox="0 0 560 280" aria-hidden="true">
+                  <defs>
+                    <linearGradient id="boardTop" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stopColor="#263447"/><stop offset="1" stopColor="#111924"/></linearGradient>
+                    <linearGradient id="boardEdge" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#26364a"/><stop offset="1" stopColor="#0a1018"/></linearGradient>
+                    <linearGradient id="chipTop" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stopColor="#334155"/><stop offset="1" stopColor="#111827"/></linearGradient>
+                  </defs>
+                  <ellipse cx="290" cy="224" rx="218" ry="28" fill="#020617" opacity=".55" />
+                  <path d="M84 77 424 48 493 88 153 119Z" fill="url(#boardTop)" stroke="#64748b" strokeWidth="2" />
+                  <path d="M153 119 493 88 493 111 153 143Z" fill="url(#boardEdge)" stroke="#334155" strokeWidth="1.5" />
+                  <path d="M84 77 153 119 153 143 84 101Z" fill="#0c1420" stroke="#334155" strokeWidth="1.5" />
+                  <path d="M96 83 135 80 165 97 126 101Z" fill="#cbd5e1" stroke="#f8fafc" strokeWidth="2" />
+                  <path d="M108 86 130 84 151 96 129 98Z" fill="#475569" />
+                  <path d="M177 75 219 71 246 86 204 91Z" fill="#d97706" stroke="#fbbf24" strokeWidth="1.5" />
+                  <path d="M184 70 212 68 218 71 190 74Z" fill="#fde68a" />
+                  <path d="M278 71 355 65 384 82 307 89Z" fill="url(#chipTop)" stroke="#94a3b8" strokeWidth="1.5" />
+                  <path d="M286 67 356 61 365 66 295 73Z" fill="#475569" />
+                  <text x="331" y="81" fill="#e2e8f0" fontSize="11" fontFamily="monospace" textAnchor="middle">{mcuTarget === "arduino" ? "ATmega328P" : "ESP32-WROOM"}</text>
+                  {Array.from({ length: 9 }).map((_, index) => <g key={`pin-top-${index}`}><path d={`M${168 + index * 31} 60 l12 -1 l8 5 l-12 1Z`} fill="#fbbf24"/><path d={`M${172 + index * 31} 132 l12 -1 l8 5 l-12 1Z`} fill="#fbbf24"/></g>)}
+                  <path d="M392 68 422 65 441 76 411 79Z" fill="#0f172a" stroke="#38bdf8" strokeWidth="1.4" />
+                  <circle cx="433" cy="87" r="5" fill="#38bdf8" opacity=".9" />
+                  <path d="M245 92 267 90 281 98 259 100Z" fill="#ef4444" stroke="#fecaca" strokeWidth="1" />
+                  <path d="M246 97 267 95" stroke="#fca5a5" strokeWidth="2" />
+                  <circle cx="111" cy="81" r="4" fill="#020617" stroke="#94a3b8" />
+                  <circle cx="460" cy="87" r="4" fill="#020617" stroke="#94a3b8" />
+                  <path d="M112 129 135 143" stroke="#38bdf8" strokeWidth="1.5" strokeDasharray="4 3" />
+                  <path d="M325 93 348 128" stroke="#a78bfa" strokeWidth="1.5" strokeDasharray="4 3" />
+                  <path d="M407 81 444 126" stroke="#34d399" strokeWidth="1.5" strokeDasharray="4 3" />
+                </svg>
+                <div className="board-art-label board-art-usb">USB bridge</div><div className="board-art-label board-art-controller">Main controller</div><div className="board-art-label board-art-io">I/O headers</div>
+              </div>
+              <div className="board-part-explorer">
+                <span className="board-part-explorer-label">SELECT A SECTION</span>
+                <div className="board-part-tabs" role="group" aria-label="Board sections">
+                  {boardParts.map((part) => <button type="button" key={part.id} aria-pressed={selectedPart.id === part.id} onClick={() => setSelectedBoardPart(part.id)}>{part.label}</button>)}
+                </div>
+                <div className="board-part-detail" aria-live="polite"><strong>{selectedPart.label}</strong><p>{selectedPart.detail}</p><span>Active simulated pins: {outputPinLabels.join(" · ")} · {buttonPinLabel} · {sensorPinLabel}</span></div>
+              </div>
+            </div>
+            <details className="board-pin-map">
+              <summary>Open representative pin reference ({boardPinMap.length} entries)</summary>
+              {mcuTarget === "esp32" && <p className="board-pin-map-note">Reference for common ESP32-WROOM-32 DevKit boards; header placement and exposed pins vary by manufacturer. Pins marked as boot strapping pins affect startup behavior.</p>}
+              <dl>{boardPinMap.map(([pin, description]) => <div key={pin}><dt>{pin}</dt><dd>{description}</dd></div>)}</dl>
+            </details>
+          </section>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
             {/* Left Controls & Virtual Breadboard Visualizer */}
             <div className="lg:col-span-7 flex flex-col gap-4">
               {/* Virtual Breadboard SVG */}
-              <div className="rounded-xl border border-zinc-800 bg-[#0b0f19] p-4 shadow-inner">
-                <div className="flex items-center justify-between text-xs text-zinc-400 mb-3 border-b border-zinc-800 pb-2">
+              <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4 shadow-inner">
+                <div className="flex items-center justify-between text-xs text-[var(--text-secondary)] mb-3 border-b border-[var(--border-subtle)] pb-2">
                   <span className="font-semibold text-zinc-300">Solderless Breadboard &amp; Microcontroller Wiring</span>
                   <span className="font-mono text-emerald-400 flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live Simulation
@@ -580,9 +678,9 @@ void loop() {
                       fill={pinD13 ? "#ef4444" : "#451a1a"}
                       stroke={pinD13 ? "#fca5a5" : "#7f1d1d"}
                       strokeWidth="2"
-                      style={pinD13 ? { filter: "drop-shadow(0px 0px 8px #ef4444)" } : undefined}
+                      style={pinD13 ? { filter: "drop-shadow(0px 0px 8px #ef4444)", opacity: (outputDuty(outputPinLabels[0]) ?? 255) / 255 } : undefined}
                     />
-                    <text x="275" y="108" fill="#f8fafc" fontSize="9" textAnchor="middle" fontWeight="bold">D13 RED</text>
+                    <text x="275" y="108" fill="#f8fafc" fontSize="9" textAnchor="middle" fontWeight="bold">{outputPinLabels[0]} RED</text>
 
                     {/* LED 2: Green on D12 */}
                     <line x1="140" y1="96" x2="310" y2="96" stroke={pinD12 ? "#10b981" : "#4b5563"} strokeWidth="2" />
@@ -596,9 +694,9 @@ void loop() {
                       fill={pinD12 ? "#10b981" : "#064e3b"}
                       stroke={pinD12 ? "#6ee7b7" : "#065f46"}
                       strokeWidth="2"
-                      style={pinD12 ? { filter: "drop-shadow(0px 0px 8px #10b981)" } : undefined}
+                      style={pinD12 ? { filter: "drop-shadow(0px 0px 8px #10b981)", opacity: (outputDuty(outputPinLabels[1]) ?? 255) / 255 } : undefined}
                     />
-                    <text x="385" y="120" fill="#f8fafc" fontSize="9" textAnchor="middle" fontWeight="bold">D12 GREEN</text>
+                    <text x="385" y="120" fill="#f8fafc" fontSize="9" textAnchor="middle" fontWeight="bold">{outputPinLabels[1]} GREEN</text>
 
                     {/* LED 3: Blue on D11 */}
                     <line x1="140" y1="130" x2="420" y2="130" stroke={pinD11 ? "#3b82f6" : "#4b5563"} strokeWidth="2" />
@@ -612,14 +710,14 @@ void loop() {
                       fill={pinD11 ? "#3b82f6" : "#1e3a8a"}
                       stroke={pinD11 ? "#93c5fd" : "#1e40af"}
                       strokeWidth="2"
-                      style={pinD11 ? { filter: "drop-shadow(0px 0px 8px #3b82f6)" } : undefined}
+                      style={pinD11 ? { filter: "drop-shadow(0px 0px 8px #3b82f6)", opacity: (outputDuty(outputPinLabels[2]) ?? 255) / 255 } : undefined}
                     />
-                    <text x="495" y="154" fill="#f8fafc" fontSize="9" textAnchor="middle" fontWeight="bold">D11 BLUE</text>
+                    <text x="495" y="154" fill="#f8fafc" fontSize="9" textAnchor="middle" fontWeight="bold">{outputPinLabels[2]} BLUE</text>
 
                     {/* Pushbutton & Pull-Up representation (Bottom) */}
                     <rect x="220" y="145" width="24" height="24" rx="3" fill="#27272a" stroke="#52525b" strokeWidth="1.5" />
                     <circle cx="232" cy="157" r="7" fill={buttonPressed ? "#22c55e" : "#71717a"} stroke="#a1a1aa" strokeWidth="1" />
-                    <text x="232" y="182" fill="#a1a1aa" fontSize="8" textAnchor="middle">D2 BTN</text>
+                    <text x="232" y="182" fill="#a1a1aa" fontSize="8" textAnchor="middle">{buttonPinLabel} BTN</text>
 
                     {/* Bottom Power Rail Ground */}
                     <line x1="30" y1="195" x2="510" y2="195" stroke="#3b82f6" strokeWidth="1.5" strokeDasharray="6 3" />
@@ -638,41 +736,41 @@ void loop() {
                   <div className="flex flex-col gap-2">
                     <button
                       type="button"
-                      onClick={() => setPinD13(!pinD13)}
+                      onClick={() => { setPinD13(!pinD13); setSimulatedPwm((current) => { const next = { ...current }; const pin = pinFor(outputPinLabels[0]); if (pin) delete next[pin]; return next; }); }}
                       className={`flex items-center justify-between p-2 rounded text-xs font-mono transition-colors border ${
                         pinD13
                           ? "bg-red-500/20 text-red-300 border-red-500/40 font-bold"
                           : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-subtle)]"
                       }`}
                     >
-                      <span>Pin D13 (Red LED)</span>
-                      <span>{pinD13 ? "HIGH (1)" : "LOW (0)"}</span>
+                      <span>Pin {outputPinLabels[0]} (Red LED)</span>
+                      <span>{outputDuty(outputPinLabels[0]) !== undefined ? `PWM ${outputDuty(outputPinLabels[0])}/255` : pinD13 ? "HIGH (1)" : "LOW (0)"}</span>
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => setPinD12(!pinD12)}
+                      onClick={() => { setPinD12(!pinD12); setSimulatedPwm((current) => { const next = { ...current }; const pin = pinFor(outputPinLabels[1]); if (pin) delete next[pin]; return next; }); }}
                       className={`flex items-center justify-between p-2 rounded text-xs font-mono transition-colors border ${
                         pinD12
                           ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 font-bold"
                           : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-subtle)]"
                       }`}
                     >
-                      <span>Pin D12 (Green LED)</span>
-                      <span>{pinD12 ? "HIGH (1)" : "LOW (0)"}</span>
+                      <span>Pin {outputPinLabels[1]} (Green LED)</span>
+                      <span>{outputDuty(outputPinLabels[1]) !== undefined ? `PWM ${outputDuty(outputPinLabels[1])}/255` : pinD12 ? "HIGH (1)" : "LOW (0)"}</span>
                     </button>
 
                     <button
                       type="button"
-                      onClick={() => setPinD11(!pinD11)}
+                      onClick={() => { setPinD11(!pinD11); setSimulatedPwm((current) => { const next = { ...current }; const pin = pinFor(outputPinLabels[2]); if (pin) delete next[pin]; return next; }); }}
                       className={`flex items-center justify-between p-2 rounded text-xs font-mono transition-colors border ${
                         pinD11
                           ? "bg-blue-500/20 text-blue-300 border-blue-500/40 font-bold"
                           : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-subtle)]"
                       }`}
                     >
-                      <span>Pin D11 (Blue LED)</span>
-                      <span>{pinD11 ? "HIGH (1)" : "LOW (0)"}</span>
+                      <span>Pin {outputPinLabels[2]} (Blue LED)</span>
+                      <span>{outputDuty(outputPinLabels[2]) !== undefined ? `PWM ${outputDuty(outputPinLabels[2])}/255` : pinD11 ? "HIGH (1)" : "LOW (0)"}</span>
                     </button>
                   </div>
                 </div>
@@ -685,7 +783,7 @@ void loop() {
 
                   <div>
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="text-[var(--text-secondary)]">Analog ADC (Potentiometer)</span>
+                      <span className="text-[var(--text-secondary)]">Analog ADC input ({sensorPinLabel})</span>
                       <span className="font-mono font-bold text-blue-400">
                         {clampedAdc} ({sensorVoltage.toFixed(2)}V)
                       </span>
@@ -702,7 +800,7 @@ void loop() {
                   </div>
 
                   <div className="pt-1">
-                    <span className="text-xs text-[var(--text-secondary)] block mb-1.5">Pushbutton Switch (Pin D2 Input)</span>
+                    <span className="text-xs text-[var(--text-secondary)] block mb-1.5">Pushbutton Switch (Pin {buttonPinLabel} input)</span>
                     <button
                       type="button"
                       onMouseDown={() => setButtonPressed(true)}
@@ -715,28 +813,72 @@ void loop() {
                           : "bg-[var(--surface-primary)] text-[var(--text-primary)] border-[var(--border-subtle)] hover:bg-[var(--surface-tertiary)]"
                       }`}
                     >
-                      <Zap size={14} className={buttonPressed ? "text-yellow-300" : "text-zinc-400"} />
-                      <span>{buttonPressed ? "Button Pressed (Pin D2 = LOW)" : "Press & Hold Pushbutton (D2)"}</span>
+                      <Zap size={14} className={buttonPressed ? "text-yellow-300" : "text-[var(--text-secondary)]"} />
+                      <span>{buttonPressed ? `Button Pressed (${buttonPinLabel} = LOW)` : `Press & Hold Pushbutton (${buttonPinLabel})`}</span>
                     </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Right: Live Firmware Code Generator */}
-            <div className="lg:col-span-5 flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[#0d1117] p-4 text-xs">
-              <div className="flex items-center justify-between pb-2 border-b border-zinc-800 text-zinc-400 mb-2">
-                <span className="flex items-center gap-1.5 font-semibold text-zinc-200">
+            {/* Right: editable sketch and bounded serial monitor */}
+            <div className="lg:col-span-5 flex min-h-[520px] flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4 text-xs">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border-subtle)] pb-2 text-[var(--text-secondary)]">
+                <span className="flex items-center gap-1.5 font-semibold text-[var(--text-primary)]">
                   <Code size={14} className="text-blue-400" />
-                  Live Firmware Code (C++)
+                  Firmware sketch
                 </span>
-                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300">
-                  {mcuTarget === "arduino" ? "Arduino C++" : "ESP-IDF / Arduino"}
+                <span className="rounded bg-[var(--surface-tertiary)] px-1.5 py-0.5 font-mono text-[10px] text-[var(--text-secondary)]">
+                  {mcuTarget === "arduino" ? "Uno · Arduino C++ subset" : "ESP32 · Arduino framework subset"}
                 </span>
               </div>
-              <pre className="font-mono text-[11px] leading-relaxed text-zinc-300 overflow-x-auto flex-1 p-2 bg-zinc-950 rounded border border-zinc-900 select-all">
-                <code>{firmwareSnippet}</code>
-              </pre>
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <label className="sr-only" htmlFor="hardware-sketch-preset">Sketch preset</label>
+                <select
+                  id="hardware-sketch-preset"
+                  aria-label="Sketch preset"
+                  value={sketchPreset}
+                  onChange={(event) => {
+                    const preset = event.target.value as HardwareSketchPreset;
+                    setSketchPreset(preset);
+                    setSketchSource(getHardwareSketchPreset(mcuTarget, preset));
+                    setSketchOutput("Preset loaded. Run the sketch to update the board.");
+                    setSketchStatus("Ready");
+                  }}
+                  className="min-h-9 flex-1 rounded-md border border-[var(--border-subtle)] bg-[var(--surface-primary)] px-2 text-[var(--text-primary)]"
+                >
+                  <option value="blink">Blink</option>
+                  <option value="button">Button + LED</option>
+                  <option value="sensor">ADC + Serial</option>
+                  <option value="pwm">PWM fade</option>
+                </select>
+                <button type="button" onClick={runSketch} className="min-h-9 rounded-md bg-blue-600 px-3 font-semibold text-white hover:bg-blue-500">Run sketch</button>
+                <button type="button" onClick={() => { setSketchSource(getHardwareSketchPreset(mcuTarget, sketchPreset)); setSketchOutput("Sketch reset to preset."); setSketchStatus("Ready"); }} className="min-h-9 rounded-md border border-[var(--border-subtle)] px-3 text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)]">Reset</button>
+              </div>
+              <textarea
+                aria-label={`${mcuTarget === "arduino" ? "Arduino Uno" : "ESP32"} firmware sketch editor`}
+                spellCheck={false}
+                value={sketchSource}
+                onChange={(event) => setSketchSource(event.target.value.slice(0, 12_000))}
+                onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); runSketch(); } }}
+                className="min-h-[230px] w-full flex-1 resize-y rounded-md border border-[var(--border-subtle)] bg-[#090b10] p-3 font-mono text-[11px] leading-5 text-slate-100 outline-none focus:border-blue-500"
+                aria-describedby="hardware-sketch-help"
+              />
+              <p id="hardware-sketch-help" className="mt-2 text-[10px] leading-4 text-[var(--text-secondary)]">
+                Safe deterministic subset: pinMode, digital/analog I/O, delay, millis, bounded for/while loops, if/else, and Serial input/output. Serial input is provided before a run; Ctrl/⌘ + Enter runs four loop cycles. This does not execute arbitrary C++ or connect to physical hardware.
+              </p>
+              <div className="mt-3 overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[#090b10]">
+                <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+                  <strong className="font-semibold text-[var(--text-primary)]">Serial Monitor</strong>
+                  <span role="status" className="font-mono text-[10px] text-[var(--text-secondary)]">{sketchStatus}</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 border-b border-white/10 px-3 py-2">
+                  <label htmlFor="hardware-serial-input" className="shrink-0 text-[10px] text-[var(--text-secondary)]">Serial input</label>
+                  <input id="hardware-serial-input" aria-label="Serial input before run" maxLength={256} value={serialInput} onChange={(event) => setSerialInput(event.target.value)} placeholder="Optional command for Serial.read()" className="min-h-8 min-w-0 flex-1 rounded border border-white/10 bg-[#11141a] px-2 font-mono text-[11px] text-slate-100 placeholder:text-slate-500" />
+                  <span className="text-[9px] text-[var(--text-secondary)]">available before next run</span>
+                </div>
+                <pre aria-label="Serial monitor output" aria-live="polite" className="max-h-36 min-h-16 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[11px] leading-5 text-emerald-200">{sketchOutput}</pre>
+              </div>
             </div>
           </div>
         </div>

@@ -1,3 +1,4 @@
+import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 import { getVerifiedSupabaseUser } from "@/lib/supabase/server";
@@ -61,12 +62,12 @@ export async function recordAdminAuditLog(params: {
   previousState?: Record<string, unknown> | null;
   newState?: Record<string, unknown> | null;
   ipAddress?: string | null;
-}): Promise<void> {
+}): Promise<boolean> {
   const admin = getAdminClient();
-  if (!admin) return;
+  if (!admin) return false;
 
   try {
-    await admin.from("ai_admin_audit_log").insert({
+    const { error } = await admin.from("ai_admin_audit_log").insert({
       actor_id: params.actorId,
       actor_email: params.actorEmail,
       action: params.action,
@@ -74,8 +75,9 @@ export async function recordAdminAuditLog(params: {
       new_state: params.newState ?? null,
       ip_address: params.ipAddress ?? null,
     });
+    return !error;
   } catch {
-    // Ignore audit log persistence failure
+    return false;
   }
 }
 

@@ -5,7 +5,7 @@ import {
   estimateTokensFromText,
   getCurrentUtcMonthPeriod,
 } from "@/lib/ai-gateway/credits";
-import { signGuestSession, verifyGuestSession, hashClientIp } from "@/lib/ai-gateway/guest";
+import { signGuestSession, verifyGuestSession, getTrustedClientIpRateLimitHash, hashClientIp } from "@/lib/ai-gateway/guest";
 import { checkRateLimit, resetRateLimitsForTesting } from "@/lib/ai-gateway/rate-limiter";
 import { isEmailConfiguredAdmin } from "@/lib/ai-gateway/admin";
 import type { AIModelConfig, AICreditPolicies } from "@/lib/ai-gateway/types";
@@ -116,11 +116,49 @@ describe("AI Gateway — Guest Session Security & Anti-Abuse", () => {
     expect(hash1).toHaveLength(64);
     expect(hash1).not.toContain("203.0.113");
 
-    // Same IP yields deterministic hash for trial re-binding
+    // Same IP yields a deterministic hash for the separate network burst limit.
     const mockReq2 = new Request("http://localhost:3000", {
       headers: { "x-forwarded-for": "203.0.113.195" },
     });
     expect(hashClientIp(mockReq2)).toBe(hash1);
+  });
+
+  it("prefers the reverse proxy client-IP header over a supplied forwarding chain", () => {
+    const trustedProxyRequest = new Request("http://localhost:3000", {
+      headers: {
+        "cf-connecting-ip": "198.51.100.42",
+        "x-forwarded-for": "203.0.113.195, 10.0.0.1",
+      },
+    });
+    const directRequest = new Request("http://localhost:3000", {
+      headers: { "cf-connecting-ip": "198.51.100.42" },
+    });
+
+    expect(hashClientIp(trustedProxyRequest)).toBe(hashClientIp(directRequest));
+  });
+
+  it("uses Vercel's platform-owned address and ignores a spoofed forwarding chain", () => {
+    const previousVercel = process.env.VERCEL;
+    vi.stubEnv("VERCEL", "1");
+    const trustedProxyRequest = new Request("https://katalyst.example/api", {
+      headers: { "x-vercel-forwarded-for": "198.51.100.42", "x-forwarded-for": "203.0.113.195" },
+    });
+    const spoofedRequest = new Request("https://katalyst.example/api", {
+      headers: { "x-vercel-forwarded-for": "198.51.100.42", "x-forwarded-for": "198.18.0.77" },
+    });
+    expect(hashClientIp(trustedProxyRequest)).toBe(hashClientIp(spoofedRequest));
+    if (previousVercel === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = previousVercel;
+  });
+
+  it("does not apply a shared fallback IP bucket when no trusted proxy address exists", () => {
+    vi.stubEnv("VERCEL", "");
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("KATALYST_TRUSTED_CLIENT_IP_HEADER", "");
+    expect(getTrustedClientIpRateLimitHash(new Request("https://katalyst.example/api", {
+      headers: { "x-forwarded-for": "203.0.113.195" },
+    }))).toBeNull();
+    vi.unstubAllEnvs();
   });
 });
 
@@ -156,6 +194,14 @@ describe("AI Gateway — Rate Limiting", () => {
 
     const third = checkRateLimit(guestKey, true, policies);
     expect(third.allowed).toBe(false);
+  });
+
+  it("uses a separate, generous per-IP limit without merging guest credit identities", () => {
+    for (let request = 0; request < 120; request += 1) {
+      expect(checkRateLimit("guest-ip:campus", true, policies, 120).allowed).toBe(true);
+    }
+    expect(checkRateLimit("guest-ip:campus", true, policies, 120).allowed).toBe(false);
+    expect(checkRateLimit("guest:another-learner", true, policies).allowed).toBe(true);
   });
 });
 

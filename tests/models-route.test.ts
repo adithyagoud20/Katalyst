@@ -26,11 +26,20 @@ describe("GET /api/models for Ollama", () => {
 });
 
 describe("GET /api/models for Cloudflare Workers AI", () => {
+  it("does not expose the shared model through the BYOK model catalog", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await GET(new Request("http://localhost/api/models?provider=cloudflare&mode=platform"));
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toContain("Kat AI");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("returns account-compatible models using the session token and account ID", async () => {
     const accountId = "0123456789abcdef0123456789abcdef";
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, errors: [], messages: [], result: [{ name: "@cf/acme/model", display_name: "Catalog Model", task: { name: "Text Generation" } }] }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
-    const response = await GET(new Request("http://localhost/api/models?provider=cloudflare", { headers: { "x-katalyst-provider-key": "session-token", [CLOUDFLARE_ACCOUNT_HEADER]: accountId } }));
+    const response = await GET(new Request("http://localhost/api/models?provider=cloudflare&mode=byok", { headers: { "x-katalyst-provider-key": "session-token", [CLOUDFLARE_ACCOUNT_HEADER]: accountId } }));
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ provider: "cloudflare", models: [{ id: "@cf/acme/model", source: "cloudflare-models-api" }], diagnostic: { sourceCount: 1, compatibleCount: 1, excludedCount: 0 } });
     expect((fetchMock.mock.calls[0]?.[1] as RequestInit).headers).toMatchObject({ Authorization: "Bearer session-token" });

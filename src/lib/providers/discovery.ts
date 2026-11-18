@@ -339,9 +339,9 @@ export async function discoverModels(
   if (!apiKey && provider === "openrouter") {
     return { provider, models: [{ ...freeRouterModel }], refreshedAt: Date.now(), cached: false };
   }
-  if (!apiKey) throw new ProviderError(`Add ${providerCatalog[provider].keyEnv} or a session key before loading models.`, 503, "configuration");
+  if (!apiKey) throw new ProviderError(`Configure server credentials or enter a session key for ${providerCatalog[provider].name} before loading models.`, 503, "configuration");
   if (provider === "cloudflare" && !isCloudflareApiToken(apiKey)) throw new ProviderError("The Cloudflare API token format is invalid. Enter a token without spaces or control characters.", 400, "configuration");
-  if (provider === "cloudflare" && !options.accountId) throw new ProviderError("Add CLOUDFLARE_ACCOUNT_ID and a Cloudflare API token before loading models.", 503, "configuration");
+  if (provider === "cloudflare" && !options.accountId) throw new ProviderError("A Cloudflare account ID and API token are required to load this catalog.", 503, "configuration");
   const key = cacheKey(provider, apiKey, options.accountId);
   const now = Date.now();
   const cached = cache.get(key);

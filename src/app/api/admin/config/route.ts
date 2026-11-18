@@ -1,7 +1,9 @@
+import "server-only";
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseConfig } from "@/lib/supabase/config";
+import { sameOriginMutation } from "@/lib/account-server";
 import { requireAdminUser, recordAdminAuditLog } from "@/lib/ai-gateway/admin";
 import { getAiSystemConfig, getAiCreditPolicies, invalidateConfigCache } from "@/lib/ai-gateway/config";
 
@@ -18,22 +20,22 @@ const updateConfigSchema = z.object({
   system: z.object({
     sharedAiEnabled: z.boolean().optional(),
     killSwitchActive: z.boolean().optional(),
-    selectedModelId: z.string().min(1).optional(),
+    selectedModelId: z.string().min(1).max(240).optional(),
     globalDailyThresholdCredits: z.number().int().min(100).optional(),
     globalWarningThresholdCredits: z.number().int().min(100).optional(),
-  }).optional(),
+  }).strict().optional(),
   policies: z.object({
     monthlyAuthenticatedCredits: z.number().int().min(10).optional(),
     guestTrialCredits: z.number().int().min(5).optional(),
     userRequestsPerMinute: z.number().int().min(1).max(120).optional(),
     guestRequestsPerMinute: z.number().int().min(1).max(60).optional(),
     maxInputCharacters: z.number().int().min(1000).max(100000).optional(),
-  }).optional(),
+  }).strict().optional(),
   models: z.record(z.string(), z.object({
     enabled: z.boolean().optional(),
     creditWeight: z.number().min(0.1).max(100).optional(),
-  })).optional(),
-});
+  }).strict()).refine((models) => Object.keys(models).length <= 150, "At most 150 model entries may be updated.").optional(),
+}).strict();
 
 export async function GET() {
   const adminAuth = await requireAdminUser();
@@ -54,30 +56,39 @@ export async function GET() {
     if (data) models = data;
   }
 
-  return NextResponse.json({ system, policies, models });
+  return NextResponse.json({ system, policies, models }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function PUT(request: NextRequest) {
+  if (!sameOriginMutation(request)) {
+    return NextResponse.json({ error: "This admin change must come from the KATALYST site." }, { status: 403, headers: { "Cache-Control": "no-store" } });
+  }
   const adminAuth = await requireAdminUser();
   if (!adminAuth.ok) {
     return NextResponse.json({ error: adminAuth.error }, { status: adminAuth.status });
   }
 
+  const maxBodyBytes = 32_768;
+  const declaredLength = Number(request.headers.get("content-length") ?? "0");
+  if (declaredLength > maxBodyBytes) return NextResponse.json({ error: "Admin configuration payload is too large." }, { status: 413, headers: { "Cache-Control": "no-store" } });
+
   let body: unknown;
   try {
-    body = await request.json();
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > maxBodyBytes) return NextResponse.json({ error: "Admin configuration payload is too large." }, { status: 413, headers: { "Cache-Control": "no-store" } });
+    body = JSON.parse(rawBody);
   } catch {
-    return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON payload." }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
 
   const parsed = updateConfigSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Validation failed.", issues: parsed.error.issues }, { status: 400 });
+    return NextResponse.json({ error: "Validation failed.", issues: parsed.error.issues }, { status: 400, headers: { "Cache-Control": "no-store" } });
   }
 
   const admin = getAdminClient();
   if (!admin) {
-    return NextResponse.json({ error: "Database service unavailable." }, { status: 503 });
+    return NextResponse.json({ error: "Database service unavailable." }, { status: 503, headers: { "Cache-Control": "no-store" } });
   }
 
   const previousSystem = await getAiSystemConfig();
@@ -137,5 +148,5 @@ export async function PUT(request: NextRequest) {
     ipAddress: request.headers.get("x-forwarded-for")?.split(",")[0] || null,
   });
 
-  return NextResponse.json({ success: true, updated: parsed.data });
+  return NextResponse.json({ success: true, updated: parsed.data }, { headers: { "Cache-Control": "no-store" } });
 }

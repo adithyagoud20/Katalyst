@@ -12,3 +12,4 @@ test-results/
 .agents/skills/
 public/vendor/wasmer-sdk/
 work/
+desktop/site-config.json
