@@ -3,6 +3,7 @@ export const C_PLAYGROUND_SOURCE_LIMIT = 12_000;
 export const C_PLAYGROUND_STDIN_LIMIT = 2_000;
 export const C_PLAYGROUND_OUTPUT_LIMIT = 64_000;
 export const C_PLAYGROUND_RUN_TIMEOUT_MS = 8_000;
+export const C_PLAYGROUND_INTERACTIVE_RUN_TIMEOUT_MS = 60_000;
 export const C_PLAYGROUND_COMPILE_TIMEOUT_MS = 15_000;
 export const C_PLAYGROUND_COMPILER_PACKAGE = "clang/clang@=0.160000.1";
 
@@ -67,6 +68,12 @@ export function normalizeStdin(stdin: string): string {
   if (!stdin) return "";
   const normalized = stdin.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
+}
+
+export function getCPlaygroundRunTimeoutMs(source: string, stdin: string): number {
+  return programExpectsStdin(source) && !normalizeStdin(stdin)
+    ? C_PLAYGROUND_INTERACTIVE_RUN_TIMEOUT_MS
+    : C_PLAYGROUND_RUN_TIMEOUT_MS;
 }
 
 export function getOutputText(output: { stdout: { text: () => string; truncated: boolean }; stderr: { text: () => string; truncated: boolean } }): string {

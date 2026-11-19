@@ -3,12 +3,14 @@ import { cProgrammingPath, flattenLessons } from "../src/lib/learning-curriculum
 import {
   C_PLAYGROUND_COMPILER_PACKAGE,
   C_PLAYGROUND_COMPILE_TIMEOUT_MS,
+  C_PLAYGROUND_INTERACTIVE_RUN_TIMEOUT_MS,
   C_PLAYGROUND_OUTPUT_LIMIT,
   C_PLAYGROUND_RUN_TIMEOUT_MS,
   C_PLAYGROUND_SOURCE_LIMIT,
   C_PLAYGROUND_STDIN_LIMIT,
   defaultCProgram,
   extractCCode,
+  getCPlaygroundRunTimeoutMs,
   getOutputChannels,
   getOutputText,
   limitCPlaygroundRecord,
@@ -48,6 +50,7 @@ describe("C Playground inputs, compiler infrastructure and execution limits", ()
   it("provides a real bounded browser compiler configuration", () => {
     expect(C_PLAYGROUND_COMPILER_PACKAGE).toMatch(/^clang\/clang@=/);
     expect(C_PLAYGROUND_RUN_TIMEOUT_MS).toBe(8_000);
+    expect(C_PLAYGROUND_INTERACTIVE_RUN_TIMEOUT_MS).toBe(60_000);
     expect(C_PLAYGROUND_COMPILE_TIMEOUT_MS).toBe(15_000);
     expect(C_PLAYGROUND_OUTPUT_LIMIT).toBe(64_000);
     expect(defaultCProgram).toContain("int main(void)");
@@ -68,6 +71,13 @@ describe("C Playground inputs, compiler infrastructure and execution limits", ()
       expect(normalizeStdin("42")).toBe("42\n");
       expect(normalizeStdin("42\n")).toBe("42\n");
       expect(normalizeStdin("-100")).toBe("-100\n");
+    });
+
+    it("keeps interactive C/C++ runs alive long enough for stdin and keeps ordinary runs bounded", () => {
+      const interactiveProgram = 'int main() { int value; scanf("%d", &value); return 0; }';
+      expect(getCPlaygroundRunTimeoutMs(interactiveProgram, "")).toBe(C_PLAYGROUND_INTERACTIVE_RUN_TIMEOUT_MS);
+      expect(getCPlaygroundRunTimeoutMs(interactiveProgram, "21")).toBe(C_PLAYGROUND_RUN_TIMEOUT_MS);
+      expect(getCPlaygroundRunTimeoutMs("int main() { return 0; }", "")).toBe(C_PLAYGROUND_RUN_TIMEOUT_MS);
     });
 
     it("normalizes multiple input values on a single line", () => {
@@ -131,10 +141,12 @@ describe("C Playground inputs, compiler infrastructure and execution limits", ()
     });
 
     it("verifies timeout and limit invariants for local compiler safety", () => {
-      // Compile timeout must be longer than run timeout
+      // Keep ordinary execution below the C compilation budget.
       expect(C_PLAYGROUND_COMPILE_TIMEOUT_MS).toBeGreaterThan(C_PLAYGROUND_RUN_TIMEOUT_MS);
-      // Run timeout is strictly capped at 8 seconds to prevent infinite loops
+      // Ordinary runs stay strictly capped at 8 seconds to prevent infinite loops.
       expect(C_PLAYGROUND_RUN_TIMEOUT_MS).toBeLessThanOrEqual(8_000);
+      // Programs waiting for stdin get time to accept input before a bounded stop.
+      expect(C_PLAYGROUND_INTERACTIVE_RUN_TIMEOUT_MS).toBe(60_000);
       // Source code cannot exceed 12 KB
       expect(C_PLAYGROUND_SOURCE_LIMIT).toBe(12_000);
       // Stdin cannot exceed 2 KB
@@ -161,7 +173,8 @@ describe("C Playground inputs, compiler infrastructure and execution limits", ()
       expect(CIRCUIT_PLAYGROUND_STORAGE_KEY).toBe("katalyst.circuit.playground.v1");
 
       expect(defaultCppProgram).toContain("template <typename T>");
-      expect(defaultCppProgram).toContain("scanf");
+      expect(defaultCppProgram).not.toMatch(/\bscanf\s*\(|\bcin\s*>>/);
+      expect(defaultCppProgram).toContain("const int value = 21;");
       expect(defaultCppProgram).toContain("printf");
       expect(defaultJsProgram).toContain("computeFibonacci");
       expect(defaultSqlProgram).toContain("CREATE TABLE engineers");

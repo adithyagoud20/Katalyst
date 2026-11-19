@@ -15,11 +15,11 @@ import {
   C_PLAYGROUND_COMPILER_PACKAGE,
   C_PLAYGROUND_COMPILE_TIMEOUT_MS,
   C_PLAYGROUND_OUTPUT_LIMIT,
-  C_PLAYGROUND_RUN_TIMEOUT_MS,
   C_PLAYGROUND_SOURCE_LIMIT,
   C_PLAYGROUND_STDIN_LIMIT,
   C_PLAYGROUND_STORAGE_KEY,
   defaultCProgram,
+  getCPlaygroundRunTimeoutMs,
   getOutputChannels,
   getOutputText,
   limitCPlaygroundRecord,
@@ -61,7 +61,7 @@ export const SQL_PLAYGROUND_STORAGE_KEY = "katalyst.sql.playground.v1";
 export const HTML_PLAYGROUND_STORAGE_KEY = "katalyst.html.playground.v1";
 export const CIRCUIT_PLAYGROUND_STORAGE_KEY = "katalyst.circuit.playground.v1";
 
-export const defaultCppProgram = `// C++17 browser workbench: templates and interactive standard input
+const legacyDefaultCppProgram = `// C++17 browser workbench: templates and interactive standard input
 #include <stdio.h>
 
 template <typename T>
@@ -73,6 +73,21 @@ int main() {
   int value = 0;
   printf("Enter an integer: ");
   if (scanf("%d", &value) != 1) return 1;
+  printf("Twice: %d\\n", doubleValue(value));
+  return 0;
+}
+`;
+
+export const defaultCppProgram = `// C++17 browser workbench: templates
+#include <stdio.h>
+
+template <typename T>
+T doubleValue(T value) {
+  return value + value;
+}
+
+int main() {
+  const int value = 21;
   printf("Twice: %d\\n", doubleValue(value));
   return 0;
 }
@@ -359,8 +374,11 @@ export function CPlayground({
       try {
         const saved = readDraftForLang(activeLanguage);
         if (saved) {
-          setSource(saved.source);
+          const migrateCppStarter = activeLanguage === "cpp" && saved.source === legacyDefaultCppProgram;
+          const savedSource = migrateCppStarter ? defaultCppProgram : saved.source;
+          setSource(savedSource);
           setStdin(saved.stdin);
+          if (migrateCppStarter) saveDraftForLang("cpp", savedSource, saved.stdin);
         } else {
           setSource(getDefaultProgramForLang(activeLanguage));
           setStdin("");
@@ -1024,8 +1042,11 @@ export function CPlayground({
       if (!isCurrent()) return;
 
       setStatus("Starting the compiled program in the browser sandbox…");
+      const normalizedInput = normalizeStdin(stdin);
+      const waitingForInput = expectsInput && !normalizedInput;
+      const runTimeoutMs = getCPlaygroundRunTimeoutMs(source, stdin);
       const programProcess = await sandbox.command(program).spawn({
-        timeoutMs: C_PLAYGROUND_RUN_TIMEOUT_MS,
+        timeoutMs: runTimeoutMs,
         outputBytes: C_PLAYGROUND_OUTPUT_LIMIT,
         stdin: "pipe",
         terminal: { columns: 100, rows: 32 },
@@ -1037,8 +1058,9 @@ export function CPlayground({
         return;
       }
       setStage("running");
-      setStatus("Running the compiled program in the browser sandbox…");
-      const normalizedInput = normalizeStdin(stdin);
+      setStatus(waitingForInput
+        ? "Program is waiting for standard input. Enter input below or stop the run."
+        : "Running the compiled program in the browser sandbox…");
       if (normalizedInput) await programProcess.stdin?.write(normalizedInput);
       const captureStream = async (stream: AsyncIterable<Uint8Array> | null, update: (value: string) => void) => {
         if (!stream) return "";
@@ -1093,7 +1115,7 @@ export function CPlayground({
       setOutput([finalStdout, finalStderr && `stderr:\n${finalStderr}`, noOutputMessage].filter(Boolean).join("\n"));
       if (result.reason === "timeout") {
         setOutcome("timeout");
-        setError("The program exceeded the 8 second run limit. Check its loop conditions and try again.");
+        setError(`The program exceeded the ${Math.round(runTimeoutMs / 1_000)} second run limit. Check its loop conditions and try again.`);
         setStatus("Program timed out and was stopped.");
       } else if (result.reason === "terminated") {
         setOutcome("none");

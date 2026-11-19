@@ -1122,6 +1122,35 @@ test("retries C compilation when Wasmer reports a dead scheduler as a failed pro
   expect(clientCount).toBeGreaterThanOrEqual(2);
 });
 
+test("updates an untouched saved C++ starter so it runs without waiting for stdin", async ({ page }) => {
+  const previousStarter = `// C++17 browser workbench: templates and interactive standard input
+#include <stdio.h>
+
+template <typename T>
+T doubleValue(T value) {
+  return value + value;
+}
+
+int main() {
+  int value = 0;
+  printf("Enter an integer: ");
+  if (scanf("%d", &value) != 1) return 1;
+  printf("Twice: %d\\n", doubleValue(value));
+  return 0;
+}
+`;
+  await page.addInitScript((source) => {
+    localStorage.setItem("katalyst.cpp.playground.v1", JSON.stringify({ version: 1, source, stdin: "" }));
+  }, previousStarter);
+  await page.goto("/#katalyst=playground");
+  await page.getByText("Launch C++ Workbench").click();
+
+  const cppEditor = page.getByLabel("C++ source code");
+  await expect(cppEditor).toContainText("const int value = 21;");
+  await expect(cppEditor).not.toContainText("scanf");
+  await expect.poll(() => page.evaluate(() => JSON.parse(window.localStorage.getItem("katalyst.cpp.playground.v1") ?? "{}").source)).toContain("const int value = 21;");
+});
+
 test("shows compile and runtime failures clearly and reuses the prepared compiler", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
@@ -1220,10 +1249,22 @@ test("compiles C and C++17 programs with live stdin in the browser sandbox", asy
   await expect(page.locator(".c-console-output").getByText("Read: K")).toBeVisible({ timeout: 10_000 });
   await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
   await page.getByRole("button", { name: "Playground", exact: true }).click();
+  await page.getByText("Launch C Workbench").click();
+  await page.getByRole("button", { name: "Reset example" }).click();
+  await expect(page.getByLabel("C source code")).toContainText("Hello, C!");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".c-console-output")).toContainText("Hello, C!", { timeout: 30_000 });
+  await expect(page.locator(".c-run-status")).toContainText("finished successfully", { timeout: 10_000 });
+  await page.getByRole("button", { name: "All Labs", exact: true }).click();
   await page.getByText("Launch C++ Workbench").click();
   await expect(page.locator("#runtime-switcher-select")).toHaveValue("code:cpp", { timeout: 10_000 });
   const cppEditor = page.getByLabel("C++ source code");
   await expect(cppEditor).toContainText("doubleValue");
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".c-console-output")).toContainText("Twice: 42", { timeout: 330_000 });
+  await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
+  await page.getByRole("button", { name: "Clear terminal output" }).click();
+  await cppEditor.fill(`#include <stdio.h>\ntemplate <typename T> T doubleValue(T value) { return value + value; }\nint main() { int value = 0; if (scanf("%d", &value) != 1) return 1; printf("Twice: %d\\n", doubleValue(value)); return 0; }\n`);
   await page.getByRole("button", { name: "Run", exact: true }).click();
   const cppInput = page.getByLabel("Terminal standard input");
   try {
