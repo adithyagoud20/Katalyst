@@ -8,12 +8,15 @@ import {
 
 let sqlJsPromise: Promise<SqlJsStatic> | null = null;
 
-function getSqlJs(): Promise<SqlJsStatic> {
+async function getSqlJs(): Promise<SqlJsStatic> {
   if (!sqlJsPromise) {
     sqlJsPromise = initSqlJs({
       locateFile: (file: string) => {
         if (typeof window !== "undefined") {
-          return `/vendor/sqljs/${file}`;
+          // sql.js' browser entrypoint requests sql-wasm-browser.wasm; the
+          // browser and default package builds ship identical WASM bytes.
+          const asset = file === "sql-wasm-browser.wasm" ? "sql-wasm.wasm" : file;
+          return `/vendor/sqljs/${asset}`;
         }
         // In Node.js / test environments, locate from public/vendor/sqljs or node_modules
         try {
@@ -26,7 +29,15 @@ function getSqlJs(): Promise<SqlJsStatic> {
       },
     });
   }
-  return sqlJsPromise;
+  const pending = sqlJsPromise;
+  try {
+    return await pending;
+  } catch (error) {
+    // A transient WASM asset/network failure must not poison SQLite for the
+    // rest of this tab. Let the next Run retry initialization.
+    if (sqlJsPromise === pending) sqlJsPromise = null;
+    throw error;
+  }
 }
 
 export function formatSqlResults(results: QueryExecResult[]): string {

@@ -87,6 +87,17 @@ test.describe("Milestone M21 Architecture & Platform Expansion E2E Suite", () =>
     await expect(page.locator(".ide-file-status code")).toHaveText("query.sql");
     await expect(page.locator(".c-pane-heading strong", { hasText: "query.sql" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
+    const sqliteWasm = await page.request.get("/vendor/sqljs/sql-wasm.wasm");
+    expect(sqliteWasm.status(), "SQLite WebAssembly asset must be served to the browser").toBe(200);
+    expect(sqliteWasm.headers()["content-type"], "SQLite WASM asset must have the correct media type").toContain("application/wasm");
+
+    const runSql = page.getByRole("button", { name: "Run", exact: true });
+    await runSql.click();
+    await expect(page.locator(".c-console-output")).toContainText("Ada Lovelace");
+    await expect(page.locator(".c-run-status")).toContainText("Execution completed");
+    await runSql.click();
+    await expect(page.locator(".c-console-output")).toContainText("Grace Hopper");
+    await expect(page.locator(".c-run-status")).toContainText("Execution completed");
 
     // Use runtime dropdown switcher to switch to HTML Live Preview
     const switcher = page.locator("#runtime-switcher-select");

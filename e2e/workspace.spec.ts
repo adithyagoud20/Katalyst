@@ -56,7 +56,11 @@ async function selectSettingsModel(page: Page, modelId: string) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => { (window as Window & { __failCompilerFirst?: boolean }).__failCompilerFirst = window.location.search.includes("failCompilerFirst=1"); });
+  await page.addInitScript(() => {
+    const testWindow = window as Window & { __failCompilerFirst?: boolean; __deadSchedulerOnce?: boolean };
+    testWindow.__failCompilerFirst = window.location.search.includes("failCompilerFirst=1");
+    testWindow.__deadSchedulerOnce = window.location.search.includes("deadSchedulerOnce=1");
+  });
   await page.route("**/vendor/wasmer-sdk/dist/index.js", async (route) => {
     await route.fulfill({
       status: 200,
@@ -65,6 +69,7 @@ test.beforeEach(async ({ page }) => {
 export class Wasmer {
   constructor(options = {}) {
     this.namespace = options.cache?.namespace ?? "default";
+    window.__wasmerClientCount = (window.__wasmerClientCount ?? 0) + 1;
     window.__wasmerCacheNamespace = this.namespace;
     this.packages = { load: async (reference) => {
       window.__compilerAttempts = (window.__compilerAttempts ?? 0) + 1;
@@ -81,7 +86,12 @@ export class Wasmer {
       }
       return { id: "mock-program" };
     } };
-    this.sandboxes = { create: async () => ({
+    this.sandboxes = { create: async () => {
+      if (window.__deadSchedulerOnce) {
+        window.__deadSchedulerOnce = false;
+        throw new Error("Initialization function failed - the thread pool is shut down: Scheduler is dead");
+      }
+      return ({
       command: (_program, args) => ({ spawn: async () => {
         const compiling = Array.isArray(args);
         const mode = window.__cPlaygroundOutcome;
@@ -103,7 +113,8 @@ export class Wasmer {
       fs: { readFile: async () => new Uint8Array([1]) },
       installPackage: async () => {},
       close: async () => {},
-    }) };
+      });
+    } };
   }
   async close() {}
 }`,
@@ -1083,6 +1094,17 @@ test("initializes the compiler in the background and retries a failed setup", as
   await expect(page.getByRole("button", { name: "Run code" })).toBeEnabled();
   const attempts = await page.evaluate(() => (window as Window & { __compilerAttempts?: number }).__compilerAttempts);
   expect(attempts).toBeGreaterThanOrEqual(3);
+});
+
+test("recreates C/C++ runtime after its browser scheduler shuts down", async ({ page }) => {
+  await page.goto("/?deadSchedulerOnce=1#katalyst=playground");
+  await page.getByText("Launch C Workbench").click();
+
+  const runButton = page.getByRole("button", { name: "Run", exact: true });
+  await runButton.click();
+  await expect(page.locator(".c-run-status")).toContainText("finished successfully");
+  const clientCount = await page.evaluate(() => (window as Window & { __wasmerClientCount?: number }).__wasmerClientCount ?? 0);
+  expect(clientCount).toBeGreaterThanOrEqual(2);
 });
 
 test("shows compile and runtime failures clearly and reuses the prepared compiler", async ({ page }) => {

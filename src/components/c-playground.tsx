@@ -40,6 +40,13 @@ import { pythonStreamParser, sqlStreamParser, htmlStreamParser } from "./code-wo
 
 const CPP_PLAYGROUND_COMPILE_TIMEOUT_MS = 60_000;
 
+function isWasmerSchedulerShutdown(error: unknown): boolean {
+  const message = error instanceof Error
+    ? `${error.message} ${error.cause instanceof Error ? error.cause.message : ""}`
+    : String(error);
+  return /thread pool is shut down|scheduler is dead/i.test(message);
+}
+
 export type PlaygroundLanguage = "c" | "cpp" | "python" | "javascript" | "sql" | "html" | "circuit";
 export type PlaygroundRuntimeSelection = {
   language: PlaygroundLanguage;
@@ -329,6 +336,8 @@ export function CPlayground({
   const handledExampleRef = useRef(0);
   const aliveRef = useRef(true);
   const isSwitchingRef = useRef(false);
+  const schedulerRecoveryAttemptsRef = useRef(0);
+  const retryAfterSchedulerShutdownRef = useRef(false);
 
   useEffect(() => {
     if (stage === "running" && (activeLanguage === "c" || activeLanguage === "cpp")) {
@@ -421,14 +430,25 @@ export function CPlayground({
         return compiler;
       } catch (initializationError) {
         if (aliveRef.current) {
+          const schedulerStopped = isWasmerSchedulerShutdown(initializationError);
+          if (schedulerStopped) {
+            const staleClient = clientRef.current;
+            clientRef.current = null;
+            compilerRef.current = null;
+            void staleClient?.close().catch(() => undefined);
+          }
           const timedOut = initializationError instanceof DOMException && initializationError.name === "TimeoutError";
           setCompilerState("failed");
-          setStatus(`The ${activeLanguage === "cpp" ? "C++17" : "C11"} compiler could not be initialized.`);
+          setStatus(schedulerStopped
+            ? "The local compiler worker stopped. Restart the compiler and try again."
+            : `The ${activeLanguage === "cpp" ? "C++17" : "C11"} compiler could not be initialized.`);
           const errorText = initializationError instanceof Error ? initializationError.message : "";
           const needsIsolation = /cross-origin isolated|COOP\/COEP/i.test(errorText);
           const registryUnavailable = /registry\.wasmer\.io|graphql|fetch|network|unable to load package/i.test(errorText);
           setError(
-            needsIsolation
+            schedulerStopped
+              ? "The browser stopped the C/C++ runtime worker. The stale runtime was cleared; retry compiler setup to start a fresh one."
+              : needsIsolation
               ? "Local C/C++ compilation needs a secure page and cross-origin isolation. Open the HTTPS site and check that its COOP and COEP response headers are present."
               : timedOut || registryUnavailable
                 ? "Wasmer could not download the compiler package. First setup needs access to registry.wasmer.io and downloads about 106 MiB; after a successful setup it is cached in this browser. Check the network or firewall, then retry."
@@ -1068,6 +1088,7 @@ export function CPlayground({
         setStatus("Program finished with a runtime error.");
       } else {
         setOutcome("success");
+        schedulerRecoveryAttemptsRef.current = 0;
         setStatus(`Program finished successfully in ${Math.round(performance.now() - runStartedAt)} ms in the local WebAssembly sandbox.`);
       }
     } catch (runError) {
@@ -1080,9 +1101,34 @@ export function CPlayground({
       }
       const timedOut = controller.signal.reason instanceof DOMException && controller.signal.reason.name === "TimeoutError";
       const stopped = controller.signal.aborted;
+      const schedulerStopped = !stopped && isWasmerSchedulerShutdown(runError);
+      if (schedulerStopped) {
+        const staleClient = clientRef.current;
+        clientRef.current = null;
+        compilerRef.current = null;
+        compilerPromiseRef.current = null;
+        void staleClient?.close().catch(() => undefined);
+        setCompilerState("idle");
+        if (schedulerRecoveryAttemptsRef.current === 0) {
+          schedulerRecoveryAttemptsRef.current = 1;
+          retryAfterSchedulerShutdownRef.current = true;
+        }
+      }
       setOutcome(timedOut ? "timeout" : stopped ? "none" : "runtime-error");
-      setError(timedOut ? "The C runtime took too long to finish. Check the program and try again." : stopped ? "Run stopped." : runError instanceof Error ? runError.message.slice(0, 1_000) : "The C runtime could not start.");
-      setStatus(timedOut ? "Program timed out and was stopped." : stopped ? "Run stopped." : "The C playground could not finish this run.");
+      setError(timedOut
+        ? "The C runtime took too long to finish. Check the program and try again."
+        : stopped
+          ? "Run stopped."
+          : schedulerStopped
+            ? "The browser stopped the C/C++ runtime worker. It has been reset; run again to start a fresh worker."
+            : runError instanceof Error ? runError.message.slice(0, 1_000) : "The C runtime could not start.");
+      setStatus(timedOut
+        ? "Program timed out and was stopped."
+        : stopped
+          ? "Run stopped."
+          : schedulerStopped
+            ? "C/C++ runtime reset. Run again to continue."
+            : "The C playground could not finish this run.");
     } finally {
       if (isCurrent()) {
         abortRef.current = null;
@@ -1163,6 +1209,15 @@ export function CPlayground({
     ideRunRef.current = runProgram;
     ideStopRef.current = stopRun;
   }, [runProgram, stopRun]);
+
+  useEffect(() => {
+    if (stage !== "idle" || !retryAfterSchedulerShutdownRef.current) return;
+    retryAfterSchedulerShutdownRef.current = false;
+    const retryTimer = window.setTimeout(() => {
+      if (aliveRef.current) void ideRunRef.current(false);
+    }, 0);
+    return () => window.clearTimeout(retryTimer);
+  }, [compilerState, stage]);
 
   useEffect(() => {
     if (!isStandaloneIde) return;
