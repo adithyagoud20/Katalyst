@@ -989,6 +989,22 @@ export function CPlayground({
       const compileDiagnostics = getOutputText(compiled);
       setDiagnostics(compileDiagnostics);
       if (compiled.reason !== "exited" || compiled.exitCode !== 0) {
+        if (isWasmerSchedulerShutdown(new Error(compileDiagnostics))) {
+          const staleClient = clientRef.current;
+          clientRef.current = null;
+          compilerRef.current = null;
+          compilerPromiseRef.current = null;
+          void staleClient?.close().catch(() => undefined);
+          setCompilerState("idle");
+          if (schedulerRecoveryAttemptsRef.current === 0) {
+            schedulerRecoveryAttemptsRef.current = 1;
+            retryAfterSchedulerShutdownRef.current = true;
+          }
+          setOutcome("runtime-error");
+          setError("The browser stopped the C/C++ compiler worker. The runtime was reset and this run will retry.");
+          setStatus("C/C++ compiler worker restarted; retrying your program…");
+          return;
+        }
         const timedOut = compileDeadlineExceeded || compiled.reason === "timeout";
         setOutcome(timedOut ? "timeout" : "compile-error");
         setError(

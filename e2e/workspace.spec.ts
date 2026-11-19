@@ -57,9 +57,10 @@ async function selectSettingsModel(page: Page, modelId: string) {
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    const testWindow = window as Window & { __failCompilerFirst?: boolean; __deadSchedulerOnce?: boolean };
+    const testWindow = window as Window & { __failCompilerFirst?: boolean; __deadSchedulerOnce?: boolean; __deadSchedulerCompileOnce?: boolean };
     testWindow.__failCompilerFirst = window.location.search.includes("failCompilerFirst=1");
     testWindow.__deadSchedulerOnce = window.location.search.includes("deadSchedulerOnce=1");
+    testWindow.__deadSchedulerCompileOnce = window.location.search.includes("deadSchedulerCompileOnce=1");
   });
   await page.route("**/vendor/wasmer-sdk/dist/index.js", async (route) => {
     await route.fulfill({
@@ -103,6 +104,10 @@ export class Wasmer {
           stderr: null,
           wait: async () => {
             if (!compiling && window.__mockWaitForInput) await inputReceived;
+            if (compiling && window.__deadSchedulerCompileOnce) {
+              window.__deadSchedulerCompileOnce = false;
+              return { reason: "terminated", exitCode: 1, stdout: output(), stderr: output("command execution failed: unable to spawn the command: Initialization function failed - the thread pool is shut down: Scheduler is dead") };
+            }
             return compiling && mode === "compile-error"
               ? { reason: "exited", exitCode: 1, stdout: output(), stderr: output("main.c:1: error: expected ';'") }
               : { reason: "exited", exitCode: !compiling && mode === "runtime-error" ? 7 : 0, stdout: output(!compiling && mode === "runtime-error" ? "mock program output" : !compiling && window.__mockWaitForInput ? "mock interactive output" : ""), stderr: output(!compiling && mode === "runtime-error" ? "mock runtime stderr" : "") };
@@ -1107,6 +1112,16 @@ test("recreates C/C++ runtime after its browser scheduler shuts down", async ({ 
   expect(clientCount).toBeGreaterThanOrEqual(2);
 });
 
+test("retries C compilation when Wasmer reports a dead scheduler as a failed process", async ({ page }) => {
+  await page.goto("/?deadSchedulerCompileOnce=1#katalyst=playground");
+  await page.getByText("Launch C Workbench").click();
+
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(page.locator(".c-run-status")).toContainText("finished successfully");
+  const clientCount = await page.evaluate(() => (window as Window & { __wasmerClientCount?: number }).__wasmerClientCount ?? 0);
+  expect(clientCount).toBeGreaterThanOrEqual(2);
+});
+
 test("shows compile and runtime failures clearly and reuses the prepared compiler", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
@@ -1197,6 +1212,13 @@ test("compiles C and C++17 programs with live stdin in the browser sandbox", asy
   ]);
   if ("error" in runResult) throw new Error(`C compiler integration failed: ${runResult.error}\n${browserErrors.join("\n")}`);
   await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
+  await page.getByRole("button", { name: "Clear terminal output" }).click();
+  await page.getByRole("button", { name: "Run code", exact: true }).click();
+  await expect(terminalInput).toBeEnabled({ timeout: 10_000 });
+  await terminalInput.fill("K");
+  await terminalInput.press("Enter");
+  await expect(page.locator(".c-console-output").getByText("Read: K")).toBeVisible({ timeout: 10_000 });
+  await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
   await page.getByRole("button", { name: "Playground", exact: true }).click();
   await page.getByText("Launch C++ Workbench").click();
   await expect(page.locator("#runtime-switcher-select")).toHaveValue("code:cpp", { timeout: 10_000 });
@@ -1210,6 +1232,13 @@ test("compiles C and C++17 programs with live stdin in the browser sandbox", asy
     const cppError = await page.locator(".c-playground-error").innerText().catch(() => "");
     throw new Error(`C++17 terminal input did not become available: ${cppError || "no compiler/runtime error was rendered"}\n${browserErrors.join("\n")}`);
   }
+  await cppInput.fill("21");
+  await cppInput.press("Enter");
+  await expect(page.locator(".c-console-output")).toContainText("Twice: 42", { timeout: 10_000 });
+  await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
+  await page.getByRole("button", { name: "Clear terminal output" }).click();
+  await page.getByRole("button", { name: "Run", exact: true }).click();
+  await expect(cppInput).toBeEnabled({ timeout: 10_000 });
   await cppInput.fill("21");
   await cppInput.press("Enter");
   await expect(page.locator(".c-console-output")).toContainText("Twice: 42", { timeout: 10_000 });
