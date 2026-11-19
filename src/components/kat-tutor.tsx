@@ -6,7 +6,8 @@ import { ArrowUp, Bot, BookOpen, Code2, Lightbulb, MessageSquareText, Plus, Rota
 import { AssistantMarkdown } from "@/components/assistant-markdown";
 import { BrandMark } from "@/components/brand-mark";
 import { getProviderRequestHeaders, type CloudflareRequestMode } from "@/lib/providers/client-request-headers";
-import { providerCatalog, type ProviderId } from "@/lib/providers/catalog";
+import { type ProviderId } from "@/lib/providers/catalog";
+import { getKatalystCreatorAnswer } from "@/lib/providers/prompt";
 import { trackAIRequestFinish, trackAIRequestStart } from "@/lib/ai-activity";
 import { boundTutorHistory, composeTutorReference, composeTutorSkillContext, tutorModes, type TutorMessage, type TutorMode, type TutorWorkspaceActivity } from "@/lib/tutor-request";
 import {
@@ -45,7 +46,6 @@ export type TutorLessonContext = {
 type Props = {
   provider: ProviderId;
   model: string;
-  modelName: string;
   sessionKey: string;
   cloudflareAccountId: string;
   cloudflareMode: CloudflareRequestMode;
@@ -76,7 +76,6 @@ function useIsClient(): boolean {
 export function KatTutor({
   provider,
   model,
-  modelName,
   sessionKey,
   cloudflareAccountId,
   cloudflareMode,
@@ -106,6 +105,7 @@ export function KatTutor({
   const conversationRef = useRef<HTMLDivElement>(null);
   const composerInputRef = useRef<HTMLTextAreaElement>(null);
   const followConversationRef = useRef(true);
+  const touchPositionRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const [lastQuestion, setLastQuestion] = useState("");
 
@@ -182,8 +182,9 @@ export function KatTutor({
   const ask = async (question: string) => {
     const trimmed = question.trim();
     if (!trimmed || pending) return;
-    if (!model) {
-      setError(`Choose a supported ${providerCatalog[provider].name} model before asking Kat.`);
+    const creatorAnswer = getKatalystCreatorAnswer(trimmed);
+    if (!creatorAnswer && (!configured || !model)) {
+      setError("Kat is not ready yet. Check AI & Kat in Settings.");
       return;
     }
     const currentConv = activeConversation;
@@ -205,6 +206,15 @@ export function KatTutor({
         appliedSkills: skillComposition.appliedSkills,
         omittedSkills: skillComposition.omittedSkills,
       });
+    }
+
+    if (creatorAnswer) {
+      followConversationRef.current = true;
+      addMessageToConversation(store, currentConv.id, { role: "assistant", content: creatorAnswer });
+      setInput("");
+      setError("");
+      setQuotaError(null);
+      return;
     }
 
     const currentMessages = readTutorStore().conversations.find((c) => c.id === currentConv.id)?.messages ?? [];
@@ -261,8 +271,6 @@ export function KatTutor({
       addMessageToConversation(latestStore, currentConv.id, {
         role: "assistant",
         content: result.text,
-        responseProvider: provider,
-        responseModel: model,
       });
     } catch (requestError) {
       if (controller.signal.aborted) {
@@ -323,11 +331,23 @@ export function KatTutor({
           </button>
         )}
       </div>
-      <span className="tutor-provider">{provider === "cloudflare" && cloudflareMode === "platform" ? "Kat AI" : providerCatalog[provider].name}{modelName ? ` · ${modelName}` : ""}</span>
     </div>
     <div ref={conversationRef} className="tutor-scroll-region" onScroll={(event) => {
       const element = event.currentTarget;
-      followConversationRef.current = element.scrollHeight - element.scrollTop - element.clientHeight <= 72;
+      followConversationRef.current = element.scrollHeight - element.scrollTop - element.clientHeight <= 24;
+    }} onWheel={(event) => {
+      if (event.deltaY < 0) followConversationRef.current = false;
+    }} onTouchStart={(event) => {
+      touchPositionRef.current = event.touches[0]?.clientY ?? null;
+    }} onTouchMove={(event) => {
+      const y = event.touches[0]?.clientY;
+      const element = event.currentTarget;
+      if (y !== undefined && touchPositionRef.current !== null && y > touchPositionRef.current + 2 && element.scrollTop > 0) {
+        followConversationRef.current = false;
+      }
+      touchPositionRef.current = y ?? null;
+    }} onTouchEnd={() => {
+      touchPositionRef.current = null;
     }}>
     {showHistoryMenu && (
       <div className="tutor-history-dropdown" role="menu" aria-label="Past conversations">
@@ -383,12 +403,12 @@ export function KatTutor({
       <label><input type="checkbox" aria-label="Use enabled workspace skills" checked={applySkills} disabled={!enabledSkillCount} onChange={(event) => setApplySkills(event.target.checked)} /><span>Use enabled workspace skills</span><small>{enabledSkillCount ? `${enabledSkillCount} available · off by default` : "No enabled skills"}</small></label>
       <p>Skills are optional, untrusted guidance. Your question stays primary.</p>
     </div>
-    {availableWorkspaceActions.length > 0 && <div className="tutor-action-list" aria-label="Ask Kat about your workspace">
+    {availableWorkspaceActions.length > 0 && configured && Boolean(model) && <div className="tutor-action-list" aria-label="Ask Kat about your workspace">
       {availableWorkspaceActions.map(({ label, icon: Icon, prompt }) => <button key={label} type="button" className="tutor-action" disabled={!configured || !model || pending} onClick={() => void ask(prompt)} title={label}><Icon size={14} />{label}</button>)}
     </div>}
-    {!configured && <div className="tutor-setup" role="status"><span>{provider === "ollama" ? "Load an installed local model" : provider === "cloudflare" && cloudflareMode === "platform" ? "Kat AI is temporarily unavailable. Try again later or set up a personal provider in Settings." : provider === "cloudflare" ? "Choose your personal Cloudflare access in Settings" : `Add a ${providerCatalog[provider].name} API key`} to ask Kat.</span><button className="secondary-button" type="button" onClick={onOpenSettings}><Settings2 size={14} /> Open Settings</button></div>}
+    {!configured && <div className="tutor-setup" role="status"><span>Kat is not ready yet. Check AI & Kat in Settings to review access and model setup.</span><button className="secondary-button" type="button" onClick={onOpenSettings}><Settings2 size={14} /> Open Settings</button></div>}
     <div className="tutor-conversation" aria-live="polite">
-      {!messages.length ? <div className="tutor-empty"><BrandMark className="mini-brand" /><p>{context ? "Choose an action above or ask a question. Kat uses this lesson only when it helps." : "What are you working through? Kat can explain a concept, ask guiding questions, or help you practice."}</p></div> : messages.map((message, index) => <article key={`${index}-${message.role}`} className={`tutor-message ${message.role}`}><span className="tutor-message-label">{message.role === "assistant" ? "Kat" : "You"}</span>{message.role === "assistant" ? <AssistantMarkdown content={message.content} /> : <p>{message.content}</p>}{message.role === "assistant" && message.responseProvider && message.responseModel && <div className="tutor-response-route" aria-label={`Response from ${message.responseProvider === "cloudflare" && cloudflareMode === "platform" ? "Kat AI" : providerCatalog[message.responseProvider].name}, model ${message.responseModel}`}>Via {message.responseProvider === "cloudflare" && cloudflareMode === "platform" ? "Kat AI" : providerCatalog[message.responseProvider].name} · {message.responseModel}</div>}{message.role === "user" && message.appliedSkills?.length ? <div className="tutor-applied-skills" aria-label="Skills applied to this Kat request">Skills used: {message.appliedSkills.map((skill) => skill.name).join(", ")}</div> : null}{message.role === "user" && message.omittedSkills?.length ? <div className="tutor-omitted-skills">Not included: {message.omittedSkills.map((skill) => `${skill.name} (${skill.reason === "prompt-limit" ? "prompt limit" : "duplicate instructions"})`).join(", ")}</div> : null}</article>)}
+      {!messages.length ? <div className="tutor-empty"><BrandMark className="mini-brand" /><p>{context ? "Choose an action above or ask a question. Kat uses this lesson only when it helps." : "What are you working through? Kat can explain a concept, ask guiding questions, or help you practice."}</p></div> : messages.map((message, index) => <article key={`${index}-${message.role}`} className={`tutor-message ${message.role}`}><span className="tutor-message-label">{message.role === "assistant" ? "Kat" : "You"}</span>{message.role === "assistant" ? <AssistantMarkdown content={message.content} /> : <p>{message.content}</p>}{message.role === "user" && message.appliedSkills?.length ? <div className="tutor-applied-skills" aria-label="Skills applied to this Kat request">Skills used: {message.appliedSkills.map((skill) => skill.name).join(", ")}</div> : null}{message.role === "user" && message.omittedSkills?.length ? <div className="tutor-omitted-skills">Not included: {message.omittedSkills.map((skill) => `${skill.name} (${skill.reason === "prompt-limit" ? "prompt limit" : "duplicate instructions"})`).join(", ")}</div> : null}</article>)}
       {pending && <div className="tutor-pending" role="status"><span className="pending-dot" /> Kat is thinking…</div>}
     </div>
     {quotaError && <div className="quota-exhausted-banner" role="alert">
@@ -398,7 +418,7 @@ export function KatTutor({
         {quotaError.requiresSignIn ? (
           <Link className="primary-button" href="/login">Sign in or create an account</Link>
         ) : (
-          <button type="button" className="secondary-button" onClick={onOpenSettings}>Configure BYOK Providers</button>
+          <button type="button" className="secondary-button" onClick={onOpenSettings}>Open AI & Kat settings</button>
         )}
       </div>
     </div>}
@@ -412,7 +432,7 @@ export function KatTutor({
               <RotateCcw size={13} /> Retry
             </button>
           )}
-          <button type="button" onClick={onOpenSettings}>Open provider settings</button>
+          <button type="button" onClick={onOpenSettings}>Open AI settings</button>
         </div>
       </div>
     )}
@@ -431,7 +451,7 @@ export function KatTutor({
             event.currentTarget.form?.requestSubmit();
           }
         }}
-        placeholder={configured ? "Ask about the lesson, code, or output…" : "Connect a provider to ask Kat…"}
+        placeholder="Ask Kat a question…"
         disabled={pending}
       />
       {pending ? (
@@ -449,7 +469,7 @@ export function KatTutor({
           type="submit"
           className="send-button"
           aria-label="Send question to Kat"
-          disabled={!input.trim() || !configured || !model}
+          disabled={!input.trim() || (!getKatalystCreatorAnswer(input) && (!configured || !model))}
         >
           <ArrowUp size={17} />
         </button>

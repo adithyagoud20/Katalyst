@@ -19,6 +19,14 @@ const structuredData = [
   },
   {
     "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "KATALYST",
+    url: siteOrigin,
+    description: "An interactive technical learning studio for engineering topics and browser-based tools.",
+    publisher: { "@type": "EducationalOrganization", name: "KATALYST", url: siteOrigin },
+  },
+  {
+    "@context": "https://schema.org",
     "@type": "WebApplication",
     name: "KATALYST",
     url: siteOrigin,
@@ -61,6 +69,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: dark)", color: "#09090b" },
     { media: "(prefers-color-scheme: light)", color: "#fafafa" },

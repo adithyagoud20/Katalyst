@@ -4,7 +4,7 @@ import { openAIProvider, parseOpenAIResponse, ProviderError } from "../src/lib/p
 import { openRouterProvider, parseOpenRouterResponse } from "../src/lib/providers/openrouter";
 import { cloudflareProvider, cloudflareMessageText, isCloudflareModelId } from "../src/lib/providers/cloudflare";
 import { discoverOllamaModels, isLocalOllamaRequest, normalizeOllamaBaseUrl, ollamaProvider, parseOllamaResponse } from "../src/lib/providers/ollama";
-import { addWorkspaceContext, TRUSTED_PROVIDER_INSTRUCTIONS } from "../src/lib/providers/prompt";
+import { addWorkspaceContext, getKatalystCreatorAnswer, KATALYST_CREATOR_RESPONSE, TRUSTED_PROVIDER_INSTRUCTIONS } from "../src/lib/providers/prompt";
 import { getProvider, providers } from "../src/lib/providers";
 import { isSupportedModel, providerCatalog, providerIds } from "../src/lib/providers/catalog";
 
@@ -307,5 +307,13 @@ describe("shared provider prompt boundary", () => {
     expect(messages[0].content).toContain(JSON.stringify(malicious));
     expect(TRUSTED_PROVIDER_INSTRUCTIONS).toContain("untrusted reference material");
     expect(TRUSTED_PROVIDER_INSTRUCTIONS).not.toContain(malicious);
+  });
+
+  it("answers creator questions with ADITHYA and leaves unrelated questions to the model", () => {
+    expect(getKatalystCreatorAnswer("Who made Kat AI and KATALYST?")).toBe(KATALYST_CREATOR_RESPONSE);
+    expect(getKatalystCreatorAnswer("Who created this assistant?")).toBe(KATALYST_CREATOR_RESPONSE);
+    expect(getKatalystCreatorAnswer("What can Kat teach me?")).toBeNull();
+    expect(TRUSTED_PROVIDER_INSTRUCTIONS).toContain("Never volunteer provider, vendor, model, or routing details");
+    expect(TRUSTED_PROVIDER_INSTRUCTIONS).toContain("created by ADITHYA");
   });
 });

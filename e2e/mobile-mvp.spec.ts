@@ -12,6 +12,12 @@ async function expectNoHorizontalOverflow(page: Page, label: string) {
   expect(sizes.body, `${label} body width ${sizes.body}px exceeded ${sizes.viewport}px`).toBeLessThanOrEqual(sizes.viewport);
 }
 
+async function expectMinimumTargetHeight(locator: import("@playwright/test").Locator, minHeight = 44) {
+  await expect(locator).toBeVisible();
+  const height = await locator.evaluate((element) => element.getBoundingClientRect().height);
+  expect(height, "mobile control should meet the minimum touch height").toBeGreaterThanOrEqual(minHeight);
+}
+
 async function selectSidebarView(page: Page, name: string) {
   const menu = page.getByRole("button", { name: "Open navigation" });
   if (await menu.isVisible()) {
@@ -28,6 +34,9 @@ test.describe("390px mobile MVP", () => {
     await expect(page.getByRole("heading", { name: /explore how things work/i })).toBeVisible();
     await expectNoHorizontalOverflow(page, "Home");
     await expect(page).not.toHaveURL(/\/login/);
+    await expectMinimumTargetHeight(page.locator(".topbar .theme-quick-toggle"));
+    await expectMinimumTargetHeight(page.getByRole("button", { name: "Open settings", exact: true }));
+    await expect(page.locator(".topbar .provider-selector, .topbar .model-selector, .topbar .model-managed-label")).toHaveCount(0);
 
     await selectSidebarView(page, "Explore Learning Paths");
     await expect(page.getByRole("heading", { name: "Build a foundation" })).toBeVisible();
@@ -44,6 +53,9 @@ test.describe("390px mobile MVP", () => {
     await expect(start).toBeVisible();
     await start.click();
     await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
+    for (const name of ["Learn", "Code", "Kat"]) {
+      await expectMinimumTargetHeight(page.getByRole("tab", { name }));
+    }
     await expectNoHorizontalOverflow(page, "Lesson");
     await expect(page).not.toHaveURL(/\/login/);
 

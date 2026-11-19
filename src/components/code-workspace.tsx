@@ -612,8 +612,7 @@ export function CodeWorkspace({
               title="HTML Sandbox Live Preview"
               className="html-preview-frame transition-all duration-200"
               style={{
-                width: previewMode === "mobile" ? "375px" : "100%",
-                minWidth: previewMode === "mobile" ? "375px" : undefined,
+                width: previewMode === "mobile" ? "min(375px, 100%)" : "100%",
                 maxWidth: previewMode === "mobile" ? "375px" : "100%",
                 minHeight: "320px",
                 height: "100%",

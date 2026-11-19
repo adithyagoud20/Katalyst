@@ -5,7 +5,7 @@ import { getProvider } from "@/lib/providers";
 import { isCloudflareModelId } from "@/lib/providers/cloudflare";
 import { isProviderId, isSupportedModel, providerCatalog } from "@/lib/providers/catalog";
 import { discoverModels } from "@/lib/providers/discovery";
-import { getProviderApiKey, isSecureSessionKeyRequest, MAX_SESSION_KEY_LENGTH, SESSION_KEY_HEADER } from "@/lib/providers/credentials";
+import { getProviderApiKey, getSharedAiProviderId, isSecureSessionKeyRequest, isServerProviderConfigured, MAX_SESSION_KEY_LENGTH, resolveSharedAiSelection, SESSION_KEY_HEADER } from "@/lib/providers/credentials";
 import { ProviderError } from "@/lib/providers/types";
 import { CLOUDFLARE_ACCOUNT_HEADER, DEFAULT_OLLAMA_BASE_URL, MAX_OLLAMA_URL_LENGTH, OLLAMA_URL_HEADER } from "@/lib/providers/constants";
 import { isLocalOllamaRequest } from "@/lib/providers/ollama";
@@ -114,9 +114,14 @@ async function enforceGuestNetworkRateLimit(request: Request | NextRequest, poli
       code: "RATE_LIMIT_STORE_UNAVAILABLE",
     });
   }
+  if ("configurationMissing" in status && status.configurationMissing) {
+    throw new GatewayError("Guest AI is unavailable because this production host cannot verify client IPs for abuse protection. Configure KATALYST_TRUSTED_CLIENT_IP_HEADER for a header overwritten by the trusted reverse proxy.", 503, {
+      code: "TRUSTED_CLIENT_IP_UNAVAILABLE",
+    });
+  }
   if (!status.allowed) {
     throw new GatewayError(
-      `Too many AI requests are coming from this network. Please wait ${status.retryAfterSeconds}s before trying again.`,
+      "Too many AI requests are coming from this network. Please wait " + ("retryAfterSeconds" in status ? status.retryAfterSeconds : 1) + "s before trying again.",
       429,
       { code: "RATE_LIMIT_EXCEEDED" }
     );
@@ -207,9 +212,13 @@ export async function executeGatewayChat(
     await enforceRequestRateLimit(userId ? `user:${userId}` : `guest:${guestId}`, !userId, creditPolicies);
 
     const provider = getProvider(input.provider);
+    const sharedProviderId = getSharedAiProviderId();
+    const sharedGeminiKeyIsKatOnly = input.provider === "gemini" && sharedProviderId === "gemini";
     const apiKey = input.provider === "ollama" ? undefined : input.provider === "cloudflare"
       ? rawSessionKey!.trim()
-      : getProviderApiKey(input.provider, rawSessionKey);
+      : sharedGeminiKeyIsKatOnly
+        ? rawSessionKey?.trim()
+        : getProviderApiKey(input.provider, rawSessionKey);
     const cloudflareAccountId = input.provider === "cloudflare" ? rawCloudflareAccountId!.trim() : undefined;
 
     try {
@@ -283,17 +292,19 @@ export async function executeGatewayChat(
     });
   }
 
-  // Step 3: Model resolution & admin model lock. Public request bodies never
-  // select the shared model; only the server-side admin setting is authoritative.
-  const rawModelId = systemConfig.selectedModelId || "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
-  // Map historical model IDs to active Cloudflare inference IDs
-  const targetModelId = rawModelId === "@cf/meta/llama-3.3-70b-instruct"
-    ? "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
-    : rawModelId === "@cf/meta/llama-3.1-8b-instruct"
-      ? "@cf/meta/llama-3.1-8b-instruct-fp8"
-      : rawModelId;
-  if (!isCloudflareModelId(targetModelId)) {
+  // Step 3: Shared provider and model are deployment/admin controlled. Public
+  // request bodies never choose the shared provider, key, or model.
+  const sharedSelection = resolveSharedAiSelection(systemConfig.selectedModelId || "@cf/meta/llama-3.3-70b-instruct-fp8-fast");
+  if (!sharedSelection) {
+    throw new GatewayError("The shared Kat AI provider or model configuration is invalid.", 503, { code: "MODEL_UNAVAILABLE" });
+  }
+  const targetProviderId = sharedSelection.providerId;
+  const targetModelId = sharedSelection.modelId;
+  if (targetProviderId === "cloudflare" && !isCloudflareModelId(targetModelId)) {
     throw new GatewayError("The administrator-selected Kat AI model is invalid. Shared AI has been paused until it is corrected.", 503, { code: "MODEL_UNAVAILABLE" });
+  }
+  if (!isServerProviderConfigured(targetProviderId)) {
+    throw new GatewayError(`Shared Kat AI needs the deployment owner's ${targetProviderId === "gemini" ? "Gemini API key" : "Cloudflare Workers AI credentials"} configured on the server.`, 503, { code: "SHARED_AI_PROVIDER_UNAVAILABLE" });
   }
   const modelConfig = await getAiModelConfig(targetModelId);
   if (!modelConfig.enabled) {
@@ -370,15 +381,16 @@ export async function executeGatewayChat(
 
   const reservationId = reservation.reservationId!;
 
-  // Step 7: Cloudflare inference execution
-  const provider = getProvider("cloudflare");
-  const cloudflareApiKey = process.env.CLOUDFLARE_API_TOKEN?.trim();
-  const cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
+  // Step 7: Owner-managed provider inference. A shared Gemini key is read only
+  // from server environment and is never taken from a request header.
+  const provider = getProvider(targetProviderId);
+  const providerApiKey = process.env[targetProviderId === "gemini" ? "GEMINI_API_KEY" : "CLOUDFLARE_API_TOKEN"]?.trim();
+  const cloudflareAccountId = targetProviderId === "cloudflare" ? process.env.CLOUDFLARE_ACCOUNT_ID?.trim() : undefined;
 
-  if (!cloudflareApiKey || !cloudflareAccountId) {
+  if (!providerApiKey || (targetProviderId === "cloudflare" && !cloudflareAccountId)) {
     await releaseReservation({ reservationId, outcome: "failure", errorKind: "unconfigured" });
     await releaseDailySharedBudget(dailyBudgetReservationId).catch(() => undefined);
-    throw new GatewayError("Shared KATALYST AI server credentials are not configured.", 503);
+    throw new GatewayError("Shared KATALYST AI server credentials are not configured.", 503, { code: "SHARED_AI_PROVIDER_UNAVAILABLE" });
   }
 
   let generated;
@@ -387,8 +399,8 @@ export async function executeGatewayChat(
       ...input,
       model: targetModelId,
       maxOutputTokens: Math.min(modelConfig.maxOutputTokens, 2048),
-      apiKey: cloudflareApiKey,
-      cloudflareAccountId,
+      apiKey: providerApiKey,
+      ...(cloudflareAccountId ? { cloudflareAccountId } : {}),
       signal: request.signal,
     });
   } catch (inferenceError) {
@@ -405,9 +417,9 @@ export async function executeGatewayChat(
       throw new GatewayError(inferenceError.message, inferenceError.status, { errorKind: inferenceError.kind });
     }
     if (inferenceError instanceof DOMException && inferenceError.name === "TimeoutError") {
-      throw new GatewayError("Cloudflare Workers AI took too long to respond. Try again.", 504);
+      throw new GatewayError(`${provider.name} took too long to respond. Try again.`, 504);
     }
-    throw new GatewayError("Could not reach Cloudflare Workers AI. Try again shortly.", 502);
+    throw new GatewayError(`Could not reach ${provider.name}. Try again shortly.`, 502);
   }
 
   // Step 8 & 9: Token accounting & Settlement
@@ -445,7 +457,7 @@ export async function executeGatewayChat(
   return {
     result: {
       text: generated.text,
-      provider: "cloudflare",
+      provider: targetProviderId,
       model: targetModelId,
       usage: { inputTokens, outputTokens },
       creditsDeducted: actualCredits,

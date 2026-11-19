@@ -132,12 +132,31 @@ export async function getAdminAnalytics(): Promise<AdminAnalyticsData> {
     const todayStart = new Date();
     todayStart.setUTCHours(0, 0, 0, 0);
 
-    const { data: ledger } = await admin
-      .from("ai_usage_ledger")
-      .select("user_id,guest_id,model_id,credits_deducted,is_estimated,outcome,created_at")
-      .gte("created_at", fourteenDaysAgo);
+    type LedgerRow = {
+      user_id: string | null;
+      guest_id: string | null;
+      model_id: string | null;
+      credits_deducted: number | null;
+      is_estimated: boolean;
+      outcome: string;
+      created_at: string;
+    };
+    const ledger: LedgerRow[] = [];
+    const pageSize = 1000;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await admin
+        .from("ai_usage_ledger")
+        .select("id,user_id,guest_id,model_id,credits_deducted,is_estimated,outcome,created_at")
+        .gte("created_at", fourteenDaysAgo)
+        .order("created_at", { ascending: true })
+        .order("id", { ascending: true })
+        .range(offset, offset + pageSize - 1);
 
-    if (!ledger) return emptyResult;
+      if (error) return emptyResult;
+      const rows = (data ?? []) as LedgerRow[];
+      ledger.push(...rows);
+      if (rows.length < pageSize) break;
+    }
 
     const totalRequests = ledger.length;
     let successfulRequests = 0;

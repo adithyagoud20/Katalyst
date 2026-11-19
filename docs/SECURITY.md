@@ -10,7 +10,7 @@ The video is loaded directly by the visitor's browser from the administrator-sup
 
 ## Browser security headers
 
-`src/proxy.ts` attaches a per-request nonce Content Security Policy to application responses and passes the nonce through request headers for the Next.js root layout. The policy restricts scripts to same-origin/nonce and approved WebAssembly use, blocks objects and framing, and limits network connections to the configured app dependencies. Inline styles remain allowed for current UI components. Cross-origin isolation headers are configured separately in `next.config.ts` for browser-side compiler runtimes. This defense-in-depth policy does not replace output escaping, dependency maintenance, or review of external media and WASM packages. The CSP and production browser behavior still need verification on the final host.
+`src/proxy.ts` attaches a per-request nonce Content Security Policy to application responses and passes the nonce through request headers for the Next.js root layout. The policy restricts scripts to same-origin/nonce and approved WebAssembly use, blocks objects and framing, and limits network connections to the configured app dependencies plus the Wasmer registry origin required for first-use browser compiler downloads. Inline styles remain allowed for current UI components. Cross-origin isolation headers are configured separately in `next.config.ts` for browser-side compiler runtimes. This defense-in-depth policy does not replace output escaping, dependency maintenance, or review of external media and WASM packages. The CSP and production browser behavior still need verification on the final host.
 
 ## Credential handling
 

@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDown, ArrowUp, BookOpen, Bot, Check, ChartNoAxesColumnIncreasing, ChevronDown, Coins, Command, Compass, Copy, Cpu, Download, ExternalLink, FileDown, FileUp,
-  FlaskConical, FolderArchive, FolderInput, GraduationCap, House, Menu, MessageSquare, MoreHorizontal, Moon, Palette, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, RefreshCw, RotateCcw, Search, Settings2, ShieldAlert, ShieldCheck, Sparkles, Sun, Terminal,
+  ArrowDown, ArrowUp, BookOpen, Bot, Check, ChartNoAxesColumnIncreasing, Command, Compass, Copy, Cpu, Download, ExternalLink, FileDown, FileUp,
+  FlaskConical, FolderArchive, FolderInput, GraduationCap, House, Menu, MessageSquare, MoreHorizontal, Moon, Palette, PanelLeftClose, PanelLeftOpen, Pencil, Pin, PinOff, Plus, RotateCcw, Search, Settings2, ShieldAlert, ShieldCheck, Sparkles, Sun, Terminal,
   SquarePen, Trash2, User as UserIcon, X,
 } from "lucide-react";
 import { AssistantMarkdown } from "@/components/assistant-markdown";
@@ -34,15 +34,28 @@ import {
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
 import { readLearningProgress } from "@/lib/learning-progress";
-type Status = { defaultProvider: ProviderId; defaultModel: string; providers: Record<ProviderId, { configured: boolean; tokenConfigured?: boolean; accountConfigured?: boolean }> };
+type Status = { defaultProvider: ProviderId; defaultModel: string; providers: Record<ProviderId, { configured: boolean; tokenConfigured?: boolean; accountConfigured?: boolean }>; sharedAi?: { providerId: "cloudflare" | "gemini" | null; configured: boolean } };
 type ModelCatalogState = { models: ModelMetadata[]; loading: boolean; error: string; errorKind?: string; selectionIssue?: string; diagnostic?: ModelDiscoveryDiagnostic; refreshedAt?: number; cached?: boolean };
 type PricingFilter = "all" | "free" | "paid";
 type AppView = ApplicationView;
-type SettingsCategory = "account" | "appearance" | "ai-models" | "usage-credits" | "learning" | "workspace" | "privacy" | "admin";
+type SettingsCategory = "account" | "appearance" | "ai-models" | "learning" | "workspace" | "privacy" | "admin";
 type InferenceState = Partial<Record<ProviderId, "pending" | "success" | "permission" | "quota" | "network" | "failed">>;
 type AccountPhase = "checking" | "unconfigured" | "guest" | "migration" | "active" | "conflict" | "error";
 type AccountRemote = { snapshot: AccountSnapshot | null; revision: number; updatedAt: string | null };
 type PendingAccountMigration = { userId: string; migrationId: string; expectedRevision: number; snapshot: AccountSnapshot };
+
+function modelOptionLabel(model: ModelMetadata): string {
+  const parts = [model.name, model.id];
+  const formatPrice = (value: number) => "$" + new Intl.NumberFormat("en-US", { maximumSignificantDigits: 6 }).format(value);
+  if (model.pricingStatus === "free") parts.push("Free");
+  if (model.pricingStatus === "paid") {
+    if (model.pricing?.inputPerMillion !== undefined) parts.push(formatPrice(model.pricing.inputPerMillion) + "/1M input");
+    if (model.pricing?.outputPerMillion !== undefined) parts.push(formatPrice(model.pricing.outputPerMillion) + "/1M output");
+    if (!model.pricing) parts.push("Paid");
+  }
+  if (model.pricingStatus === "unknown") parts.push("Pricing unavailable");
+  return parts.join(" · ");
+}
 
 function readAccountActiveMarker(): AccountActiveMarker | null {
   try {
@@ -103,8 +116,7 @@ const settingsNavGroups: SettingsNavGroup[] = [
   {
     group: "System & Developer",
     items: [
-      { id: "ai-models", label: "AI Models & BYOK", icon: Cpu },
-      { id: "usage-credits", label: "Usage & Credits", icon: Coins },
+      { id: "ai-models", label: "AI & Kat", icon: Cpu },
       { id: "workspace", label: "Workspace Data", icon: FolderArchive },
       { id: "privacy", label: "Privacy & Data", icon: ShieldCheck },
     ],
@@ -151,22 +163,12 @@ function emptyStatus(): Status {
     defaultProvider: "cloudflare",
     defaultModel: "",
     providers: { cloudflare: { configured: false }, openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } },
+    sharedAi: { providerId: null, configured: false },
   };
 }
 
 function emptyModelState(provider: ProviderId): ModelCatalogState {
   return { models: [...providerCatalog[provider].models], loading: false, error: "" };
-}
-
-function formatModelPrice(value: number | undefined): string {
-  if (value === undefined) return "Unknown";
-  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(value);
-}
-
-function formatModelSize(bytes: number | undefined): string | undefined {
-  if (!bytes || !Number.isFinite(bytes) || bytes <= 0) return undefined;
-  const unit = 1_000_000_000;
-  return `~${(bytes / unit).toFixed(bytes >= 10 * unit ? 0 : 1)} GB download`;
 }
 
 function playgroundSelectionFromHash(hash: string): PlaygroundRuntimeSelection | null {
@@ -209,6 +211,7 @@ export function Workspace() {
   const [activityFilter, setActivityFilter] = useState<ProviderId | "all">("all");
   const [aiSystem, setAiSystem] = useState<{ sharedAiEnabled: boolean; killSwitchActive: boolean } | null>(null);
   const [katModelId, setKatModelId] = useState("");
+  const [katProviderId, setKatProviderId] = useState<"cloudflare" | "gemini" | "">("");
   const [inferenceState, setInferenceState] = useState<InferenceState>({});
   const [routeLessonId, setRouteLessonId] = useState("");
   const [skillTab, setSkillTab] = useState<"installed" | "available">("installed");
@@ -269,14 +272,8 @@ export function Workspace() {
   const [conversationSearch, setConversationSearch] = useState("");
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
   const [importError, setImportError] = useState("");
-  const [modelMenuOpen, setModelMenuOpen] = useState(false);
-  const [providerMenuOpen, setProviderMenuOpen] = useState(false);
   const [cloudflareInferenceTestMessage, setCloudflareInferenceTestMessage] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const providerMenuRef = useRef<HTMLDivElement>(null);
-  const modelMenuRef = useRef<HTMLDivElement>(null);
-  const providerMenuButtonRef = useRef<HTMLButtonElement>(null);
-  const modelMenuButtonRef = useRef<HTMLButtonElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const backupFileRef = useRef<HTMLInputElement>(null);
   const requestControllerRef = useRef<AbortController | null>(null);
@@ -303,9 +300,9 @@ export function Workspace() {
     if (window.location.hash !== nextHash) window.history.pushState({ katalyst: true }, "", nextHash);
   }, []);
 
-  const openSettings = (category?: SettingsCategory | "providers" | "models") => {
+  const openSettings = (category?: SettingsCategory | "providers" | "models" | "usage-credits") => {
     if (category) {
-      if (category === "providers" || category === "models") {
+      if (category === "providers" || category === "models" || category === "usage-credits") {
         setSettingsCategory("ai-models");
       } else {
         setSettingsCategory(category);
@@ -350,33 +347,6 @@ export function Workspace() {
     window.addEventListener("popstate", restoreLocation);
     return () => window.removeEventListener("popstate", restoreLocation);
   }, []);
-
-  useEffect(() => {
-    if (!providerMenuOpen && !modelMenuOpen) return;
-    const onPointerDown = (event: PointerEvent) => {
-      const target = event.target;
-      if (!(target instanceof Node)) return;
-      if (providerMenuOpen && !providerMenuRef.current?.contains(target)) setProviderMenuOpen(false);
-      if (modelMenuOpen && !modelMenuRef.current?.contains(target)) setModelMenuOpen(false);
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape") return;
-      if (modelMenuOpen) {
-        setModelMenuOpen(false);
-        modelMenuButtonRef.current?.focus();
-      }
-      if (providerMenuOpen) {
-        setProviderMenuOpen(false);
-        providerMenuButtonRef.current?.focus();
-      }
-    };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [modelMenuOpen, providerMenuOpen]);
 
   const loadModels = useCallback(async (provider: ProviderId, refresh = false, sessionKey = "", ollamaBaseUrl = "", cloudflareAccountId = "") => {
     setModelCatalogs((current) => ({ ...current, [provider]: { ...current[provider], loading: true, error: "" } }));
@@ -568,19 +538,23 @@ export function Workspace() {
   const selectedModel = modelState.models.find((model) => model.id === data.models[data.provider]);
   const sharedKatMode = data.provider === "cloudflare" && cloudflareMode === "platform";
   const learningModel = sharedKatMode ? katModelId : data.models[data.provider];
-  const learningModelName = sharedKatMode ? katModelId : selectedModel?.name ?? "";
 
   useEffect(() => {
     if (!sharedKatMode || (view !== "tutor" && view !== "lesson")) {
-      if (!sharedKatMode) setKatModelId("");
+      if (!sharedKatMode) { setKatModelId(""); setKatProviderId(""); }
       return;
     }
     setKatModelId("");
+    setKatProviderId("");
     let active = true;
     void fetch("/api/ai/kat-model", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() as Promise<{ modelId?: string }> : Promise.reject(new Error("Kat model unavailable")))
-      .then((result) => { if (active) setKatModelId(typeof result.modelId === "string" ? result.modelId : ""); })
-      .catch(() => { if (active) setKatModelId(""); });
+      .then((response) => response.ok ? response.json() as Promise<{ modelId?: string; providerId?: string }> : Promise.reject(new Error("Kat model unavailable")))
+      .then((result) => {
+        if (!active) return;
+        setKatModelId(typeof result.modelId === "string" ? result.modelId : "");
+        setKatProviderId(result.providerId === "gemini" || result.providerId === "cloudflare" ? result.providerId : "");
+      })
+      .catch(() => { if (active) { setKatModelId(""); setKatProviderId(""); } });
     return () => { active = false; };
   }, [sharedKatMode, view]);
   const providerCredentialPresent = (providerId: ProviderId) => providerId === "ollama" ? false
@@ -593,7 +567,9 @@ export function Workspace() {
     ? modelState.models.length > 0
     : data.provider === "openrouter"
       ? providerCredentialPresent("openrouter") || data.models.openrouter === "openrouter/free"
-      : providerCredentialPresent(data.provider);
+      : sharedKatMode
+        ? Boolean(status?.sharedAi?.configured && aiSystem?.sharedAiEnabled && !aiSystem?.killSwitchActive && katModelId)
+        : providerCredentialPresent(data.provider);
   const isProviderConfigured = (providerId: ProviderId) => providerId === "ollama"
     ? modelCatalogs.ollama.models.length > 0
     : providerId === "openrouter"
@@ -605,15 +581,6 @@ export function Workspace() {
     return searchMatch && priceMatch;
   });
   const displayedModels = visibleModels.slice(0, 150);
-  const renderModelOption = (model: ModelMetadata) => {
-    const size = formatModelSize(model.sizeBytes);
-    const detail = data.provider === "ollama"
-      ? [size, model.parameterSize, model.quantization].filter(Boolean).join(" · ") || "Local model metadata not provided"
-      : model.pricingStatus === "free" ? "Free"
-        : model.pricingStatus === "paid" ? `Input $${formatModelPrice(model.pricing?.inputPerMillion)} / output $${formatModelPrice(model.pricing?.outputPerMillion)} per 1M tokens`
-          : "Pricing not listed";
-    return <button key={model.id} className={`dropdown-row ${data.models[data.provider] === model.id ? "chosen" : ""}`} aria-pressed={data.models[data.provider] === model.id} onClick={() => { setData((current) => ({ ...current, models: { ...current.models, [current.provider]: model.id } })); setModelMenuOpen(false); }}><span className="model-dot" /><span><strong>{model.name}{model.recommended && <em className="recommended-badge">Recommended</em>}</strong><small>{model.namespace ? `${model.namespace} · ` : ""}{model.id} · {detail}</small></span>{data.models[data.provider] === model.id && <Check size={15} />}</button>;
-  };
   const projectForExport = data.projects.find((project) => project.id === selectedProjectExportId) ?? activeProject;
   const conversationForExport = projectForExport?.chats.find((chat) => chat.id === selectedConversationExportId) ?? projectForExport?.chats[0];
   const filteredSkills = data.skills.filter((skill) => `${skill.name} ${skill.description} ${skill.sourceName ?? ""} ${skill.author ?? ""} ${skill.license ?? ""} ${skill.metadata ? Object.values(skill.metadata).join(" ") : ""}`.toLowerCase().includes(skillSearch.trim().toLowerCase()));
@@ -1266,8 +1233,21 @@ export function Workspace() {
     const onScroll = (event: Event) => {
       const target = event.target;
       if (!(target instanceof HTMLElement) || target.closest(".sidebar")) return;
+
+      const isPageScroll = target.matches(".learning-view") && !target.classList.contains("learning-playground");
+      const isPlaygroundPageScroll = target.id === "main-content" && target.classList.contains("main-panel-playground");
+      if (!isPageScroll && !isPlaygroundPageScroll) return;
+
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLInputElement ||
+        activeElement instanceof HTMLTextAreaElement ||
+        activeElement instanceof HTMLSelectElement ||
+        (activeElement instanceof HTMLElement && activeElement.isContentEditable)
+      ) return;
       const topbar = document.querySelector<HTMLElement>(".topbar");
-      if (topbar?.contains(document.activeElement)) return;
+      if (topbar?.contains(activeElement)) return;
+
       const current = target.scrollTop;
       const intent = scrollIntents.get(target) ?? { position: 0, direction: 0, distance: 0 };
       const delta = current - intent.position;
@@ -1290,8 +1270,7 @@ export function Workspace() {
         intent.distance += Math.abs(delta);
       }
 
-      // Touch momentum and nested Code/Kat scrollers often emit small reversals.
-      // Reveal only after a deliberate upward gesture; collapse promptly on descent.
+      // Only the active lesson panel can affect the header; directional thresholds absorb scroll noise.
       if (direction > 0 && intent.distance >= 10) setMobileHeaderCollapsed(true);
       else if (direction < 0 && intent.distance >= 40) setMobileHeaderCollapsed(false);
     };
@@ -1300,6 +1279,17 @@ export function Workspace() {
   }, [smallScreen]);
 
   useEffect(() => setMobileHeaderCollapsed(false), [view]);
+
+  useEffect(() => {
+    if (!mobileNav) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMobileNav(false);
+      window.requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".mobile-menu")?.focus());
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [mobileNav]);
 
   useEffect(() => {
     try {
@@ -1607,29 +1597,46 @@ export function Workspace() {
     }
     const used = Math.max(0, allocated - remaining);
     const percentRemaining = allocated > 0 ? Math.round((remaining / allocated) * 100) : 0;
-    const isSharedActive = !aiSystem?.killSwitchActive;
+    const sharedProviderConfigured = Boolean(status?.sharedAi?.configured);
+    const sharedProviderName = status?.sharedAi?.providerId ? providerCatalog[status.sharedAi.providerId].name : "KATALYST AI";
+    const isSharedActive = Boolean(sharedProviderConfigured && aiSystem?.sharedAiEnabled && !aiSystem?.killSwitchActive);
+    const sharedStatusLabel = !status || !aiSystem
+      ? "Checking setup…"
+      : aiSystem.killSwitchActive
+        ? "Maintenance Active"
+        : !sharedProviderConfigured
+          ? "Server setup needed"
+          : !aiSystem.sharedAiEnabled
+            ? "Disabled by administrator"
+            : "Available";
 
     return (
       <>
         <div id="settings-usage-credits" className="settings-section-heading">
           <span className="eyebrow">QUOTA & TELEMETRY</span>
           <h2>Usage & Credits</h2>
-          <p>KATALYST provides shared AI credits powered by Cloudflare Workers AI. BYOK provider usage consumes 0 credits.</p>
+          <p>KATALYST provides shared AI credits through the deployment owner’s configured provider. Personal BYOK usage consumes 0 KATALYST credits.</p>
         </div>
 
         <article className="settings-card shared-ai-status-card">
           <div className="context-head">
             <div>
               <h2>Shared AI Gateway</h2>
-              <p>Managed Cloudflare Workers AI gateway serving all KATALYST learners.</p>
+              <p>Managed {sharedProviderName} gateway serving Kat for all KATALYST learners.</p>
             </div>
             <span className={`status-pill ${isSharedActive ? "ready" : "needs-setup"}`}>
               <span className="connection-dot" />
-              {isSharedActive ? "Available" : "Maintenance Active"}
+              {sharedStatusLabel}
             </span>
           </div>
+          {status && !sharedProviderConfigured && isAdmin && (
+            <div className="shared-ai-setup-note" role="status">
+              <strong>Enable shared Kat AI for everyone</strong>
+              <p>Ask the deployment operator to configure a server-side Gemini provider and API key, or the required Cloudflare Workers AI credentials, then redeploy. Keep all credentials server-only and apply the Supabase migrations before enabling shared requests. The deployment guide lists the exact environment settings.</p>
+            </div>
+          )}
           <div className="provider-lifecycle" aria-label="Shared AI gateway configuration">
-            <span><strong>Managed Provider</strong>Cloudflare Workers AI</span>
+            <span><strong>Managed Provider</strong>{sharedProviderName}</span>
             <span><strong>Model</strong>Managed in Kat AI</span>
             <span><strong>Credit use</strong>Varies by model and request size</span>
             <span><strong>Infrastructure</strong>Zero-key server proxy</span>
@@ -1876,55 +1883,15 @@ export function Workspace() {
           <div className="sidebar-section recent-section"><div className="section-heading"><span>{conversationSearch.trim() ? "Search results" : "Recent"}</span></div><label className="conversation-search"><Search size={13} /><input type="search" aria-label="Search conversations" placeholder="Search conversations" value={conversationSearch} onChange={(event) => setConversationSearch(event.target.value)} /></label><div className="chat-list">{(conversationSearch.trim() ? searchableConversations.filter(({ chat }) => !chat.pinned) : searchableConversations.filter(({ project, chat }) => project.id === activeProject?.id && !chat.pinned).slice(0, 8)).map(renderConversationRow)}</div>{conversationSearch.trim() && searchableConversations.length === 0 && <span className="search-empty">No matching conversations.</span>}{!conversationSearch.trim() && !searchableConversations.some(({ project, chat }) => project.id === activeProject?.id && !chat.pinned) && <span className="search-empty">No recent conversations in this project.</span>}</div>
         </>}
         <div className="sidebar-bottom">
-          <div className={`provider-state ${providerConfigured ? "connected" : "disconnected"}`}><span className="connection-dot" /><span>{sharedKatMode ? providerConfigured ? "Kat AI ready · managed by KATALYST" : "Kat AI is temporarily unavailable" : data.provider === "ollama" ? providerConfigured ? "Ollama models available" : "Ollama setup needed" : data.provider === "openrouter" && data.models.openrouter === "openrouter/free" && !providerCredentialPresent("openrouter") ? "OpenRouter free route selected" : providerConfigured ? `${selectedProvider.name} credentials configured` : `${selectedProvider.name} setup needed`}</span><button aria-label="Open provider settings" onClick={() => openSettings("providers")}><ChevronDown size={14} /></button></div>
           <nav className="sidebar-legal-links" aria-label="Legal information"><Link className="sidebar-get-app" href="/download">Get App</Link><Link href="/privacy">Privacy</Link><Link href="/terms">Terms</Link><Link href="/account/delete">Delete account</Link><Link href="/sitemap">Sitemap</Link></nav>
         </div>
       </aside>
 
-      <main className={`main-panel${view === "playground" ? " main-panel-playground" : ""}`} id="main-content" tabIndex={-1}>
+      <main className={`main-panel${view === "playground" ? " main-panel-playground" : ""}`} id="main-content" data-view={view} tabIndex={-1}>
         <header className={`topbar${mobileHeaderCollapsed ? " topbar-collapsed" : ""}`} aria-hidden={mobileHeaderCollapsed} inert={mobileHeaderCollapsed}>
           <button className="icon-button mobile-menu" aria-label="Open navigation" aria-expanded={mobileNav} aria-controls="sidebar-nav" onClick={() => setMobileNav(true)}><Menu size={20} /></button>
           <div className="breadcrumbs"><button className="breadcrumb-root" onClick={() => setView("home")}>KATALYST</button>{view === "workspace" && <><span className="crumb-sep">/</span><span>{activeProject?.name ?? "Workspace"}</span></>}<span className="crumb-sep">/</span><strong>{view === "workspace" ? (activeChat?.title ?? "New conversation") : view === "skills" ? "Skill library" : view === "settings" ? "Settings" : view === "home" ? "Learning Home" : view === "paths" ? "Learning Paths" : view === "my-learning" ? "My Learning" : view === "playground" ? "Playground" : view === "practice" ? "Practice Lab" : view === "progress" ? "Progress" : view === "tutor" ? "AI Tutor" : "Lesson"}</strong></div>
           <div className="topbar-actions">
-            <div className="menu-anchor" ref={providerMenuRef}>
-              <button className="provider-selector" ref={providerMenuButtonRef} aria-expanded={providerMenuOpen} onClick={() => setProviderMenuOpen((open) => !open)}>
-                <span className="provider-logo">{sharedKatMode ? "K" : selectedProvider.logo}</span><span className="provider-name">{sharedKatMode ? "Kat AI" : selectedProvider.name}</span><ChevronDown size={14} />
-              </button>
-              {providerMenuOpen && <div className="dropdown provider-dropdown"><div className="dropdown-title">Model provider</div>
-                {providerIds.map((providerId) => {
-                  const provider = providerCatalog[providerId];
-                  const configured = isProviderConfigured(providerId);
-                  const state = providerId === "ollama" ? configured ? "Local server ready" : "Local setup" : providerId === "cloudflare" && cloudflareMode === "platform" ? "Managed model · Kat tutor only" : configured ? providerId === "cloudflare" ? "Credentials configured" : "API key configured" : "Setup required";
-                  return <button key={providerId} className={`dropdown-row ${data.provider === providerId ? "chosen" : ""}`} aria-pressed={data.provider === providerId} onClick={() => {
-                    setData((current) => ({ ...current, provider: providerId }));
-                    if ((providerId !== "cloudflare" || cloudflareMode === "byok") && providerCatalog[providerId].dynamicModels && !modelCatalogs[providerId].models.length && !modelCatalogs[providerId].refreshedAt && configured) void loadModels(providerId, false, sessionKeys[providerId], data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL, sessionCloudflareAccountId);
-                    setProviderMenuOpen(false);
-                  }}><span className="provider-logo">{providerId === "cloudflare" && cloudflareMode === "platform" ? "K" : provider.logo}</span><span><strong>{providerId === "cloudflare" && cloudflareMode === "platform" ? "Kat AI" : provider.name}</strong><small>{state}</small></span>{data.provider === providerId && <Check size={15} />}</button>;
-                })}
-                <div className="dropdown-note">Choose Kat AI for the managed tutor, or configure a personal provider for Workspace. Ollama uses local inference.</div>
-              </div>}
-            </div>
-            {sharedKatMode ? <div className="model-managed-label" aria-label="Kat AI managed model">Kat AI <span>Managed model · configured by KATALYST</span></div> : <div className="menu-anchor" ref={modelMenuRef}>
-              <button className="model-selector" ref={modelMenuButtonRef} aria-expanded={modelMenuOpen} aria-label={`Selected model: ${selectedModel?.name ?? "none"}. Open model selector`} onClick={() => {
-                setModelMenuOpen((open) => !open);
-                setModelSearch("");
-                if (providerCatalog[data.provider].dynamicModels && !modelCatalogs[data.provider].models.length && !modelCatalogs[data.provider].refreshedAt && providerConfigured) void loadModels(data.provider, false, sessionKeys[data.provider], data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL, sessionCloudflareAccountId);
-              }}><span className="model-dot" /><span className="model-selector-label">{selectedModel?.name ?? (modelState.loading ? "Loading models…" : "Choose model")}</span><ChevronDown size={14} /></button>
-              {modelMenuOpen && <div className="dropdown model-dropdown"><div className="dropdown-title">Choose a {selectedProvider.name} model</div>
-                <div className="model-controls"><input aria-label="Search models" value={modelSearch} onChange={(event) => setModelSearch(event.target.value)} placeholder="Search models" />{data.provider !== "ollama" && <select aria-label="Filter by price" value={pricingFilter} onChange={(event) => setPricingFilter(event.target.value as PricingFilter)}><option value="all">All prices</option><option value="free">Free</option><option value="paid">Paid</option></select>}<button aria-label="Refresh model catalog" onClick={() => void loadModels(data.provider, true, sessionKeys[data.provider], data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL, sessionCloudflareAccountId)} disabled={modelState.loading}><RefreshCw size={14} /></button></div>
-                {modelState.loading && <div className="model-empty" role="status">Loading supported models…</div>}
-                {modelState.error && <div className="model-error" role="alert">{modelState.error}<button onClick={() => void loadModels(data.provider, true, sessionKeys[data.provider], data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL, sessionCloudflareAccountId)}>Retry</button></div>}
-                {!modelState.loading && !modelState.error && !visibleModels.length && <div className="model-empty">{data.provider === "ollama" ? "No local models are installed. Set up Ollama in Settings, install a model, then refresh." : data.provider === "cloudflare" && modelState.diagnostic ? modelState.diagnostic.message : !providerConfigured ? "Set up this provider in Settings to load its supported models." : "No models match your search or filters."}</div>}
-                {visibleModels.length > displayedModels.length && <div className="model-empty">Showing the first 150 matches. Search to narrow the catalog.</div>}
-                <div className="model-results">
-                  {displayedModels.some((model) => model.recommended) && <div className="model-section-label">Recommended models</div>}
-                  {displayedModels.filter((model) => model.recommended).map(renderModelOption)}
-                  {displayedModels.some((model) => model.recommended) && <div className="model-section-label">All compatible models</div>}
-                  {displayedModels.filter((model) => !model.recommended).map(renderModelOption)}
-                </div>
-                {selectedModel && <div className="dropdown-note model-details">{selectedModel.contextLimit ? `${selectedModel.contextLimit.toLocaleString()} token context · ` : data.provider === "ollama" ? "Context limit not reported by the model list · " : ""}{selectedModel.capabilities.join(", ")}. {data.provider === "ollama" ? `${formatModelSize(selectedModel.sizeBytes) ?? "Model size unavailable"}. Disk size does not predict RAM or speed.` : selectedModel.credentialAccess === "listed-for-key" ? "Listed for this API key." : data.provider === "cloudflare" ? "Workers AI quota and billing depend on your Cloudflare plan." : "Model listing; access is not verified."}</div>}
-              </div>}
-            </div>}
             {view === "home" && <button
               type="button"
               className="theme-quick-toggle"
@@ -1938,44 +1905,6 @@ export function Workspace() {
               {preferences.theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
               <span>{preferences.theme === "system" ? "Theme" : preferences.theme === "dark" ? "Light" : "Dark"}</span>
             </button>}
-            {(() => {
-              const isByok = data.provider !== "cloudflare" || cloudflareMode === "byok";
-              if (isByok) {
-                return (
-                  <button
-                    type="button"
-                    className="ai-quota-pill quota-byok"
-                    title="Using Bring-Your-Own-Key provider. Shared KATALYST credits are not consumed."
-                    onClick={() => openSettings("usage-credits")}
-                  >
-                    BYOK · {selectedProvider.name}
-                  </button>
-                );
-              }
-              if (creditStatus) {
-                const remaining = creditStatus.isGuest ? creditStatus.trialCreditsRemaining : creditStatus.creditsRemaining;
-                const isExhausted = remaining <= 0;
-                const isLow = remaining > 0 && remaining <= 50;
-                const pillClass = isExhausted ? "quota-exhausted" : isLow ? "quota-low" : "quota-healthy";
-                const allocated = creditStatus.isGuest ? creditStatus.trialCreditsAllocated : creditStatus.creditsAllocated;
-                const label = creditStatus.isGuest
-                  ? `Kat AI · ${remaining.toFixed(0)} credits`
-                  : `${remaining.toFixed(0)} credits`;
-                return (
-                  <button
-                    type="button"
-                    className={`ai-quota-pill ${pillClass}`}
-                    title={creditStatus.isGuest
-                      ? `Kat AI guest balance: ${remaining.toFixed(0)} of ${allocated} credits remain. Credit use varies by model and request size; your own API keys do not use Kat AI credits.`
-                      : `Monthly credits. Resets ${creditStatus.resetDate ? new Date(creditStatus.resetDate).toLocaleDateString() : "next month"}.`}
-                    onClick={() => openSettings("usage-credits")}
-                  >
-                    ✨ {label}
-                  </button>
-                );
-              }
-              return null;
-            })()}
             <button className="top-icon" aria-label="Open settings" onClick={() => openSettings()}><Settings2 size={18} /></button>
           </div>
         </header>
@@ -2016,7 +1945,7 @@ export function Workspace() {
         </section>}
         {storageError && <section className="storage-write-error" role="alert"><span>{storageError}</span><button className="secondary-button" onClick={() => openSettings("workspace")}>Open backup settings</button></section>}
 
-        {(["home", "paths", "my-learning", "playground", "practice", "progress", "tutor", "lesson"] as LearningSection[]).includes(view as LearningSection) && <LearningExperience section={view as LearningSection} onNavigate={setView} routeLessonId={routeLessonId} onOpenSettings={() => openSettings("providers")} provider={data.provider} model={learningModel} modelName={learningModelName || selectedModel?.name || ""} sessionKey={sessionKeys[data.provider]} cloudflareAccountId={sessionCloudflareAccountId} cloudflareMode={cloudflareMode} ollamaBaseUrl={data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL} configured={providerConfigured} workspaceSummary={workspaceDashboardSummary} skills={data.skills} courses={publishedLearningCourses} playgroundSelection={playgroundSelection} onPlaygroundSelectionChange={setPlaygroundSelection} />}
+        {(["home", "paths", "my-learning", "playground", "practice", "progress", "tutor", "lesson"] as LearningSection[]).includes(view as LearningSection) && <LearningExperience section={view as LearningSection} onNavigate={setView} routeLessonId={routeLessonId} onOpenSettings={() => openSettings("ai-models")} provider={data.provider} model={learningModel} sessionKey={sessionKeys[data.provider]} cloudflareAccountId={sessionCloudflareAccountId} cloudflareMode={cloudflareMode} ollamaBaseUrl={data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL} configured={providerConfigured} workspaceSummary={workspaceDashboardSummary} skills={data.skills} courses={publishedLearningCourses} playgroundSelection={playgroundSelection} onPlaygroundSelectionChange={setPlaygroundSelection} />}
 
         {view === "skills" ? <section className="library-view">
           <div className="view-heading"><div><span className="eyebrow">TOOLS FOR YOUR WORK</span><h1>Skill library</h1><p>Add reusable instructions to the conversations where they help.</p></div><button className="primary-button" onClick={() => fileRef.current?.click()}><FileUp size={16} /> Import a skill</button></div>
@@ -2044,7 +1973,7 @@ export function Workspace() {
         </section> : null}
 
         {view === "settings" ? <section className="settings-view">
-          <div className="view-heading"><div><span className="eyebrow">WORKSPACE CONFIGURATION</span><h1>Settings</h1><p>Appearance, model access, and local workspace data.</p></div></div>
+          <div className="view-heading"><div><span className="eyebrow">WORKSPACE CONFIGURATION</span><h1>Settings</h1><p>Appearance, AI & Kat, and workspace options.</p></div></div>
           <div className="settings-layout-grid">
             <nav className="settings-section-nav settings-grouped-nav" role="tablist" aria-label="Settings sections" onKeyDown={(event) => {
               const allItems = [
@@ -2112,12 +2041,17 @@ export function Workspace() {
             {preferencesIssue && <p className="settings-data-issue" role="status">{preferencesIssue}</p>}
           </article>}
           {settingsCategory === "ai-models" && <>
-          <div id="settings-ai-providers" className="settings-section-heading"><span className="eyebrow">CONNECTIONS & MODELS</span><h2>AI & Models</h2><p>Credentials stay server-side or in this tab’s memory. Choose a BYOK provider and model; shared Kat AI model settings are managed by an administrator.</p></div>
+          <div id="settings-ai-providers" className="settings-section-heading"><span className="eyebrow">CONNECTIONS & MODELS</span><h2>AI & Kat</h2><p>Choose how Kat and the Workspace assistant connect. Credentials stay server-side or in this tab’s memory; shared Kat settings are managed by an administrator.</p></div>
           <article className="settings-model-card model-settings-card" id="settings-models">
             <div className="context-head"><div><h2>Models</h2><p>Search and select from models this adapter supports.</p></div><span className="local-label">{selectedProvider.name}</span></div>
-            <p className="active-model-setting">Active selection: <strong>{sharedKatMode ? "Kat AI" : selectedProvider.name}</strong>{sharedKatMode ? " · admin-managed model for the Kat tutor" : selectedModel ? ` · ${selectedModel.name}` : " · no model selected"}</p>
-            {sharedKatMode ? <p className="settings-explainer">The shared Cloudflare model is selected and enabled by KATALYST administrators. It is used only in Kat. Switch Cloudflare access to BYOK below to select a personal Cloudflare model for Workspace.</p> : <>
-              <div className="settings-model-controls"><label className="key-field">Search available models<input type="search" aria-label="Search models in settings" placeholder="Name, publisher, or model ID" value={modelSearch} onChange={(event) => setModelSearch(event.target.value)} /></label><label className="key-field">Selected model<select aria-label="Settings selected model" value={data.models[data.provider]} onChange={(event) => setData((current) => ({ ...current, models: { ...current.models, [current.provider]: event.target.value } }))} disabled={!displayedModels.length}><option value="">No supported models loaded</option>{displayedModels.map((model) => <option key={model.id} value={model.id}>{model.name} · {model.id}</option>)}</select></label><button className="secondary-button" onClick={() => void loadModels(data.provider, true, sessionKeys[data.provider], data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL, sessionCloudflareAccountId)} disabled={modelState.loading}>{modelState.loading ? "Loading…" : "Refresh active catalog"}</button></div>
+            <p className="active-model-setting">Active selection: <strong>{sharedKatMode ? "Kat AI" : selectedProvider.name}</strong>{sharedKatMode ? katModelId ? ` · ${katProviderId ? `${providerCatalog[katProviderId].name} · ` : ""}${katModelId}` : " · administrator-managed model" : selectedModel ? ` · ${selectedModel.name}` : " · no model selected"}</p>
+            {sharedKatMode ? <p className="settings-explainer">The shared model is enabled by KATALYST administrators for Kat. Switch this connection to BYOK to select a personal model for Workspace.</p> : <>
+              <div className="settings-model-controls">
+                <label className="key-field">Search available models<input type="search" aria-label="Search models in settings" placeholder="Name, publisher, or model ID" value={modelSearch} onChange={(event) => setModelSearch(event.target.value)} /></label>
+                {data.provider !== "ollama" && <label className="key-field">Filter by price<select aria-label="Filter by price" value={pricingFilter} onChange={(event) => setPricingFilter(event.target.value as PricingFilter)}><option value="all">All prices</option><option value="free">Free</option><option value="paid">Paid</option></select></label>}
+                <label className="key-field">Selected model<select aria-label="Settings selected model" value={data.models[data.provider]} onChange={(event) => setData((current) => ({ ...current, models: { ...current.models, [current.provider]: event.target.value } }))} disabled={!displayedModels.length}><option value="">No supported models loaded</option>{displayedModels.map((model) => <option key={model.id} value={model.id}>{modelOptionLabel(model)}</option>)}</select></label>
+                <button className="secondary-button" onClick={() => void loadModels(data.provider, true, sessionKeys[data.provider], data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL, sessionCloudflareAccountId)} disabled={modelState.loading}>{modelState.loading ? "Loading…" : "Refresh active catalog"}</button>
+              </div>
               {modelState.error && <div className="inline-error" role="alert">{modelState.error}<button onClick={() => void loadModels(data.provider, true, sessionKeys[data.provider], data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL, sessionCloudflareAccountId)}>Retry</button></div>}
               <p className="model-catalog-summary">{modelState.models.length} supported model{modelState.models.length === 1 ? "" : "s"}{modelState.refreshedAt ? ` · ${modelState.cached ? "cached" : "checked"} ${new Date(modelState.refreshedAt).toLocaleTimeString()}` : " · select Refresh active catalog to check availability"}</p>
             </>}
@@ -2160,7 +2094,7 @@ export function Workspace() {
                   : inferenceState[providerId] === "network" ? "Network or provider failure"
                     : inferenceState[providerId] === "failed" ? "Provider rejected the request"
                       : "Inference not tested in this session";
-            return <article className={`settings-card ${active ? "provider-card-active" : ""}`} key={providerId}>
+            return <article className={`settings-card provider-settings-card ${active ? "provider-card-active" : ""}`} key={providerId}>
               <div className="settings-card-head"><div className="provider-logo large">{provider.logo}</div><div><h2>{provider.name}</h2><p>{provider.apiLabel} · {providerId === "ollama" ? "local inference" : "server-side requests"}</p></div><span className={`status-pill ${configured ? "ready" : "needs-setup"}`}><span className="connection-dot" />{active ? "Active provider" : "Available provider"}</span></div>
               <div className="provider-lifecycle" aria-label={`${provider.name} connection status`}><span><strong>Credentials</strong>{credentialState}</span><span><strong>Authentication</strong>{authenticationState}</span><span><strong>Catalog</strong>{discoveryState}</span><span><strong>Inference</strong>{lastInference}</span></div>
               {providerId === "ollama" ? <>
@@ -2198,8 +2132,8 @@ export function Workspace() {
               {providerId !== "ollama" && providerId !== "cloudflare" && !configured && <div className="setup-steps"><strong>Provider setup</strong><p>The deployment operator may configure this provider on the server. You can also enter your own credential above; it stays in this tab’s memory and is sent only to KATALYST’s server.</p><span>Provider usage and charges follow {provider.name} terms.</span></div>}
             </article>;
           })}
+          {renderUsageAndCreditsSettings()}
           </>}
-          {settingsCategory === "usage-credits" && renderUsageAndCreditsSettings()}
           {settingsCategory === "learning" && <article className="settings-card learning-settings-card" id="settings-learning"><div className="context-head"><div><h2>Learning</h2><p>Learning progress is stored separately from workspace backups.</p></div><span className="local-label">Explicit completion</span></div><p className="settings-explainer">KATALYST records path enrollment, lesson opens, and lessons you mark complete. It does not infer mastery from chat history or time spent. Current progress stays in this browser.</p><button className="secondary-button" onClick={() => setView("progress")}>Open Progress dashboard</button></article>}
           {settingsCategory === "workspace" && <>
           <div id="settings-workspace" className="settings-section-heading"><span className="eyebrow">LOCAL DATA</span><h2>Workspace</h2><p>Export, restore, and manage your projects and conversations.</p></div>
@@ -2240,16 +2174,13 @@ export function Workspace() {
             <div className="welcome-orbit"><BrandMark className="welcome-mark" /><span className="orbit-node node-a" /><span className="orbit-node node-b" /><span className="orbit-node node-c" /></div>
             <span className="eyebrow welcome-eyebrow">A WORKSPACE THAT WORKS YOUR WAY</span><h1>Make room for<br /><em>what comes next.</em></h1><p className="welcome-copy">Bring a model, add the right skills, and get to work in your own space.</p>
             <div className="suggestion-list">{starterPrompts.map((item, index) => <button key={item.title} className="suggestion" onClick={() => { setPrompt(item.prompt); textareaRef.current?.focus(); }}><span className={`suggestion-glyph glyph-${index}`}>{index === 0 ? <ArrowUp size={15} /> : index === 1 ? <Command size={15} /> : <BookOpen size={15} />}</span><span><strong>{item.title}</strong><small>{item.prompt}</small></span><ArrowDown size={14} className="suggestion-arrow" /></button>)}</div>
-            {!providerConfigured && <button className="setup-nudge" onClick={() => openSettings("providers")}><span className="connection-dot" />Connect {selectedProvider.name} to start chatting <ArrowDown size={14} /></button>}
+            {!providerConfigured && <button className="setup-nudge" onClick={() => openSettings("ai-models")}><span className="connection-dot" />Set up AI access in Settings <ArrowDown size={14} /></button>}
           </div> : <div className="messages-scroll"><div className="message-thread" aria-live="polite">
             {activeChat.messages.map((message, index) => {
               const usageDetails = [
-                message.provider ? providerCatalog[message.provider].name : undefined,
-                message.model,
                 message.usage?.inputTokens !== undefined ? `${message.usage.inputTokens.toLocaleString()} input tokens` : undefined,
                 message.usage?.outputTokens !== undefined ? `${message.usage.outputTokens.toLocaleString()} output tokens` : undefined,
                 message.usage?.costUsd !== undefined ? `$${new Intl.NumberFormat("en-US", { maximumSignificantDigits: 8 }).format(message.usage.costUsd)} reported cost` : undefined,
-                message.provider === "ollama" ? "local usage · no cloud charge" : undefined,
               ].filter(Boolean).join(" · ");
               return <div key={`${activeChat.id}-${index}`} className={`message ${message.role}`}>
                 <div className="message-avatar">{message.role === "user" ? "Y" : <BrandMark className="mini-brand" />}</div>
@@ -2265,12 +2196,12 @@ export function Workspace() {
               </div>;
             })}
             {pending && <div className="message assistant"><div className="message-avatar"><BrandMark className="mini-brand" /></div><div className="message-body"><span className="message-author">Katalyst</span><div className="typing-indicator"><i /><i /><i /></div><span className="sr-only">Generating a response</span><button className="stop-generation" onClick={stopGeneration}>Stop generation</button></div></div>}
-            {error && <div className="send-error" role="alert"><strong>Couldn’t get a response</strong><span>{error}</span>{retryRequestRef.current && <button onClick={retryLastRequest}><RotateCcw size={12} /> Retry request</button>}<button onClick={() => openSettings("providers")}>Open provider settings</button></div>}
+            {error && <div className="send-error" role="alert"><strong>Couldn’t get a response</strong><span>{error}</span>{retryRequestRef.current && <button onClick={retryLastRequest}><RotateCcw size={12} /> Retry request</button>}<button onClick={() => openSettings("ai-models")}>Open AI settings</button></div>}
             {copyStatus && <span className="sr-only" role="status">{copyStatus}</span>}
           </div></div>}
           <div className={`composer-wrap ${!activeChat?.messages.length ? "composer-welcome" : ""}`}>
             {editingMessageIndex !== null && <div className="edit-mode"><span>Editing a message. Sending will replace it and remove later turns.</span><button onClick={() => { setEditingMessageIndex(null); setPrompt(""); }}>Cancel edit</button></div>}
-            <form className="composer" onSubmit={onSubmit}><textarea ref={textareaRef} name="message" autoComplete="off" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} rows={1} maxLength={8000} aria-label="Message Katalyst" placeholder="Ask anything, or bring in a skill…" disabled={pending} /><div className="composer-toolbar"><div className="composer-tools"><button type="button" className={`skill-chip ${enabledSkills.length ? "skill-chip-active" : ""}`} onClick={() => setView("skills")}><Sparkles size={14} /><span>{enabledSkills.length ? `${enabledSkills.length} skill${enabledSkills.length > 1 ? "s" : ""}` : "Add a skill"}</span></button><span className="composer-separator" /><button type="button" className="model-caption" onClick={() => setModelMenuOpen(true)}>{selectedModel?.name ?? "Choose a model"}<ChevronDown size={13} /></button></div><button className="send-button" aria-label="Send message" disabled={!prompt.trim() || pending || !selectedModel}><ArrowUp size={18} /></button></div></form><div className="composer-footnote">AI can make mistakes. Check important information.</div></div>
+            <form className="composer" onSubmit={onSubmit}><textarea ref={textareaRef} name="message" autoComplete="off" value={prompt} onChange={(event) => setPrompt(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} rows={1} maxLength={8000} aria-label="Message Katalyst" placeholder="Ask anything, or bring in a skill…" disabled={pending} /><div className="composer-toolbar"><div className="composer-tools"><button type="button" className={`skill-chip ${enabledSkills.length ? "skill-chip-active" : ""}`} onClick={() => setView("skills")}><Sparkles size={14} /><span>{enabledSkills.length ? `${enabledSkills.length} skill${enabledSkills.length > 1 ? "s" : ""}` : "Add a skill"}</span></button><span className="composer-separator" /><button type="button" className="model-caption" onClick={() => openSettings("ai-models")}><Settings2 size={13} /><span>AI settings</span></button></div><button className="send-button" aria-label="Send message" disabled={!prompt.trim() || pending || !selectedModel}><ArrowUp size={18} /></button></div></form><div className="composer-footnote">AI can make mistakes. Check important information.</div></div>
         </div> : null}
       </main>
     </div>

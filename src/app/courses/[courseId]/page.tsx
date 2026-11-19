@@ -21,7 +21,16 @@ export async function generateMetadata({ params }: { params: Promise<{ courseId:
     title: course.title,
     description: course.description,
     alternates: { canonical: "/courses/" + course.id },
-    openGraph: { type: "article", title: course.title + " — KATALYST", description: course.description },
+    keywords: [course.title, course.level, ...(course.learningOutcomes ?? [])],
+    openGraph: {
+      type: "article",
+      url: new URL("/courses/" + course.id, siteOrigin).toString(),
+      siteName: "KATALYST",
+      title: course.title + " — KATALYST",
+      description: course.description,
+      images: [{ url: "/opengraph-image.png", width: 1200, height: 630, alt: "KATALYST course: " + course.title }],
+    },
+    twitter: { card: "summary_large_image", title: course.title + " — KATALYST", description: course.description, images: ["/opengraph-image.png"] },
   };
 }
 
@@ -37,8 +46,10 @@ export default async function PublicCoursePage({ params }: { params: Promise<{ c
     name: course.title,
     description: course.description,
     educationalLevel: course.level,
-    provider: { "@type": "Organization", name: "KATALYST", url: siteOrigin },
-    numberOfCredits: totalLessons,
+    url: new URL("/courses/" + course.id, siteOrigin).toString(),
+    provider: { "@type": "EducationalOrganization", name: "KATALYST", url: siteOrigin },
+    teaches: course.learningOutcomes,
+    ...(course.prerequisites.length ? { coursePrerequisites: course.prerequisites.join(" ") } : {}),
   }).replace(/</g, "\\u003c");
 
   return (

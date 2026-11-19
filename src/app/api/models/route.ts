@@ -1,6 +1,6 @@
 import "server-only";
 import { discoverModels } from "@/lib/providers/discovery";
-import { getCloudflareAccountId, getProviderApiKey, isSecureSessionKeyRequest, MAX_SESSION_KEY_LENGTH, SESSION_KEY_HEADER } from "@/lib/providers/credentials";
+import { getCloudflareAccountId, getProviderApiKey, getSharedAiProviderId, isSecureSessionKeyRequest, MAX_SESSION_KEY_LENGTH, SESSION_KEY_HEADER } from "@/lib/providers/credentials";
 import { isProviderId, providerCatalog } from "@/lib/providers/catalog";
 import { ProviderError } from "@/lib/providers/types";
 import { CLOUDFLARE_ACCOUNT_HEADER, DEFAULT_OLLAMA_BASE_URL, MAX_OLLAMA_URL_LENGTH, OLLAMA_URL_HEADER } from "@/lib/providers/constants";
@@ -41,6 +41,9 @@ export async function GET(request: Request) {
   }
 
   try {
+    if (providerParam === "gemini" && getSharedAiProviderId() === "gemini" && !rawSessionKey?.trim()) {
+      return Response.json({ error: "The shared Gemini key is reserved for Kat. Add your own Gemini key in Settings to discover Workspace models." }, { status: 403, headers: { "Cache-Control": "no-store" } });
+    }
     if (providerParam === "cloudflare" && cloudflareMode === "platform") {
       return Response.json({ error: "Shared Kat AI models are managed by KATALYST and are not part of the BYOK model catalog." }, { status: 403, headers: { "Cache-Control": "no-store" } });
     }

@@ -2,6 +2,17 @@
 
 ## Unreleased — MVP operations, announcement scheduling, and launch media
 
+- Consolidated provider, model, Kat AI, credit, and request-history controls under Settings.
+- Stabilized mobile Kat scrolling and lesson navigation; hid route metadata from chat and added direct creator attribution for Kat.
+- Improved light-theme syntax contrast and mobile touch targets.
+
+- Fixed mobile lesson scrolling by ignoring nested Code/Kat panel scroll events, fitting the lesson to the dynamic viewport, and hiding provider/model controls from the compact lesson header.
+- Made shared Kat use server-side Cloudflare or Gemini credentials with admin-only setup guidance; visitors do not need or receive the owner's credentials.
+- Separated guest session status rate limits from inference limits, secured the session cookie, made shared credit mutations fail closed without atomic database RPCs, and reserved the shared Gemini key for Kat.
+- Paged the admin usage ledger, improved code contrast and mobile touch targets, contained the narrow-screen HTML preview, and allowed the Wasmer registry required for first-use compiler downloads through CSP.
+
+- Added Course, WebSite, and FAQ structured data plus course-specific sharing metadata for search and answer engines.
+- Replaced exposed credential examples in the provider guide with placeholders.
 - Added administrator-managed text announcement banners and scheduled Home launch-video events, backed by a service-role-only Supabase table and authenticated, origin-checked, size-bounded writes.
 - Added active-window filtering, safe text rendering, HTTPS URL validation, dismissible muted playback, audit logging, and browser E2E coverage.
 - Replaced stale custom-host references with Vercel production project-alias handling and made the optional desktop package require its explicit production `.vercel.app` origin at build time.

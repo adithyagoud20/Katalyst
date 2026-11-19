@@ -3,7 +3,7 @@ import { getVerifiedSupabaseUser } from "@/lib/supabase/server";
 import { getOrCreateGuestIdentity, GUEST_COOKIE_NAME } from "@/lib/ai-gateway/guest";
 import { getAuthenticatedUserCreditStatus } from "@/lib/ai-gateway/credits";
 import { getAiCreditPolicies, getAiSystemConfig } from "@/lib/ai-gateway/config";
-import { consumeGuestNetworkLimit } from "@/lib/ai-gateway/guest-network-limit";
+import { consumeGuestSessionNetworkLimit } from "@/lib/ai-gateway/guest-network-limit";
 import { checkIsAppAdmin } from "@/lib/ai-gateway/admin";
 
 export async function GET(request: NextRequest) {
@@ -37,9 +37,9 @@ export async function GET(request: NextRequest) {
 
   // Guest flow
   const policies = await getAiCreditPolicies();
-  let networkLimit: Awaited<ReturnType<typeof consumeGuestNetworkLimit>>;
+  let networkLimit: Awaited<ReturnType<typeof consumeGuestSessionNetworkLimit>>;
   try {
-    networkLimit = await consumeGuestNetworkLimit(request, policies);
+    networkLimit = await consumeGuestSessionNetworkLimit(request, policies);
   } catch {
     return NextResponse.json(
       { error: "Guest AI is temporarily unavailable. Please try again shortly." },
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
   }
   if (!networkLimit.allowed) {
     return NextResponse.json(
-      { error: "Too many AI requests are coming from this network. Please wait before trying again." },
+      { error: "Too many session status requests are coming from this network. Please wait before trying again." },
       {
         status: 429,
         headers: {
@@ -83,6 +83,7 @@ export async function GET(request: NextRequest) {
     httpOnly: true,
     sameSite: "lax",
     maxAge: 30 * 24 * 60 * 60,
+    secure: process.env.NODE_ENV === "production" || request.nextUrl.protocol === "https:",
   });
 
   return response;

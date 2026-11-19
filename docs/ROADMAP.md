@@ -515,6 +515,19 @@ The current interface uses one source-defined KATALYST mark, a high-contrast Lig
 - `npm run build` — passed with Next.js 16.4.5 production output.
 - Provider requests were mocked; the optional real C compiler download/integration was not run. No local data schema or provider behavior changed.
 
+## Current fixes — 2026-11-19
+
+- Moved provider/model controls, shared access status, credits, and AI request history into the single AI & Kat Settings section.
+- Removed provider/model route labels from Kat replies and conversation views; direct creator questions receive ADITHYA attribution.
+- Kept the global header stable while learners scroll nested lesson Code and Kat panels.
+
+- Mobile lesson Code and Kat panels no longer trigger the global header scroll handler; lesson sizing follows the actual viewport and keyboard height, and the mobile header no longer wraps provider/model controls above the tabs.
+- Shared Kat now reports server credential readiness clearly and remains disabled if server AI configuration is unavailable. Owner Cloudflare keys are read only by the server gateway.
+- Guest session checks use a separate network rate-limit bucket from inference; shared credit reservations, settlements, and releases require atomic database RPCs.
+- Admin usage analytics page through the full 14-day ledger instead of silently stopping at Supabase’s 1,000-row response cap.
+- HTML mobile preview fits the available viewport. The first C/C++ compiler download still depends on reaching Wasmer’s registry; retry and browser caching remain available.
+- Deferred follow-ups: streamed model responses and transactional email delivery.
+
 ## Known limitations
 
 - Email/password and Google OAuth account storage remain optional and require an operator-configured Supabase project. Live identity-provider setup, cloud deployment, and project-specific deletion behavior require deployment verification.

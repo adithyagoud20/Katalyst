@@ -5,6 +5,39 @@ export { SESSION_KEY_HEADER } from "./constants";
 
 export const MAX_SESSION_KEY_LENGTH = 2_048;
 
+export type SharedAiProviderId = "cloudflare" | "gemini";
+
+export type SharedAiSelection = {
+  providerId: SharedAiProviderId;
+  modelId: string;
+};
+
+/**
+ * The shared Kat provider is deployment-owned. Cloudflare remains the default
+ * for existing deployments; Gemini can be selected with server-only env vars.
+ */
+export function getSharedAiProviderId(): SharedAiProviderId | null {
+  const configured = process.env.KATALYST_SHARED_AI_PROVIDER?.trim().toLowerCase();
+  if (!configured) return "cloudflare";
+  return configured === "cloudflare" || configured === "gemini" ? configured : null;
+}
+
+export function resolveSharedAiSelection(cloudflareModelId: string): SharedAiSelection | null {
+  const providerId = getSharedAiProviderId();
+  if (!providerId) return null;
+  if (providerId === "cloudflare") {
+    const modelId = cloudflareModelId === "@cf/meta/llama-3.3-70b-instruct"
+      ? "@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+      : cloudflareModelId === "@cf/meta/llama-3.1-8b-instruct"
+        ? "@cf/meta/llama-3.1-8b-instruct-fp8"
+        : cloudflareModelId;
+    return /^[A-Za-z0-9@/._-]{1,240}$/.test(modelId) ? { providerId, modelId } : null;
+  }
+
+  const modelId = process.env.KATALYST_SHARED_AI_MODEL?.trim() || "gemini-3.5-flash-lite";
+  return /^[A-Za-z0-9._-]{1,200}$/.test(modelId) ? { providerId, modelId } : null;
+}
+
 const providerEnvironmentKey: Partial<Record<ProviderId, string>> = {
   cloudflare: "CLOUDFLARE_API_TOKEN",
   openai: "OPENAI_API_KEY",

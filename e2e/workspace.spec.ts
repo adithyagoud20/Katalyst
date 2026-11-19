@@ -9,20 +9,16 @@ async function ensureCourseDetails(page: import("@playwright/test").Page) {
   await expect(startButton).toBeVisible();
 }
 
-async function expectMobileHeaderToStayCollapsedDuringScrollNoise(page: Page, scroller: Locator) {
+async function expectMobileHeaderStableDuringPanelScroll(page: Page, scroller: Locator) {
   const topbar = page.locator(".topbar");
   await expect.poll(() => scroller.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
-  await scroller.evaluate((element) => { element.scrollTop = 80; });
-  await expect(topbar).toHaveClass(/topbar-collapsed/);
-
-  for (const position of [86, 80, 87, 81, 88]) {
+  const initiallyCollapsed = await topbar.evaluate((element) => element.classList.contains("topbar-collapsed"));
+  for (const position of [80, 86, 80, 87, 81, 88, 0]) {
     await scroller.evaluate((element, nextPosition) => { element.scrollTop = nextPosition; }, position);
     await page.waitForTimeout(25);
-    await expect(topbar).toHaveClass(/topbar-collapsed/);
+    if (initiallyCollapsed) await expect(topbar).toHaveClass(/topbar-collapsed/);
+    else await expect(topbar).not.toHaveClass(/topbar-collapsed/);
   }
-
-  await scroller.evaluate((element) => { element.scrollTop = 0; });
-  await expect(topbar).not.toHaveClass(/topbar-collapsed/);
 }
 
 async function openWorkspace(page: import("@playwright/test").Page) {
@@ -33,9 +29,30 @@ async function openWorkspace(page: import("@playwright/test").Page) {
 }
 
 async function openSettingsCategory(page: import("@playwright/test").Page, category: string) {
-  await page.getByRole("button", { name: "Open settings", exact: true }).click();
-  const targetCategory = category === "AI Providers" || category === "Models" ? "AI Models & BYOK" : category === "Workspace" ? "Workspace Data" : category;
+  const targetCategory = ["AI Providers", "Models", "Usage & Credits"].includes(category)
+    ? "AI & Kat"
+    : category === "Workspace" ? "Workspace Data" : category;
+  const targetTab = page.getByRole("tab", { name: targetCategory, exact: true });
+  if (!(await targetTab.isVisible().catch(() => false))) {
+    await page.getByRole("button", { name: "Open settings", exact: true }).click();
+  }
   await page.getByRole("tab", { name: targetCategory, exact: true }).click();
+}
+
+async function selectProviderInSettings(page: Page, providerName: string) {
+  await openSettingsCategory(page, "AI & Kat");
+  const cardName = providerName === "Kat AI" ? "Cloudflare Workers AI" : providerName;
+  const card = page.locator(".provider-settings-card").filter({
+    has: page.getByRole("heading", { name: cardName, exact: true }),
+  });
+  await expect(card).toBeVisible();
+  const useProvider = card.getByRole("button", { name: "Use " + cardName, exact: true });
+  if (await useProvider.count()) await useProvider.click();
+  return card;
+}
+
+async function selectSettingsModel(page: Page, modelId: string) {
+  await page.getByLabel("Settings selected model").selectOption(modelId);
 }
 
 test.beforeEach(async ({ page }) => {
@@ -94,6 +111,16 @@ export class Wasmer {
   });
 });
 
+test("compiler package registry is permitted by the document security headers", async ({ page }) => {
+  const response = await page.goto("/");
+  expect(response).not.toBeNull();
+  const headers = response!.headers();
+  expect(headers["content-security-policy"]).toContain("https://registry.wasmer.io");
+  expect(headers["content-security-policy"]).toContain("https://cdn.wasmer.io");
+  expect(headers["cross-origin-opener-policy"]).toBe("same-origin");
+  expect(headers["cross-origin-embedder-policy"]).toBe("require-corp");
+});
+
 test("workspace explains provider setup when no key is configured", async ({ page }) => {
   page.on("pageerror", (error) => console.error("Browser page error:", error.message));
   await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false } } }) }));
@@ -104,7 +131,7 @@ test("workspace explains provider setup when no key is configured", async ({ pag
   await openWorkspace(page);
   await page.screenshot({ path: "work/katalyst-desktop.png", fullPage: true });
   await expect(page.getByRole("heading", { name: /make room for/i })).toBeVisible();
-  await expect(page.getByText(/connect OpenAI to start chatting/i)).toBeVisible();
+  await expect(page.getByText(/Set up AI access in Settings/i)).toBeVisible();
   await page.getByRole("button", { name: /new conversation/i }).click();
   await page.getByRole("textbox", { name: "Message Katalyst" }).fill("A request that should not get a fake answer");
   await expect(page.getByRole("button", { name: "Send message" })).toBeEnabled();
@@ -123,24 +150,19 @@ test("switches provider and only shows that provider's model catalog", async ({ 
     : route.continue());
   await page.goto("/");
   await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
-  await openWorkspace(page);
-  await page.locator(".provider-selector").click();
-  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "Gemini" }).click();
-  await expect(page.locator(".provider-selector")).toContainText("Gemini");
-  await openSettingsCategory(page, "AI Providers");
-  const geminiSettings = page.locator(".settings-card").filter({ hasText: "Gemini" });
+  await page.goto("/");
+  const geminiSettings = await selectProviderInSettings(page, "Gemini");
   await page.getByLabel("Gemini session API key").fill("ephemeral-gemini-key");
   await geminiSettings.getByRole("button", { name: "Save & refresh models" }).click();
   await expect(geminiSettings).toContainText("2 supported models");
-  await page.getByRole("button", { name: "Workspace", exact: true }).click();
-  await page.locator(".model-selector").click();
-  await expect(page.locator(".model-dropdown")).toContainText("Gemini 3.8 Flash");
-  await expect(page.locator(".model-dropdown")).not.toContainText("GPT-6");
-  await page.locator(".model-dropdown .dropdown-row").filter({ hasText: "Gemini 3.7 Flash" }).click();
-  await expect(page.locator(".model-selector")).toContainText("Gemini 3.7 Flash");
-  await openSettingsCategory(page, "AI Providers");
-  await expect(page.locator(".settings-card").filter({ hasText: "Gemini" })).toContainText("Session credentials set for this tab");
-  await expect(page.locator(".settings-card").filter({ hasText: "Gemini" })).toContainText("Active provider for new requests");
+  const modelSelect = page.getByLabel("Settings selected model");
+  await expect(modelSelect).toContainText("Gemini 3.8 Flash · gemini-3.8-flash");
+  await expect(modelSelect).toContainText("Gemini 3.7 Flash · gemini-3.7-flash");
+  await expect(modelSelect).not.toContainText("GPT-6");
+  await selectSettingsModel(page, "gemini-3.7-flash");
+  await expect(page.locator(".active-model-setting")).toContainText("Gemini 3.7 Flash");
+  await expect(geminiSettings).toContainText("Session credentials set for this tab");
+  await expect(geminiSettings).toContainText("Active provider for new requests");
 });
 
 test("configures Cloudflare with a session token and account ID, then sends the selected model", async ({ page }) => {
@@ -169,34 +191,28 @@ test("configures Cloudflare with a session token and account ID, then sends the 
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "Cloudflare answered the lesson question." }) });
   });
   await page.goto("/");
-  await openWorkspace(page);
-  await page.locator(".provider-selector").click();
-  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "Kat AI" }).click();
-  await openSettingsCategory(page, "AI Providers");
+  const settingsCard = await selectProviderInSettings(page, "Kat AI");
   await page.getByRole("radio", { name: /Bring your own key/ }).check();
   await page.getByLabel("Cloudflare account ID").fill(accountId);
   await page.getByLabel("Cloudflare Workers AI session API key").fill("tab-cloudflare-secret");
-  const settingsCard = page.locator(".settings-card").filter({ hasText: "Cloudflare Workers AI" });
   await settingsCard.getByRole("button", { name: "Save & refresh models" }).click();
   await expect(settingsCard).toContainText("1 supported model");
-  await page.getByRole("button", { name: "Workspace", exact: true }).click();
-  await page.locator(".model-selector").click();
-  await expect(page.locator(".model-dropdown")).toContainText("Gemma 4 26B A4B IT");
-  await page.locator(".model-dropdown .dropdown-row").filter({ hasText: "Gemma 4 26B A4B IT" }).click();
-  await openSettingsCategory(page, "AI Providers");
+  await expect(page.getByLabel("Settings selected model")).toContainText("Gemma 4 26B A4B IT");
+  await selectSettingsModel(page, "@cf/google/gemma-4-26b-a4b-it");
   await settingsCard.getByRole("button", { name: "Test inference" }).click();
   await expect(settingsCard).toContainText("Inference succeeded using @cf/google/gemma-4-26b-a4b-it.");
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
   await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Help me understand C compilation");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await expect(page.getByText("Cloudflare answered the lesson question.")).toBeVisible();
-  await openSettingsCategory(page, "AI Providers");
+  await openSettingsCategory(page, "AI & Kat");
   await expect(settingsCard).toContainText("Inference succeeded");
   await settingsCard.getByRole("button", { name: "Save & refresh models" }).click();
   await expect(settingsCard.locator(".inline-error")).toContainText("Cloudflare denied access");
+  await expect(page.locator(".active-model-setting")).toContainText("Gemma 4 26B A4B IT");
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
-  await expect(page.locator(".provider-selector")).toContainText("Cloudflare Workers AI");
-  await expect(page.locator(".model-selector")).toContainText("Gemma 4 26B A4B IT");
+  await expect(page.locator(".topbar .provider-selector")).toHaveCount(0);
+  await expect(page.locator(".topbar .model-selector")).toHaveCount(0);
   expect({ sentProvider, sentModel, sentToken, sentAccount }).toEqual({ sentProvider: "cloudflare", sentModel: "@cf/google/gemma-4-26b-a4b-it", sentToken: "tab-cloudflare-secret", sentAccount: accountId });
   const localRecord = await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1") ?? "");
   expect(localRecord).not.toContain("tab-cloudflare-secret");
@@ -220,8 +236,7 @@ test("explains empty and filtered Cloudflare catalogs in Settings and the model 
     }) });
   });
   await page.goto("/");
-  await openSettingsCategory(page, "AI Providers");
-  const card = page.locator(".settings-card").filter({ hasText: "Cloudflare Workers AI" });
+  const card = await selectProviderInSettings(page, "Kat AI");
   await page.getByRole("radio", { name: /Bring your own key/ }).check();
   await page.getByLabel("Cloudflare account ID").fill("0123456789abcdef0123456789abcdef");
   await page.getByLabel("Cloudflare Workers AI session API key").fill("mock-cloudflare-token");
@@ -230,8 +245,8 @@ test("explains empty and filtered Cloudflare catalogs in Settings and the model 
   await expect(card.locator(".model-catalog-diagnostic")).toContainText("empty model catalog");
   await refresh.click();
   await expect(card.locator(".model-catalog-diagnostic")).toContainText("3 catalog entries");
-  await page.locator(".model-selector").click();
-  await expect(page.locator(".model-dropdown .model-empty")).toContainText("none could be confirmed as text-generation models");
+  await expect(page.getByLabel("Settings selected model")).toBeDisabled();
+  await expect(page.getByLabel("Settings selected model")).toContainText("No supported models loaded");
   expect(refreshCount).toBe(2);
 });
 
@@ -314,23 +329,21 @@ test("filters OpenRouter catalog prices and routes the selected model without a 
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "Selected OpenRouter model answered." }) });
   });
   await page.goto("/");
-  await openWorkspace(page);
-  await page.locator(".provider-selector").click();
-  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "OpenRouter" }).click();
-  await openSettingsCategory(page, "AI Providers");
+  const openRouterSettings = await selectProviderInSettings(page, "OpenRouter");
   await page.getByLabel("OpenRouter session API key").fill("tab-router-key");
-  const openRouterSettings = page.locator(".settings-card").filter({ hasText: "OpenRouter" });
   await openRouterSettings.getByRole("button", { name: "Save & refresh models" }).click();
-  await page.getByRole("button", { name: "Workspace", exact: true }).click();
-  await page.locator(".model-selector").click();
+  const modelSelect = page.getByLabel("Settings selected model");
   await page.getByLabel("Filter by price").selectOption("free");
-  await expect(page.locator(".model-dropdown")).toContainText("Publisher Free Demo");
-  await expect(page.locator(".model-dropdown")).not.toContainText("Publisher Paid Demo");
+  await expect(modelSelect).toContainText("Publisher Free Demo");
+  await expect(modelSelect).not.toContainText("Publisher Paid Demo");
   await page.getByLabel("Filter by price").selectOption("paid");
-  await expect(page.locator(".model-dropdown")).toContainText("$1.25");
-  await page.getByLabel("Search models").fill("Publisher Paid Demo");
-  await expect(page.locator(".model-dropdown .dropdown-row")).toHaveCount(1);
-  await page.locator(".model-dropdown .dropdown-row").filter({ hasText: "Publisher Paid Demo" }).click();
+  await expect(modelSelect).toContainText("Publisher Paid Demo");
+  await expect(modelSelect).not.toContainText("Publisher Free Demo");
+  await expect(modelSelect).toContainText("$1.25");
+  await page.getByLabel("Search models in settings").fill("Publisher Paid Demo");
+  await expect(modelSelect.locator("option")).toHaveCount(2);
+  await selectSettingsModel(page, "publisher/paid-demo");
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
   await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Use the selected model");
   await page.getByRole("button", { name: "Send message" }).click();
   await expect(page.getByText("Selected OpenRouter model answered.")).toBeVisible();
@@ -546,47 +559,31 @@ test("verifies dark mode contrast, readability, and absence of legacy green tone
   await checkContrastAndLegibility("Playground");
 });
 
-test("dismisses provider and model pickers outside and with Escape while preserving menu interaction", async ({ page }) => {
+test("keeps provider and model controls inside the AI & Kat Settings section", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
-  await openWorkspace(page);
-  const providerButton = page.locator(".provider-selector");
-  await providerButton.click();
-  await expect(page.locator(".provider-dropdown")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.locator(".provider-dropdown")).toHaveCount(0);
-  await expect(providerButton).toBeFocused();
-
-  await providerButton.click();
-  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "OpenAI" }).click();
-  await page.locator(".model-selector").click();
-  await expect(page.locator(".model-dropdown")).toBeVisible();
-  await page.getByLabel("Search models").fill("GPT");
-  await expect(page.locator(".model-dropdown")).toBeVisible();
-  await page.getByLabel("Filter by price").selectOption("free");
-  await expect(page.locator(".model-dropdown")).toBeVisible();
-  await page.locator(".model-dropdown").getByRole("button", { name: "Refresh model catalog" }).click();
-  await expect(page.locator(".model-dropdown")).toBeVisible();
-  await page.locator(".topbar .breadcrumbs").click();
-  await expect(page.locator(".model-dropdown")).toHaveCount(0);
-
-  await page.locator(".model-selector").click();
-  await page.keyboard.press("Escape");
-  await expect(page.locator(".model-dropdown")).toHaveCount(0);
-  await expect(page.locator(".model-selector")).toBeFocused();
+  await expect(page.locator(".topbar .provider-selector, .topbar .model-selector, .topbar .model-managed-label")).toHaveCount(0);
+  await expect(page.locator(".ai-quota-pill")).toHaveCount(0);
+  await expect(page.locator(".provider-settings-card")).toHaveCount(0);
+  await openSettingsCategory(page, "AI & Kat");
+  await expect(page.getByRole("heading", { name: "AI & Kat", exact: true })).toBeVisible();
+  await expect(page.locator(".provider-settings-card").first()).toBeVisible();
+  await selectProviderInSettings(page, "OpenAI");
+  await expect(page.getByLabel("Settings selected model")).toBeVisible();
+  await expect(page.locator(".topbar .provider-selector, .topbar .model-selector, .topbar .model-managed-label")).toHaveCount(0);
+  await expect(page.locator(".app-shell")).not.toHaveCSS("overflow-x", "scroll");
 });
-
 test("renders one settings category and preserves category selection across app navigation", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("button", { name: "Open settings" }).click();
   await expect(page.getByRole("heading", { name: "Appearance" })).toBeVisible();
   await expect(page.locator(".settings-card")).toHaveCount(1);
 
-  await page.getByRole("tab", { name: "AI Models & BYOK" }).click();
-  await expect(page.getByRole("heading", { name: "AI & Models" })).toBeVisible();
+  await page.getByRole("tab", { name: "AI & Kat" }).click();
+  await expect(page.getByRole("heading", { name: "AI & Kat", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Usage & Credits" })).toBeVisible();
   await expect(page.locator(".settings-section-nav")).toHaveCSS("position", "sticky");
 
-  await page.getByRole("tab", { name: "Usage & Credits" }).click();
-  await expect(page.getByRole("heading", { name: "Usage & Credits" })).toBeVisible();
   await page.getByRole("tab", { name: "Workspace Data" }).click();
   await expect(page.getByRole("heading", { name: "Workspace", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Learning Home" }).click();
@@ -654,23 +651,21 @@ test("selects Ollama, discovers a local model, and sends a local generation requ
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: "Local Ollama answer", provider: "ollama", model: "qwen2.5:7b", usage: { inputTokens: 9, outputTokens: 5 } }) });
   });
   await page.goto("/");
-  await openWorkspace(page);
-  await page.locator(".provider-selector").click();
-  await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: "Ollama" }).click();
-  await openSettingsCategory(page, "AI Providers");
-  await page.locator(".settings-card").filter({ hasText: "Ollama" }).getByRole("button", { name: "Save & refresh models" }).click();
-  await expect(page.locator(".settings-card").filter({ hasText: "Ollama" })).toContainText("1 supported model");
+  const ollamaSettings = await selectProviderInSettings(page, "Ollama");
+  await ollamaSettings.getByRole("button", { name: "Save & refresh models" }).click();
+  await expect(ollamaSettings).toContainText("1 supported model");
+  await selectSettingsModel(page, "qwen2.5:7b");
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
-  await expect(page.locator(".model-selector")).toContainText("Choose model");
-  await page.locator(".model-selector").click();
-  await page.locator(".model-results").getByRole("button", { name: /qwen2\.5:7b/ }).click();
   await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Use local inference");
   await page.getByRole("button", { name: "Send message", exact: true }).click();
   await expect(page.getByText("Local Ollama answer")).toBeVisible();
   expect(requestBody).toMatchObject({ provider: "ollama", model: "qwen2.5:7b" });
   expect(requestHeaders).toMatchObject({ "x-katalyst-ollama-url": "http://localhost:11434" });
   expect(requestHeaders).not.toHaveProperty("x-katalyst-provider-key");
-  await expect(page.getByText(/local usage · no cloud charge/)).toBeVisible();
+  const requestMetadata = page.locator(".message-metadata").last();
+  await expect(requestMetadata).toContainText("Request complete");
+  await expect(requestMetadata).not.toContainText("Ollama");
+  await expect(requestMetadata).not.toContainText("qwen2.5:7b");
 });
 
 const markdownProviderCases = [
@@ -682,7 +677,7 @@ const markdownProviderCases = [
 
 const assistantMarkdownReply = "# Provider response\n\n**Bold** and *italic*.\n\n1. First\n   - Nested\n\n| Item | State |\n| --- | --- |\n| Markdown | rendered |\n\n```ts\nconst answer = 42;\n// A deliberately long code line to check that the code panel scrolls horizontally on small screens without stretching the page.\n```\n\n[Safe link](https://example.com)\n\n<script>window.__katalystMarkdownXssProbe = true;</script>\n<img src=x onerror=\"window.__katalystMarkdownXssProbe = true\">";
 
-for (const { provider, name, model, displayModel } of markdownProviderCases) {
+for (const { provider, name, model } of markdownProviderCases) {
   test(`renders ${name} Markdown responses with code and tables`, async ({ page }) => {
     if (provider === "openai") await page.setViewportSize({ width: 375, height: 812 });
     await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: true }, gemini: { configured: true }, openrouter: { configured: true }, ollama: { configured: true } } }) }));
@@ -703,16 +698,16 @@ for (const { provider, name, model, displayModel } of markdownProviderCases) {
 
     await page.goto("/");
     await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
-    await openWorkspace(page);
+    const settingsCard = await selectProviderInSettings(page, name);
+    if (provider === "gemini") {
+      await page.getByLabel("Gemini session API key").fill("tab-gemini-key");
+    }
     if (provider !== "openai") {
-      await page.locator(".provider-selector").click();
-      await page.locator(".provider-dropdown .dropdown-row").filter({ hasText: name }).click();
+      const refresh = settingsCard.getByRole("button", { name: "Save & refresh models" });
+      if (await refresh.isVisible().catch(() => false)) await refresh.click();
     }
-    if (provider === "gemini" || provider === "ollama") {
-      await page.locator(".model-selector").click();
-      await page.locator(".model-dropdown .dropdown-row").filter({ hasText: displayModel }).click();
-    }
-    await expect(page.locator(".model-selector")).toContainText(displayModel);
+    await selectSettingsModel(page, model);
+    await openWorkspace(page);
     await page.getByRole("textbox", { name: "Message Katalyst" }).fill("Please format **this** answer.");
     await page.getByRole("button", { name: "Send message", exact: true }).click();
 
@@ -807,7 +802,7 @@ test("keeps the integrated lesson workspace and Practice Lab within a phone view
     spacer.style.cssText = "height: 1200px; flex: none;";
     element.append(spacer);
   });
-  await expectMobileHeaderToStayCollapsedDuringScrollNoise(page, codeScroller);
+  await expectMobileHeaderStableDuringPanelScroll(page, codeScroller);
   await page.getByRole("tab", { name: "Kat" }).click();
   await expect(page.getByRole("tab", { name: "Kat" })).toHaveAttribute("aria-selected", "true");
   const lessonComposer = page.getByRole("region", { name: "AI Tutor Kat" }).locator(".tutor-composer");
@@ -820,7 +815,7 @@ test("keeps the integrated lesson workspace and Practice Lab within a phone view
     spacer.style.cssText = "height: 1200px; flex: none;";
     element.append(spacer);
   });
-  await expectMobileHeaderToStayCollapsedDuringScrollNoise(page, katScroller);
+  await expectMobileHeaderStableDuringPanelScroll(page, katScroller);
   const composerBounds = await lessonComposer.evaluate((element) => ({ top: element.getBoundingClientRect().top, bottom: element.getBoundingClientRect().bottom, viewport: window.innerHeight }));
   expect(composerBounds.top).toBeGreaterThanOrEqual(0);
   expect(composerBounds.bottom).toBeLessThanOrEqual(composerBounds.viewport);
@@ -930,8 +925,11 @@ test("keeps a general Kat question primary and applies only enabled skills after
   await expect(useSkills).not.toBeChecked();
   await tutor.getByRole("textbox", { name: "Ask Kat a question" }).fill("How does a bicycle tire work?");
   await tutor.getByRole("button", { name: "Send question to Kat" }).click();
-  await expect(tutor.locator(".tutor-message.assistant")).toContainText("bicycle tire");
-  await expect(tutor.locator(".tutor-response-route").first()).toHaveAttribute("aria-label", "Response from OpenAI, model gpt-6-luna");
+  const assistantMessage = tutor.locator(".tutor-message.assistant").last();
+  await expect(assistantMessage).toContainText("bicycle tire");
+  await expect(assistantMessage).not.toContainText("OpenAI");
+  await expect(assistantMessage).not.toContainText("gpt-6-luna");
+  await expect(tutor.locator(".tutor-response-route")).toHaveCount(0);
   const generalContext = JSON.parse(requests[0].context ?? "{}") as Record<string, unknown>;
   expect(requests[0].messages.at(-1)?.content).toBe("How does a bicycle tire work?");
   expect(requests[0]).toMatchObject({ assistantSurface: "kat" });
@@ -945,6 +943,22 @@ test("keeps a general Kat question primary and applies only enabled skills after
   const skillContext = JSON.parse(requests[1].context ?? "{}") as { enabledSkillGuidance?: string };
   expect(skillContext.enabledSkillGuidance).toContain("Use plain language.");
   expect(skillContext.enabledSkillGuidance).not.toContain("Review the code for correctness");
+});
+
+test("answers who created Kat or KATALYST without calling an AI provider", async ({ page }) => {
+  let chatRequestCount = 0;
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: false }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  await page.route("**/api/chat", async (route) => {
+    chatRequestCount += 1;
+    await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ error: "The creator question should use the local answer." }) });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "AI Tutor", exact: true }).click();
+  const tutor = page.getByRole("region", { name: "AI Tutor Kat" });
+  await tutor.getByRole("textbox", { name: "Ask Kat a question" }).fill("Who made Kat AI and KATALYST?");
+  await tutor.getByRole("button", { name: "Send question to Kat" }).click();
+  await expect(tutor.locator(".tutor-message.assistant").last().locator(".assistant-markdown")).toHaveText("KATALYST and its tutor Kat were created by ADITHYA.");
+  expect(chatRequestCount).toBe(0);
 });
 
 test("keeps Kat's composer below the message scroller and preserves an upward reading position", async ({ page }) => {
@@ -985,6 +999,49 @@ test("keeps Kat's composer below the message scroller and preserves an upward re
   await input.press("Enter");
   await expect(tutor.locator(".tutor-message.assistant")).toHaveCount(2);
   await expect.poll(() => conversation.evaluate((element) => element.scrollTop)).toBe(0);
+});
+
+test("keeps Kat reading position and the top bar steady on a phone", async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.route("**/api/status", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-6-luna", providers: { openai: { configured: true }, gemini: { configured: false }, openrouter: { configured: false }, ollama: { configured: false } } }) }));
+  let responseNumber = 0;
+  await page.route("**/api/chat", async (route) => {
+    responseNumber += 1;
+    const paragraphs = Array.from({ length: 24 }, (_, index) => "Phone response " + responseNumber + ", paragraph " + (index + 1) + ". Keep this explanation readable while the learner reviews older messages.");
+    await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ text: paragraphs.join("\n\n") }) });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  await page.getByRole("button", { name: "Explore Learning Paths", exact: true }).click();
+  await ensureCourseDetails(page);
+  await page.getByRole("button", { name: /start learning/i }).click();
+  await page.getByRole("tab", { name: "Kat", exact: true }).click();
+
+  const tutor = page.getByRole("region", { name: "AI Tutor Kat" });
+  const conversation = tutor.locator(".tutor-scroll-region");
+  const input = tutor.getByRole("textbox", { name: "Ask Kat a question" });
+  const topbar = page.locator(".topbar");
+  const initiallyCollapsed = await topbar.evaluate((element) => element.classList.contains("topbar-collapsed"));
+
+  await input.fill("First mobile question");
+  await input.press("Enter");
+  await expect(tutor.locator(".tutor-message.assistant")).toHaveCount(1);
+  await expect.poll(() => conversation.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+  await expect.poll(() => conversation.evaluate((element) => element.scrollHeight - element.scrollTop - element.clientHeight)).toBeLessThanOrEqual(2);
+
+  await conversation.evaluate((element) => { element.scrollTop = 0; });
+  await expect.poll(() => conversation.evaluate((element) => element.scrollTop)).toBe(0);
+  await input.fill("Second mobile question");
+  await input.press("Enter");
+  await expect(tutor.locator(".tutor-message.assistant")).toHaveCount(2);
+  await expect.poll(() => conversation.evaluate((element) => element.scrollTop)).toBe(0);
+  if (initiallyCollapsed) await expect(topbar).toHaveClass(/topbar-collapsed/);
+  else await expect(topbar).not.toHaveClass(/topbar-collapsed/);
+  const composer = tutor.locator(".tutor-composer");
+  await expect(composer).toBeVisible();
+  const composerBounds = await composer.evaluate((element) => ({ top: element.getBoundingClientRect().top, bottom: element.getBoundingClientRect().bottom, viewport: window.innerHeight }));
+  expect(composerBounds.top).toBeGreaterThanOrEqual(0);
+  expect(composerBounds.bottom).toBeLessThanOrEqual(composerBounds.viewport);
 });
 
 test("loads lesson examples in the integrated editor and preserves drafts across learning views", async ({ page }) => {
@@ -1065,14 +1122,47 @@ test("compiles C and C++17 programs with live stdin in the browser sandbox", asy
   test.setTimeout(360_000);
   await page.unroute("**/vendor/wasmer-sdk/dist/index.js");
   const browserErrors: string[] = [];
+  const registryTraffic: string[] = [];
+  const isRegistryUrl = (rawUrl: string) => {
+    const host = new URL(rawUrl).hostname;
+    return host === "wasmer.io" || host.endsWith(".wasmer.io") || host.endsWith(".wasmer.dev") || host.endsWith(".wasmer.app");
+  };
   page.on("pageerror", (error) => browserErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") browserErrors.push("console: " + message.text());
+  });
+  page.on("request", (request) => {
+    if (isRegistryUrl(request.url())) {
+      const url = new URL(request.url());
+      registryTraffic.push("request " + request.method() + " " + url.origin + url.pathname);
+    }
+  });
+  page.on("response", (response) => {
+    if (isRegistryUrl(response.url())) {
+      const url = new URL(response.url());
+      registryTraffic.push("response " + response.status() + " " + url.origin + url.pathname);
+    }
+  });
+  page.on("requestfailed", (request) => {
+    if (isRegistryUrl(request.url())) {
+      const url = new URL(request.url());
+      registryTraffic.push("failed " + url.origin + url.pathname + ": " + (request.failure()?.errorText ?? "request failed"));
+    }
+  });
   page.on("requestfailed", (request) => browserErrors.push(`${request.url()}: ${request.failure()?.errorText ?? "request failed"}`));
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
   await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
-  await expect(page.locator(".c-playground")).toHaveAttribute("data-compiler-state", "ready", { timeout: 330_000 });
+  await page.waitForFunction(() => {
+    const state = document.querySelector(".c-playground")?.getAttribute("data-compiler-state");
+    return state === "ready" || state === "failed";
+  }, { timeout: 330_000 });
+  if (await page.locator(".c-playground").getAttribute("data-compiler-state") === "failed") {
+    const setupError = await page.locator(".c-compiler-failure").innerText().catch(() => "Compiler initialization failed without a visible message.");
+    throw new Error("C/C++ compiler setup failed: " + setupError + " | browser errors: " + browserErrors.join(" ; ") + " | registry traffic: " + registryTraffic.join(" ; "));
+  }
   await page.getByLabel("C source code").fill("#include <stdio.h>\nint main(void) { int value = 0; scanf(\"%c\", &value); printf(\"Read: %c\\n\", value); return 0; }\n");
   await page.getByRole("button", { name: "Run code", exact: true }).click();
   const terminalInput = page.getByLabel("Terminal standard input");
@@ -1368,41 +1458,29 @@ test("records real AI request metadata and reports it in the local Progress dash
   await expect(page.getByRole("heading", { name: "See what you have worked through." })).toBeVisible();
   await expect(page.locator(".ai-dashboard-section")).toContainText("1 request recorded");
   await expect(page.locator(".ai-dashboard-section")).toContainText("up to 500 recent requests");
-  await expect(page.locator(".ai-dashboard-section")).toContainText("OpenAI");
+  await expect(page.locator(".ai-dashboard-section")).not.toContainText("OpenAI");
+  await expect(page.locator(".ai-dashboard-section")).not.toContainText("gpt-6-luna");
   await expect(page.locator(".ai-dashboard-section")).toContainText("18 input tokens reported in 1 request");
   await expect(page.locator(".ai-dashboard-section")).toContainText("6 output tokens reported in 1 request");
   await expect(page.locator(".dashboard-metrics")).toContainText("0 of 123 lessons");
   await expect(page.getByText("Local analytics · not synced")).toBeVisible();
 });
 
-test("keeps the provider and admin-managed Kat model in a separate mobile header row", async ({ page }) => {
+test("keeps AI provider details out of the mobile header and exposes them in Settings", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("/");
   await expect(page.locator(".app-shell")).toHaveAttribute("data-ready", "true");
-  const provider = page.locator(".topbar .provider-selector");
-  const model = page.locator(".topbar .model-managed-label");
-  await expect(provider).toBeVisible();
-  await expect(model).toBeVisible();
-  const boxes = await page.evaluate(() => {
-    const bounds = (selector: string) => {
-      const rect = document.querySelector(selector)!.getBoundingClientRect();
-      return { x: rect.x, y: rect.y, right: rect.right, bottom: rect.bottom, width: rect.width };
-    };
-    return {
-      viewport: window.innerWidth,
-      document: document.documentElement.scrollWidth,
-      breadcrumbs: bounds(".topbar .breadcrumbs"),
-      actions: bounds(".topbar-actions"),
-      provider: bounds(".topbar .provider-selector"),
-      model: bounds(".topbar .model-managed-label"),
-    };
-  });
-  expect(boxes.document).toBeLessThanOrEqual(boxes.viewport);
-  expect(boxes.actions.y).toBeGreaterThan(boxes.breadcrumbs.bottom - 1);
-  expect(boxes.provider.width).toBeGreaterThan(100);
-  expect(boxes.provider.right).toBeLessThanOrEqual(boxes.model.x);
-  expect(boxes.model.right).toBeLessThanOrEqual(boxes.viewport);
-
+  for (const width of [320, 375, 390]) {
+    await page.setViewportSize({ width, height: 812 });
+    await expect(page.locator(".topbar .provider-selector, .topbar .model-selector, .topbar .model-managed-label, .ai-quota-pill")).toHaveCount(0);
+    const dimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+    expect(dimensions.document).toBeLessThanOrEqual(dimensions.viewport);
+    await expect(page.getByRole("button", { name: "Open settings", exact: true })).toBeVisible();
+  }
+  await openSettingsCategory(page, "AI & Kat");
+  await selectProviderInSettings(page, "OpenAI");
+  await expect(page.locator(".provider-settings-card").first()).toBeVisible();
+  await expect(page.getByLabel("Settings selected model")).toBeVisible();
   const signInPrompt = page.getByRole("region", { name: "Optional account sign-in" });
   if (await signInPrompt.isVisible().catch(() => false)) {
     await expect(signInPrompt.getByRole("link", { name: "Sign in or create account" })).toHaveAttribute("href", "/login");

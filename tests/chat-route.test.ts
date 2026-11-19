@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../src/app/api/chat/route";
 import { GET } from "../src/app/api/status/route";
-import { SESSION_KEY_HEADER } from "../src/lib/providers/credentials";
+import { resolveSharedAiSelection, SESSION_KEY_HEADER } from "../src/lib/providers/credentials";
 import { CLOUDFLARE_ACCOUNT_HEADER, OLLAMA_URL_HEADER } from "../src/lib/providers/constants";
 
 afterEach(() => {
@@ -12,6 +12,8 @@ afterEach(() => {
   delete process.env.CLOUDFLARE_ACCOUNT_ID;
   delete process.env.AI_PROVIDER;
   delete process.env.AI_MODEL;
+  delete process.env.KATALYST_SHARED_AI_PROVIDER;
+  delete process.env.KATALYST_SHARED_AI_MODEL;
   vi.unstubAllGlobals();
 });
 
@@ -22,6 +24,27 @@ function chatRequest(body: unknown, headers: Record<string, string> = {}) {
     body: JSON.stringify(body),
   });
 }
+
+describe("shared Kat provider configuration", () => {
+  it("keeps Cloudflare as the default and supports a server-selected Gemini model", () => {
+    expect(resolveSharedAiSelection("@cf/meta/llama-3.3-70b-instruct")).toEqual({
+      providerId: "cloudflare",
+      modelId: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    });
+    process.env.KATALYST_SHARED_AI_PROVIDER = "gemini";
+    expect(resolveSharedAiSelection("@cf/meta/llama-3.3-70b-instruct")).toEqual({
+      providerId: "gemini",
+      modelId: "gemini-3.5-flash-lite",
+    });
+    process.env.KATALYST_SHARED_AI_MODEL = "gemini-3.8-flash";
+    expect(resolveSharedAiSelection("ignored-client-model")).toEqual({
+      providerId: "gemini",
+      modelId: "gemini-3.8-flash",
+    });
+    process.env.KATALYST_SHARED_AI_MODEL = "../secret";
+    expect(resolveSharedAiSelection("ignored-client-model")).toBeNull();
+  });
+});
 
 describe("POST /api/chat", () => {
   it("rejects malformed input", async () => {
@@ -141,6 +164,23 @@ describe("POST /api/chat", () => {
     expect(generation.systemInstruction.parts[0].text).toContain('"provider":"Gemini"');
     expect(generation.systemInstruction.parts[0].text).toContain('"assistantSurface":"kat"');
     expect(generation.systemInstruction.parts[0].text).toContain('"selectedModelId":"gemini-3.8-flash"');
+  });
+
+  it("does not use the shared Gemini key as a Workspace BYOK fallback", async () => {
+    process.env.GEMINI_API_KEY = "owner-kat-key";
+    process.env.KATALYST_SHARED_AI_PROVIDER = "gemini";
+    const userKey = "learner-tab-key";
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ models: [{ name: "models/gemini-3.8-flash", displayName: "Gemini Flash", outputTokenLimit: 4096, supportedGenerationMethods: ["generateContent"] }] }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: "Gemini answer" }] } }] }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const response = await POST(chatRequest(
+      { provider: "gemini", model: "gemini-3.8-flash", messages: [{ role: "user", content: "Hello" }] },
+      { [SESSION_KEY_HEADER]: userKey },
+    ));
+    expect(response.status).toBe(200);
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).headers).toMatchObject({ "x-goog-api-key": userKey });
+    expect((fetchMock.mock.calls[1]?.[1] as RequestInit).headers).not.toMatchObject({ "x-goog-api-key": "owner-kat-key" });
   });
 
   it("rejects a model that is not in the selected provider catalog", async () => {
@@ -267,6 +307,17 @@ describe("GET /api/status", () => {
       providers: { openai: { configured: false }, gemini: { configured: true }, openrouter: { configured: false } },
     });
     expect(JSON.stringify(body)).not.toContain("secret-for-test");
+  });
+
+  it("keeps the shared Gemini key private to Kat instead of reporting it as Workspace BYOK", async () => {
+    process.env.KATALYST_SHARED_AI_PROVIDER = "gemini";
+    process.env.KATALYST_SHARED_AI_MODEL = "gemini-3.5-flash-lite";
+    process.env.GEMINI_API_KEY = "owner-kat-test-key";
+    const response = await GET();
+    const body = await response.json();
+    expect(body.providers.gemini).toEqual({ configured: false });
+    expect(body.sharedAi).toEqual({ providerId: "gemini", configured: true });
+    expect(JSON.stringify(body)).not.toContain("owner-kat-test-key");
   });
 
   it("treats whitespace and the example placeholder as missing credentials", async () => {

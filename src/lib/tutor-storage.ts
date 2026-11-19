@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { ProviderId } from "./providers/catalog";
 import type { AppliedSkill, SkillOmission } from "./skills";
 import type { TutorMode } from "./tutor-request";
 
@@ -14,8 +13,6 @@ export type TutorPersistedMessage = {
   role: "user" | "assistant";
   content: string;
   createdAt: string;
-  responseProvider?: ProviderId;
-  responseModel?: string;
   appliedSkills?: AppliedSkill[];
   omittedSkills?: SkillOmission[];
 };
@@ -41,8 +38,6 @@ const tutorPersistedMessageSchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().max(10_000),
   createdAt: z.string(),
-  responseProvider: z.string().optional() as z.ZodType<ProviderId | undefined>,
-  responseModel: z.string().optional(),
   appliedSkills: z.array(z.any()).optional(),
   omittedSkills: z.array(z.any()).optional(),
 });

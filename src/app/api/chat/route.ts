@@ -2,6 +2,8 @@ import "server-only";
 import { z } from "zod";
 import { executeGatewayChat, GatewayError } from "@/lib/ai-gateway/gateway";
 
+export const maxDuration = 60;
+
 const messageSchema = z.object({ role: z.enum(["user", "assistant"]), content: z.string().trim().min(1).max(8_000) });
 const requestSchema = z.object({
   provider: z.string().min(1).max(64),

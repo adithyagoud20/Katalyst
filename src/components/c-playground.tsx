@@ -391,11 +391,14 @@ export function CPlayground({
     if (compilerRef.current) return compilerRef.current;
     if (compilerPromiseRef.current) return compilerPromiseRef.current;
     setCompilerState("initializing");
-    setStatus(`Preparing the browser-based ${activeLanguage === "cpp" ? "C++17" : "C11"} compiler. You can keep reading while it loads.`);
+    setStatus(`Preparing the browser-based ${activeLanguage === "cpp" ? "C++17" : "C11"} compiler. First setup downloads about 106 MiB once; you can keep reading while it loads.`);
     setError("");
     setDownloadProgress("");
     const pending = (async () => {
       try {
+        if (!window.crossOriginIsolated || typeof SharedArrayBuffer === "undefined") {
+          throw new Error("This browser needs HTTPS and the COOP/COEP isolation headers before local C/C++ compilation can run.");
+        }
         const sdkUrl = new URL("/vendor/wasmer-sdk/dist/index.js", window.location.href).href;
         const { Wasmer } = (await import(/* webpackIgnore: true */ sdkUrl)) as typeof import("@wasmer/sdk/browser");
         if (!aliveRef.current) throw new DOMException("Compiler initialization was interrupted.", "AbortError");
@@ -421,12 +424,15 @@ export function CPlayground({
           const timedOut = initializationError instanceof DOMException && initializationError.name === "TimeoutError";
           setCompilerState("failed");
           setStatus(`The ${activeLanguage === "cpp" ? "C++17" : "C11"} compiler could not be initialized.`);
+          const errorText = initializationError instanceof Error ? initializationError.message : "";
+          const needsIsolation = /cross-origin isolated|COOP\/COEP/i.test(errorText);
+          const registryUnavailable = /registry\.wasmer\.io|graphql|fetch|network|unable to load package/i.test(errorText);
           setError(
-            timedOut
-              ? "The compiler download exceeded five minutes. Check your connection, then retry. A previously cached runtime will be reused when available."
-              : initializationError instanceof Error
-              ? `${initializationError.message} Retry initialization; the browser cache may contain a usable copy.`
-              : "Could not prepare the local C/C++ compiler. Check the connection and retry."
+            needsIsolation
+              ? "Local C/C++ compilation needs a secure page and cross-origin isolation. Open the HTTPS site and check that its COOP and COEP response headers are present."
+              : timedOut || registryUnavailable
+                ? "Wasmer could not download the compiler package. First setup needs access to registry.wasmer.io and downloads about 106 MiB; after a successful setup it is cached in this browser. Check the network or firewall, then retry."
+                : "Could not prepare the local C/C++ compiler. Check the browser console and retry; your lesson and source code are still available."
           );
           setDownloadProgress("");
         }
@@ -1766,8 +1772,7 @@ export function CPlayground({
                 srcDoc={source}
                 title="HTML Live Sandbox Preview"
                 style={{
-                  width: previewMode === "mobile" ? "375px" : "100%",
-                  minWidth: previewMode === "mobile" ? "375px" : undefined,
+                  width: previewMode === "mobile" ? "min(375px, 100%)" : "100%",
                   maxWidth: previewMode === "mobile" ? "375px" : "100%",
                   minHeight: "360px",
                   height: "100%",

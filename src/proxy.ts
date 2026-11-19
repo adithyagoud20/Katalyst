@@ -11,7 +11,7 @@ function createCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.jsdelivr.net https://challenges.cloudflare.com http://localhost:11434 ws://localhost:11434",
+    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://registry.wasmer.io https://cdn.wasmer.io https://cdn.jsdelivr.net https://challenges.cloudflare.com http://localhost:11434 ws://localhost:11434",
     // Admin-scheduled launch videos are hosted on the operator's HTTPS media host.
     "media-src 'self' blob: https:",
     "frame-src 'self' blob: data: https://challenges.cloudflare.com",

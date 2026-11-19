@@ -271,6 +271,7 @@ export function AdminPanel() {
             </div>
           </section>
 
+          <p className="settings-explainer">The deployment owner can choose Gemini or Cloudflare Workers AI for shared Kat in the server environment. Gemini credentials remain server-side and are restricted to Kat; they are not a Workspace fallback. See the deployment guide for the exact server settings. Cloudflare remains the default when no shared provider is selected.</p>
           <section className="admin-form-group">
             <h3>User Quota & Rate Limit Rules</h3>
             <div className="form-grid-3">

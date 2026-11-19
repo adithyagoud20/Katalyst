@@ -57,7 +57,7 @@ export const geminiProvider: ModelProvider = {
   id: "gemini",
   name: providerCatalog.gemini.name,
   models: providerCatalog.gemini.models,
-  async generate({ model, messages, context, assistantSurface, apiKey: userApiKey, signal }) {
+  async generate({ model, messages, context, assistantSurface, apiKey: userApiKey, maxOutputTokens, signal }) {
     const apiKey = getProviderApiKey("gemini", userApiKey);
     if (!apiKey) throw new ProviderError("Add GEMINI_API_KEY or a session key in Settings to connect Gemini.", 503);
     if (!model || model.length > 200 || !/^[A-Za-z0-9._-]+$/.test(model)) throw new ProviderError("Choose a valid Gemini model ID from the model catalog.", 400);
@@ -71,7 +71,7 @@ export const geminiProvider: ModelProvider = {
           role: message.role === "assistant" ? "model" : "user",
           parts: [{ text: message.content }],
         })),
-        generationConfig: { maxOutputTokens: 1200 },
+        generationConfig: { maxOutputTokens: Number.isInteger(maxOutputTokens) && (maxOutputTokens ?? 0) > 0 ? Math.min(maxOutputTokens!, 2048) : 1200 },
       }),
       signal: providerSignal(signal, 45_000),
       redirect: "error",

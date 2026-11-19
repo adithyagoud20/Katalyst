@@ -4,7 +4,7 @@ import { getSupabaseConfig } from "@/lib/supabase/config";
 import type { AISystemConfig, AIModelConfig, AICreditPolicies } from "./types";
 
 const DEFAULT_SYSTEM_CONFIG: AISystemConfig = {
-  sharedAiEnabled: true,
+  sharedAiEnabled: false,
   killSwitchActive: false,
   selectedModelId: "@cf/meta/llama-3.3-70b-instruct",
   globalDailyThresholdCredits: 100000,

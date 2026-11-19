@@ -10,9 +10,9 @@ This guide details how to deploy KATALYST to production environments and configu
 > The local `.env.local` file is exclusively for local development and is ignored by Git. It does not automatically configure production environments. In production, administrators must configure environment variables directly within their hosting platform's administration dashboard (e.g., Vercel, Railway, Fly.io, or container orchestrator).
 
 ### Security Boundary Invariants
-- **Never expose credentials in browser bundles**: `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `SUPABASE_SERVICE_ROLE_KEY` must never be prefixed with `NEXT_PUBLIC_`.
+- **Never expose credentials in browser bundles**: `CLOUDFLARE_API_TOKEN`, `GEMINI_API_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` must never be prefixed with `NEXT_PUBLIC_`.
 - **API Isolation**: Server-side credentials are never returned in client API responses (`/api/status`, `/api/models`, `/api/chat`).
-- **No Client-Side Gateway Bypass**: All shared Cloudflare Workers AI inferences must route through the server-side AI Gateway at `/api/chat`, where rate limits, credit quotas, kill switches, and token ledgers are strictly enforced.
+- **No Client-Side Gateway Bypass**: Shared Cloudflare or Gemini inference routes through `/api/chat`, where rate limits, credit quotas, kill switches, and usage ledgers are enforced. The Gemini key selected for shared Kat is reserved for Kat and cannot serve as a Workspace fallback.
 
 ---
 
@@ -20,11 +20,18 @@ This guide details how to deploy KATALYST to production environments and configu
 
 For this MVP, use the Vercel production `*.vercel.app` project alias; a custom domain is not required. Set `NEXT_PUBLIC_SITE_URL` to that exact HTTPS origin in Production. Vercel's `VERCEL_PROJECT_PRODUCTION_URL` can supply the project alias when no custom production host is attached; if a custom host remains connected, this app deliberately rejects it and the explicit `.vercel.app` setting is required. Set the operator contact fields before public launch. These values are public page content, not secrets.
 
-### A. Shared Cloudflare AI Gateway (Required for Shared AI)
+### A. Shared Kat AI Gateway (Required for Shared AI)
+
+For Cloudflare, set CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN in Vercel Project Settings → Environment Variables, then redeploy. Kat uses these owner credentials through the server API for every visitor; learners do not enter or receive the token. Never add the NEXT_PUBLIC_ prefix. The public status endpoint exposes only the provider name and whether it is configured.
+
+To use the owner’s Gemini API key for shared Kat, set `KATALYST_SHARED_AI_PROVIDER=gemini`, `KATALYST_SHARED_AI_MODEL=gemini-3.5-flash-lite` (or another supported text model), and `GEMINI_API_KEY` in the Vercel server environment, then redeploy. Kat uses this key server-side for all learners. The key is not exposed to browsers and is not available as a Workspace fallback when Gemini is selected as the shared provider. Leave `KATALYST_SHARED_AI_PROVIDER` unset to keep Cloudflare as the shared provider. Never add `NEXT_PUBLIC_` to a credential. Enable shared AI in Admin only after the key and migrations are ready.
+
 | Variable | Scope | Description |
 | :--- | :--- | :--- |
 | `CLOUDFLARE_ACCOUNT_ID` | Server-only | Cloudflare account ID used to construct server-side Workers AI API URLs (`https://api.cloudflare.com/client/v4/accounts/{id}/ai/run/...`). |
 | `CLOUDFLARE_API_TOKEN` | Server-only | API token with `Workers AI - Read` and `Workers AI - Edit` permissions. Used exclusively by the server-side gateway. |
+| `KATALYST_SHARED_AI_PROVIDER` | Server-only | Optional shared Kat provider: `cloudflare` or `gemini`. Defaults to `cloudflare`. |
+| `KATALYST_SHARED_AI_MODEL` | Server-only | Optional Gemini model ID used when the shared provider is `gemini`; defaults to `gemini-3.5-flash-lite`. |
 
 ### B. Supabase Authentication & Cloud Persistence (Required for Accounts)
 | Variable | Scope | Description |
@@ -38,6 +45,7 @@ For this MVP, use the Vercel production `*.vercel.app` project alias; a custom d
 | :--- | :--- | :--- |
 | `KATALYST_ADMIN_EMAILS` | Server-only | Comma-separated list of bootstrap administrator email addresses (e.g. `admin@katalyst.learn,lead@katalyst.learn`). Authorizes access to admin AI Gateway controls. |
 | `GUEST_SESSION_SECRET` | Server-only | 32+ character cryptographically secure secret used to generate HMAC-SHA256 signatures for guest trial cookies (`katalyst_guest_token`). |
+| `KATALYST_TRUSTED_CLIENT_IP_HEADER` | Server-only, optional | For production hosts other than Vercel, set to `cf-connecting-ip`, `x-real-ip`, or `x-forwarded-for` only when your reverse proxy overwrites that header. Guest AI fails closed if a trusted client IP is unavailable, so its shared-network burst limit cannot be bypassed. Vercel uses its edge-owned `x-vercel-forwarded-for` header automatically. |
 
 ### D. Optional Transactional Email (Brevo / Sendinblue)
 | Variable | Scope | Description |
@@ -50,7 +58,7 @@ For this MVP, use the Vercel production `*.vercel.app` project alias; a custom d
 | Variable | Scope | Description |
 | :--- | :--- | :--- |
 | `OPENAI_API_KEY` | Server-only | Server-default API key for OpenAI BYOK inference. |
-| `GEMINI_API_KEY` | Server-only | Server-default API key for Google Gemini BYOK inference. |
+| `GEMINI_API_KEY` | Server-only | Google Gemini key. Can power shared Kat when `KATALYST_SHARED_AI_PROVIDER=gemini`; shared-provider use is restricted to Kat. |
 | `OPENROUTER_API_KEY` | Server-only | Server-default API key for OpenRouter BYOK inference. |
 
 ### F. Public Canonical Origin and Operator Contact
@@ -63,9 +71,16 @@ For this MVP, use the Vercel production `*.vercel.app` project alias; a custom d
 
 ---
 
-## 3. Platform Configuration Instructions
+## 3. Compiler Runtime Requirements
+
+C and C++ run locally in the browser. On a browser profile's first use, Wasmer downloads the pinned Clang package (about 106 MiB) from `registry.wasmer.io`; later uses can read it from the browser cache. The app CSP allowlists registry.wasmer.io for package metadata and cdn.wasmer.io for the compiler download. Production hosts and reverse proxies must preserve `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, and the first-use network must allow HTTPS requests to the Wasmer registry. The guest program itself still runs with network access disabled. If package setup fails, the Code tab shows a specific retryable setup message.
+
+## 4. Platform Configuration Instructions
 
 ### Supabase database migrations
+
+Apply the complete ordered migration set before enabling shared AI, including 20261116000000_ai_request_rate_limits.sql, 20261118010000_ai_global_daily_budget.sql, and 20261118020000_guest_session_hardening.sql. Shared AI stays disabled when system configuration cannot be loaded, and credit mutations fail closed if their atomic RPCs are missing.
+
 Apply the ordered migrations to the target Supabase project before deploying code that depends on them:
 ```bash
 supabase link --project-ref <your-project-ref>
@@ -77,8 +92,9 @@ The AI gateway migrations create the atomic credit ledger and shared request-rat
 1. Import the repository into Vercel.
 2. Navigate to **Project Settings → Environment Variables**.
 3. Add the production keys:
-   - `CLOUDFLARE_ACCOUNT_ID` (Environment: Production, Preview)
-   - `CLOUDFLARE_API_TOKEN` (Environment: Production, Preview)
+   - `CLOUDFLARE_ACCOUNT_ID` (when using shared Cloudflare AI)
+   - `CLOUDFLARE_API_TOKEN` (when using shared Cloudflare AI)
+   - `KATALYST_SHARED_AI_PROVIDER=gemini`, `KATALYST_SHARED_AI_MODEL`, and `GEMINI_API_KEY` (when using shared Gemini Kat)
    - `NEXT_PUBLIC_SUPABASE_URL` (Environment: Production, Preview)
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (Environment: Production, Preview)
    - `SUPABASE_SERVICE_ROLE_KEY` (Environment: Production, Preview)
@@ -110,10 +126,10 @@ docker run -d \
 
 ---
 
-## 4. Header & Runtime Requirements
+## 5. Header & Runtime Requirements
 
 ### Cross-Origin Isolation (COOP & COEP)
-The browser-based WebAssembly and Web Worker sandboxes (Wasmer C11 clang, Pyodide 3.12, and JavaScript isolated workers) require `SharedArrayBuffer` and clean process isolation in modern browsers. Next.js is preconfigured in `next.config.ts` to output:
+The browser-based WebAssembly and Web Worker sandboxes (Wasmer C11 clang, Pyodide 3.12, and JavaScript isolated workers) require `SharedArrayBuffer` and clean process isolation in modern browsers. The first C/C++ setup also downloads the pinned ~106 MiB compiler package from `registry.wasmer.io`; that download is cached in the browser after it succeeds, so first use requires an accessible network connection. Next.js is preconfigured in `next.config.ts` to output:
 - `Cross-Origin-Opener-Policy: same-origin`
 - `Cross-Origin-Embedder-Policy: require-corp`
 
@@ -143,7 +159,7 @@ In production, session-only BYOK keys and secure HTTP-only cookies (`SameSite=La
 
 ---
 
-## 5. Production Verification Checklist
+## 6. Production Verification Checklist
 
 1. **Verify Automated Health Check**:
    - Query `GET /api/health`.
@@ -174,7 +190,7 @@ In production, session-only BYOK keys and secure HTTP-only cookies (`SameSite=La
    - In Settings, verify the **Admin** tab appears with system kill-switch controls, policy limits, and user analytics.
    - Log in with a non-admin account or view as a guest; verify the **Admin** tab is completely absent.
 
-## 6. Public Launch Operations
+## 7. Public Launch Operations
 
 The code repository cannot complete production ownership, account, or vendor setup. Use the [MVP release checklist](MVP_RELEASE_CHECKLIST.md) as the operator release gate for legal operator details, privacy review, Auth email/OAuth configuration, backups and restore drills, support contact, WAF/monitoring, provider billing alerts, and Search Console. Payments are not implemented; do not present paid plans as available.
 

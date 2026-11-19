@@ -72,7 +72,7 @@ import {
   type LearningProgress,
 } from "@/lib/learning-progress";
 import { AI_ACTIVITY_KEY, getAIActivitySummary, readAIActivity, type AIRequestActivity } from "@/lib/ai-activity";
-import { providerCatalog, type ProviderId } from "@/lib/providers/catalog";
+import { type ProviderId } from "@/lib/providers/catalog";
 import type { WorkspaceSkill } from "@/lib/skills";
 import { ACCOUNT_LOCAL_CHANGE_EVENT, ACCOUNT_SNAPSHOT_APPLIED_EVENT } from "@/lib/account-data";
 import {
@@ -235,7 +235,6 @@ export function LearningExperience({
   onOpenSettings,
   provider,
   model,
-  modelName,
   sessionKey,
   cloudflareAccountId,
   cloudflareMode,
@@ -253,7 +252,6 @@ export function LearningExperience({
   onOpenSettings: () => void;
   provider: ProviderId;
   model: string;
-  modelName: string;
   sessionKey: string;
   cloudflareAccountId: string;
   cloudflareMode: CloudflareRequestMode;
@@ -846,7 +844,6 @@ export function LearningExperience({
           <KatTutor
             provider={provider}
             model={model}
-            modelName={modelName}
             sessionKey={sessionKey}
             cloudflareAccountId={cloudflareAccountId}
             cloudflareMode={cloudflareMode}
@@ -1624,8 +1621,8 @@ export function LearningExperience({
 
           <section className="dashboard-section ai-dashboard-section">
             <div className="dashboard-section-heading">
-              <div><span className="eyebrow">MODEL REQUESTS</span><h2>AI activity</h2></div>
-              <button className="learning-text-button" onClick={onOpenSettings}>Provider settings <ArrowRight size={13} /></button>
+              <div><span className="eyebrow">RECENT REQUESTS</span><h2>AI activity</h2></div>
+              <button className="learning-text-button" onClick={onOpenSettings}>AI settings <ArrowRight size={13} /></button>
             </div>
             {aiActivityIssue ? (
               <p className="dashboard-data-issue" role="status">{aiActivityIssue}</p>
@@ -1638,26 +1635,6 @@ export function LearningExperience({
                 <p className="analytics-retention-note">These totals cover up to 500 recent requests stored in this browser.</p>
                 <div className="dashboard-chart-layout">
                   <ActivityBars days={aiSummary.days} label="AI requests over the last seven days" />
-                  <div className="ai-activity-details">
-                    <div>
-                      <h3>By provider</h3>
-                      {aiSummary.providers.map(({ provider: providerId, count }) => (
-                        <p key={providerId}>
-                          <span>{providerCatalog[providerId].name}</span>
-                          <strong>{count}</strong>
-                        </p>
-                      ))}
-                    </div>
-                    <div>
-                      <h3>Most recent models</h3>
-                      {aiSummary.models.slice(0, 3).map(({ key, provider: providerId, count }) => (
-                        <p key={key}>
-                          <span>{providerCatalog[providerId].name} · {key.slice(providerId.length + 1)}</span>
-                          <strong>{count}</strong>
-                        </p>
-                      ))}
-                    </div>
-                  </div>
                 </div>
                 <div className="reported-usage" aria-label="Provider-reported token usage">
                   <span>
@@ -2408,7 +2385,6 @@ export function LearningExperience({
               <KatTutor
                 provider={provider}
                 model={model}
-                modelName={modelName}
                 sessionKey={sessionKey}
                 cloudflareAccountId={cloudflareAccountId}
                 cloudflareMode={cloudflareMode}
