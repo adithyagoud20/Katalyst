@@ -3,11 +3,11 @@ import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 
-function createCsp(nonce: string): string {
+function createCsp(nonce: string, allowWasmerWorkerEval = false): string {
   const isDev = process.env.NODE_ENV === "development";
   return [
     "default-src 'self'",
-    `script-src 'self' https://challenges.cloudflare.com 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${isDev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' https://challenges.cloudflare.com 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${isDev || allowWasmerWorkerEval ? " 'unsafe-eval'" : ""}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
@@ -24,9 +24,14 @@ function createCsp(nonce: string): string {
   ].join("; ");
 }
 
+export function getContentSecurityPolicy(nonce: string, pathname: string): string {
+  const isWasmerRuntimeWorker = pathname === "/vendor/wasmer-sdk/dist/browser-worker.js";
+  return createCsp(nonce, isWasmerRuntimeWorker);
+}
+
 export async function proxy(request: NextRequest) {
   const nonce = randomBytes(18).toString("base64");
-  const contentSecurityPolicy = createCsp(nonce);
+  const contentSecurityPolicy = getContentSecurityPolicy(nonce, request.nextUrl.pathname);
   const createResponse = () => {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-nonce", nonce);
