@@ -7,5 +7,5 @@ const origin = `http://127.0.0.1:${port}`;
 export default defineConfig({
   testDir: "./e2e",
   use: { ...devices["Desktop Chrome"], baseURL: origin, headless: true },
-  webServer: { command: `AI_PROVIDER=disabled CLOUDFLARE_API_TOKEN= CLOUDFLARE_ACCOUNT_ID= OPENAI_API_KEY= GEMINI_API_KEY= OPENROUTER_API_KEY= PORT=${port} npm run dev`, url: origin, reuseExistingServer: true, timeout: 120_000 },
+  webServer: { command: `AI_PROVIDER=disabled NEXT_PUBLIC_C_RUN_ENABLED=true CLOUDFLARE_API_TOKEN= CLOUDFLARE_ACCOUNT_ID= OPENAI_API_KEY= GEMINI_API_KEY= OPENROUTER_API_KEY= PORT=${port} npm run dev`, url: origin, reuseExistingServer: true, timeout: 120_000 },
 });

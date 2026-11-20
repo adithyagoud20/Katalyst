@@ -56,73 +56,77 @@ async function selectSettingsModel(page: Page, modelId: string) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    const testWindow = window as Window & { __failCompilerFirst?: boolean; __deadSchedulerOnce?: boolean; __deadSchedulerCompileOnce?: boolean };
-    testWindow.__failCompilerFirst = window.location.search.includes("failCompilerFirst=1");
-    testWindow.__deadSchedulerOnce = window.location.search.includes("deadSchedulerOnce=1");
-    testWindow.__deadSchedulerCompileOnce = window.location.search.includes("deadSchedulerCompileOnce=1");
-  });
-  await page.route("**/vendor/wasmer-sdk/dist/index.js", async (route) => {
+  await page.route("**/lab-runner/c/runner.js", async (route) => {
+    const parentUrl = route.request().frame().parentFrame()?.url() ?? "";
+    const failFirstSetup = parentUrl.includes("failCompilerFirst=1");
     await route.fulfill({
       status: 200,
       contentType: "text/javascript",
-      body: `const output = (value = "") => ({ text: () => value, truncated: false });
-export class Wasmer {
-  constructor(options = {}) {
-    this.namespace = options.cache?.namespace ?? "default";
-    window.__wasmerClientCount = (window.__wasmerClientCount ?? 0) + 1;
-    window.__wasmerCacheNamespace = this.namespace;
-    this.packages = { load: async (reference) => {
-      window.__compilerAttempts = (window.__compilerAttempts ?? 0) + 1;
-      if (typeof reference === "string") {
-        const cacheKey = this.namespace + ":" + reference;
-        const cache = window.__wasmerPackageCache ?? (window.__wasmerPackageCache = []);
-        if (cache.includes(cacheKey)) window.__wasmerCacheHits = (window.__wasmerCacheHits ?? 0) + 1;
-        else {
-          if (window.__failCompilerFirst) throw new Error("Mock compiler download failure");
-          cache.push(cacheKey);
-          window.__compilerPackageDownloads = (window.__compilerPackageDownloads ?? 0) + 1;
-        }
-        return { entrypoint: "clang" };
-      }
-      return { id: "mock-program" };
-    } };
-    this.sandboxes = { create: async () => {
-      if (window.__deadSchedulerOnce) {
-        window.__deadSchedulerOnce = false;
-        throw new Error("Initialization function failed - the thread pool is shut down: Scheduler is dead");
-      }
-      return ({
-      command: (_program, args) => ({ spawn: async () => {
-        const compiling = Array.isArray(args);
-        const mode = window.__cPlaygroundOutcome;
-        let releaseInput;
-        const inputReceived = new Promise((resolve) => { releaseInput = resolve; });
-        return {
-          stdin: { write: async (value) => { window.__capturedTerminalInput = value; releaseInput(); }, close: async () => { releaseInput(); } },
-          stdout: null,
-          stderr: null,
-          wait: async () => {
-            if (!compiling && window.__mockWaitForInput) await inputReceived;
-            if (compiling && window.__deadSchedulerCompileOnce) {
-              window.__deadSchedulerCompileOnce = false;
-              return { reason: "terminated", exitCode: 1, stdout: output(), stderr: output("command execution failed: unable to spawn the command: Initialization function failed - the thread pool is shut down: Scheduler is dead") };
-            }
-            return compiling && mode === "compile-error"
-              ? { reason: "exited", exitCode: 1, stdout: output(), stderr: output("main.c:1: error: expected ';'") }
-              : { reason: "exited", exitCode: !compiling && mode === "runtime-error" ? 7 : 0, stdout: output(!compiling && mode === "runtime-error" ? "mock program output" : !compiling && window.__mockWaitForInput ? "mock interactive output" : ""), stderr: output(!compiling && mode === "runtime-error" ? "mock runtime stderr" : "") };
-          },
-          kill: async () => {},
-        };
-      } }),
-      fs: { readFile: async () => new Uint8Array([1]) },
-      installPackage: async () => {},
-      close: async () => {},
-      });
-    } };
+      body: String.raw`const expectedParent = document.querySelector('meta[name="c-lab-parent-origin"]').content;
+const failFirstSetup = ${failFirstSetup};
+let token = "";
+let failedOnce = false;
+let compilerReady = false;
+let active = null;
+function send(type, requestId, payload = {}) {
+  parent.postMessage({ version: 1, type, token, requestId, ...payload }, expectedParent);
+}
+function prepare(requestId) {
+  if (failFirstSetup && !failedOnce) {
+    failedOnce = true;
+    send("COMPILER_STATE", requestId, { state: "failed", message: "mock failure" });
+    return false;
   }
-  async close() {}
-}`,
+  compilerReady = true;
+  send("COMPILER_STATE", requestId, { state: "ready", message: "Compiler ready" });
+  return true;
+}
+function done(request, outcome = "success", stdout = "", stderr = "", diagnostics = "", error = "") {
+  send("DONE", request.requestId, { outcome, stdout, stderr, diagnostics, error, durationMs: 4, exitCode: outcome === "runtime-error" ? 7 : outcome === "compile-error" ? 1 : 0 });
+  active = null;
+}
+function execute(request) {
+  send("PHASE", request.requestId, { phase: "compiling" });
+  if (request.code.includes("MOCK_COMPILE_ERROR")) {
+    done(request, "compile-error", "", "main.c:1: error: expected ';'", "main.c:1: error: expected ';'");
+    return;
+  }
+  if (!compilerReady && !prepare(request.requestId)) return;
+  send("PHASE", request.requestId, { phase: "running" });
+  if ((request.code.includes("scanf") || request.code.includes("cin >>")) && !request.stdin && !request.closeStdin) {
+    active = request;
+    return;
+  }
+  if (request.code.includes("MOCK_RUNTIME_ERROR")) {
+    done(request, "runtime-error", "mock program output", "mock runtime stderr", "", "The program exited with status 7. Check the output for details.");
+  } else {
+    const stdout = request.code.includes("Hello, C!") ? "Hello, C!\n"
+      : request.code.includes("doubleValue") ? "Twice: 42\n"
+        : request.code.includes("MOCK_INTERACTIVE") ? "mock interactive output\n" : "mock program output\n";
+    send("OUTPUT", request.requestId, { channel: "stdout", text: stdout });
+    done(request, "success", stdout);
+  }
+}
+window.addEventListener("message", (event) => {
+  if (event.source !== parent || event.origin !== expectedParent) return;
+  const message = event.data;
+  if (!message || typeof message !== "object" || message.version !== 1) return;
+  if (message.type === "INIT") {
+    token = message.token;
+    send("READY", message.requestId);
+    send("COMPILER_STATE", message.requestId, { state: "idle", message: "Compiler ready to prepare" });
+    if (message.autoInitialize) prepare(message.requestId);
+  } else if (!token || message.token !== token) return;
+  else if (message.type === "PREPARE") prepare(message.requestId);
+  else if (message.type === "RUN") execute(message);
+  else if (message.type === "INPUT" && active?.requestId === message.requestId) {
+    const stdout = "mock interactive output\n";
+    send("OUTPUT", message.requestId, { channel: "stdout", text: stdout });
+    done(active, "success", stdout);
+  } else if (message.type === "EOF" && active?.requestId === message.requestId) done(active, "success");
+  else if (message.type === "STOP" && active?.requestId === message.requestId) done(active, "stopped", "", "", "", "Run stopped.");
+});
+document.body.textContent = "Mock isolated C runner ready.";`,
     });
   });
 });
@@ -1089,37 +1093,13 @@ test("initializes the compiler in the background and retries a failed setup", as
   await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();
   await expect(page.locator(".c-playground")).toHaveAttribute("data-compiler-state", "failed");
-  await expect(page.locator(".c-playground-notice")).toContainText("The C11 compiler could not be prepared.");
+  await expect(page.locator(".c-compiler-failure")).toContainText("isolated C compiler could not be prepared");
   await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
   await page.getByRole("tab", { name: "Code" }).click();
-  await expect(page.getByRole("button", { name: "Retry compiler setup" })).toBeVisible();
-  await page.evaluate(() => { (window as Window & { __failCompilerFirst?: boolean }).__failCompilerFirst = false; });
-  await page.getByRole("button", { name: "Retry compiler setup" }).click();
+  await expect(page.getByRole("button", { name: "Retry isolated runner" })).toBeVisible();
+  await page.getByRole("button", { name: "Retry isolated runner" }).click();
   await expect(page.locator(".c-playground")).toHaveAttribute("data-compiler-state", "ready");
   await expect(page.getByRole("button", { name: "Run code" })).toBeEnabled();
-  const attempts = await page.evaluate(() => (window as Window & { __compilerAttempts?: number }).__compilerAttempts);
-  expect(attempts).toBeGreaterThanOrEqual(3);
-});
-
-test("recreates C/C++ runtime after its browser scheduler shuts down", async ({ page }) => {
-  await page.goto("/?deadSchedulerOnce=1#katalyst=playground");
-  await page.getByText("Launch C Workbench").click();
-
-  const runButton = page.getByRole("button", { name: "Run", exact: true });
-  await runButton.click();
-  await expect(page.locator(".c-run-status")).toContainText("finished successfully");
-  const clientCount = await page.evaluate(() => (window as Window & { __wasmerClientCount?: number }).__wasmerClientCount ?? 0);
-  expect(clientCount).toBeGreaterThanOrEqual(2);
-});
-
-test("retries C compilation when Wasmer reports a dead scheduler as a failed process", async ({ page }) => {
-  await page.goto("/?deadSchedulerCompileOnce=1#katalyst=playground");
-  await page.getByText("Launch C Workbench").click();
-
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect(page.locator(".c-run-status")).toContainText("finished successfully");
-  const clientCount = await page.evaluate(() => (window as Window & { __wasmerClientCount?: number }).__wasmerClientCount ?? 0);
-  expect(clientCount).toBeGreaterThanOrEqual(2);
 });
 
 test("updates an untouched saved C++ starter so it runs without waiting for stdin", async ({ page }) => {
@@ -1159,13 +1139,13 @@ test("shows compile and runtime failures clearly and reuses the prepared compile
   const runButton = page.getByRole("button", { name: "Run code" });
   await expect(runButton).toBeEnabled();
 
-  await page.evaluate(() => { (window as Window & { __cPlaygroundOutcome?: string }).__cPlaygroundOutcome = "compile-error"; });
+  await page.getByLabel("C source code").fill("#include <stdio.h>\n// MOCK_COMPILE_ERROR\nint main(void) { return 0; }");
   await runButton.click();
   await expect(page.locator(".c-run-status")).toContainText("Compilation failed.");
   await expect(page.locator(".c-playground-error")).toContainText("The C compiler could not build this program.");
   await expect(page.locator(".c-compiler-diagnostics")).toContainText("expected ';'");
 
-  await page.evaluate(() => { (window as Window & { __cPlaygroundOutcome?: string }).__cPlaygroundOutcome = "runtime-error"; });
+  await page.getByLabel("C source code").fill("#include <stdio.h>\n// MOCK_RUNTIME_ERROR\nint main(void) { return 0; }");
   await runButton.click();
   await expect(page.locator(".c-run-status")).toContainText("runtime error");
   await expect(page.locator(".c-playground-error")).toContainText("exited with status 7");
@@ -1174,21 +1154,22 @@ test("shows compile and runtime failures clearly and reuses the prepared compile
   await page.getByRole("button", { name: "Clear terminal output" }).click();
   await expect(page.locator(".c-output-stream.stderr")).toHaveCount(0);
   await expect(page.locator(".c-console-output")).toContainText("Run the example to see its output here.");
-  const cache = await page.evaluate(() => {
-    const testWindow = window as Window & { __compilerPackageDownloads?: number; __wasmerCacheHits?: number; __wasmerCacheNamespace?: string };
-    return { downloads: testWindow.__compilerPackageDownloads, hits: testWindow.__wasmerCacheHits, namespace: testWindow.__wasmerCacheNamespace };
-  });
-  expect(cache.downloads).toBe(1);
-  expect(cache.hits).toBeGreaterThan(0);
-  expect(cache.namespace).toBe("katalyst-c-playground");
+  await expect(page.locator("iframe[title='Isolated C runtime runner']")).toHaveAttribute("sandbox", "allow-scripts");
 });
 
-test("compiles C and C++17 programs with live stdin in the browser sandbox", async ({ page }) => {
+test("runs C from a public lesson through the isolated runner without parent CSP violations", async ({ page }) => {
   test.skip(process.env.RUN_C_PLAYGROUND_INTEGRATION !== "1", "first use downloads a large compiler package; run with RUN_C_PLAYGROUND_INTEGRATION=1");
   test.setTimeout(360_000);
-  await page.unroute("**/vendor/wasmer-sdk/dist/index.js");
+  await page.unroute("**/lab-runner/c/runner.js");
   const browserErrors: string[] = [];
   const registryTraffic: string[] = [];
+  await page.addInitScript(() => {
+    const host = window as Window & { __parentCspViolations?: string[] };
+    host.__parentCspViolations = [];
+    document.addEventListener("securitypolicyviolation", (event) => {
+      host.__parentCspViolations?.push(`${event.violatedDirective}: ${event.blockedURI}`);
+    });
+  });
   const isRegistryUrl = (rawUrl: string) => {
     const host = new URL(rawUrl).hostname;
     return host === "wasmer.io" || host.endsWith(".wasmer.io") || host.endsWith(".wasmer.dev") || host.endsWith(".wasmer.app");
@@ -1216,19 +1197,20 @@ test("compiles C and C++17 programs with live stdin in the browser sandbox", asy
     }
   });
   page.on("requestfailed", (request) => browserErrors.push(`${request.url()}: ${request.failure()?.errorText ?? "request failed"}`));
-  await page.goto("/");
-  await page.getByRole("button", { name: "Explore Learning Paths" }).click();
-  await ensureCourseDetails(page);
-  await page.getByRole("button", { name: /start learning/i }).click();
+  await page.goto("/courses/c-programming-foundations/source-to-output");
   await expect(page.getByRole("heading", { name: "From source code to output" })).toBeVisible();
-  await page.waitForFunction(() => {
-    const state = document.querySelector(".c-playground")?.getAttribute("data-compiler-state");
-    return state === "ready" || state === "failed";
-  }, { timeout: 330_000 });
-  if (await page.locator(".c-playground").getAttribute("data-compiler-state") === "failed") {
-    const setupError = await page.locator(".c-compiler-failure").innerText().catch(() => "Compiler initialization failed without a visible message.");
-    throw new Error("C/C++ compiler setup failed: " + setupError + " | browser errors: " + browserErrors.join(" ; ") + " | registry traffic: " + registryTraffic.join(" ; "));
-  }
+  await expect(page.locator('iframe[title="Isolated C runtime runner"]')).toHaveAttribute("sandbox", "allow-scripts");
+  await expect(page.getByRole("button", { name: "Run code", exact: true })).toBeEnabled();
+  await page.getByLabel("C source code").fill('#include <stdio.h>\nint main(void) { printf("C runner works\\n"); return 0; }\n');
+  await page.getByRole("button", { name: "Run code", exact: true }).click();
+  const compileResult = await Promise.race([
+    page.locator(".c-playground-error, .c-compiler-failure").waitFor({ state: "visible", timeout: 330_000 }).then(async () => ({ error: await page.locator(".c-playground-error, .c-compiler-failure").first().innerText() })),
+    page.locator(".c-console-output").getByText("C runner works").waitFor({ state: "visible", timeout: 330_000 }).then(() => ({ output: "C runner works" })),
+  ]);
+  if ("error" in compileResult) throw new Error(`C runner failed: ${compileResult.error}\n${browserErrors.join("\n")}\n${registryTraffic.join("\n")}`);
+  await expect(page.locator(".c-run-status")).toContainText("finished successfully", { timeout: 10_000 });
+
+  await page.getByRole("button", { name: "Clear terminal output" }).click();
   await page.getByLabel("C source code").fill("#include <stdio.h>\nint main(void) { int value = 0; scanf(\"%c\", &value); printf(\"Read: %c\\n\", value); return 0; }\n");
   await page.getByRole("button", { name: "Run code", exact: true }).click();
   const terminalInput = page.getByLabel("Terminal standard input");
@@ -1248,45 +1230,8 @@ test("compiles C and C++17 programs with live stdin in the browser sandbox", asy
   await terminalInput.press("Enter");
   await expect(page.locator(".c-console-output").getByText("Read: K")).toBeVisible({ timeout: 10_000 });
   await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
-  await page.getByRole("button", { name: "Playground", exact: true }).click();
-  await page.getByText("Launch C Workbench").click();
-  await page.getByRole("button", { name: "Reset example" }).click();
-  await expect(page.getByLabel("C source code")).toContainText("Hello, C!");
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect(page.locator(".c-console-output")).toContainText("Hello, C!", { timeout: 30_000 });
-  await expect(page.locator(".c-run-status")).toContainText("finished successfully", { timeout: 10_000 });
-  await page.getByRole("button", { name: "All Labs", exact: true }).click();
-  await page.getByText("Launch C++ Workbench").click();
-  await expect(page.locator("#runtime-switcher-select")).toHaveValue("code:cpp", { timeout: 10_000 });
-  const cppEditor = page.getByLabel("C++ source code");
-  await expect(cppEditor).toContainText("doubleValue");
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect(page.locator(".c-console-output")).toContainText("Twice: 42", { timeout: 330_000 });
-  await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
-  await page.getByRole("button", { name: "Clear terminal output" }).click();
-  await cppEditor.fill(`#include <stdio.h>\ntemplate <typename T> T doubleValue(T value) { return value + value; }\nint main() { int value = 0; if (scanf("%d", &value) != 1) return 1; printf("Twice: %d\\n", doubleValue(value)); return 0; }\n`);
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  const cppInput = page.getByLabel("Terminal standard input");
-  try {
-    await expect(cppInput).toBeEnabled({ timeout: 15_000 });
-  } catch {
-    const cppError = await page.locator(".c-playground-error").innerText().catch(() => "");
-    throw new Error(`C++17 terminal input did not become available: ${cppError || "no compiler/runtime error was rendered"}\n${browserErrors.join("\n")}`);
-  }
-  await cppInput.fill("21");
-  await cppInput.press("Enter");
-  await expect(page.locator(".c-console-output")).toContainText("Twice: 42", { timeout: 10_000 });
-  await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
-  await page.getByRole("button", { name: "Clear terminal output" }).click();
-  await page.getByRole("button", { name: "Run", exact: true }).click();
-  await expect(cppInput).toBeEnabled({ timeout: 10_000 });
-  await cppInput.fill("21");
-  await cppInput.press("Enter");
-  await expect(page.locator(".c-console-output")).toContainText("Twice: 42", { timeout: 10_000 });
-  await expect(page.locator(".c-run-status")).toContainText("finished", { timeout: 10_000 });
-  const widths = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
-  expect(widths.document).toBeLessThanOrEqual(widths.viewport);
-  await page.screenshot({ path: "work/katalyst-c-playground.png", fullPage: true });
+  const cspViolations = await page.evaluate(() => (window as Window & { __parentCspViolations?: string[] }).__parentCspViolations ?? []);
+  expect(cspViolations).toEqual([]);
 });
 
 test("preserves corrupt browser data until the user explicitly starts a fresh workspace", async ({ page }) => {

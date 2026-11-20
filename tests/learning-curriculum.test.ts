@@ -165,6 +165,26 @@ describe("authored learning catalog", () => {
     }
   });
 
+  it("keeps embedded hardware lesson examples in C while running JavaScript exercise starters", () => {
+    const hardwareCourses = [arduinoEmbeddedCourse, esp32IotCourse, breadboardElectronicsCourse];
+    let starterCount = 0;
+
+    for (const course of hardwareCourses) {
+      for (const { lesson } of flattenLessons(course)) {
+        expect(lesson.exercise.language).toBe("javascript");
+        expect(lesson.exercise.starterCode).toBeTruthy();
+        expect(lesson.codeExamples?.every((example) => example.language === "c")).toBe(true);
+        expect(resolveLessonExecution(course, lesson)).toEqual({
+          language: "javascript",
+          target: "browser-wasm",
+        });
+        starterCount += 1;
+      }
+    }
+
+    expect(starterCount).toBe(18);
+  });
+
   it("supports all lesson types, theory sections, code examples, demos, and progressive hints", () => {
     const richLesson = {
       id: "rich-demo-lesson",

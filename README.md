@@ -8,10 +8,10 @@ KATALYST is a local-first technical learning studio for curious builders. It bri
 - Learning Home with one animated multi-discipline pipeline, path discovery, My Learning, Practice Lab, Progress, and Kat's AI Tutor.
 - A published catalog of 14 courses across programming, web and AI, systems, databases, algorithms, hardware, embedded devices, circuits, and visual media. Course details open alongside the course list so learners can inspect a path and start from the same place.
 - A validated, provider-independent course catalog separates published course content from lesson presentation. Each complete C example shows its expected run, including sample input and sandbox-created files where relevant; draft entries remain out of learner navigation.
-- A first-class C11 playground connected to the lessons: open an example in the editor, provide stdin, compile it to WebAssembly, inspect diagnostics, and run it locally in the browser.
+- A C/C++ playground connected to lessons: read examples and edit local drafts. Run is temporarily disabled while the browser compiler is being replaced.
 - An integrated three-panel lesson workspace. Smaller screens switch between accessible Learn, Code, and Kat tabs without losing lesson state or the local editor draft; the app/provider header stays stable during nested editor and tutor scrolling and returns on an intentional upward scroll.
 - Lesson content scrolls in the main page area without a floating duplicate breadcrumb; on wide screens the lesson, workbench, and Kat use a balanced three-column layout, and the Kat conversation scrolls independently above its composer.
-- Background C compiler setup when a lesson opens, with download progress, browser cache reuse, a retry action, and Run enabled only when the compiler is ready.
+- The shared C/C++ Run feature flag defaults off; enabling it requires a production-verified compiler.
 - Local enrollment and explicit lesson completion, kept separate from conversations. Progress reflects recorded actions only; there are no invented scores or mastery claims.
 - Four tutor styles—Concept teacher, Socratic tutor, Practical mentor, and Exam coach—routed through the selected provider. The learner's question stays primary; relevant lesson context is included when available, and enabled workspace skills can be applied with an explicit opt-in. Kat's trusted request metadata identifies the selected provider/model; each transient reply shows its request route. Kat has no browsing or execution tools and does not claim to have run code.
 - Projects, chat, skill library, and provider settings remain available as secondary workspace tools.
@@ -62,7 +62,7 @@ The C playground component is loaded as a separate client chunk when the lesson/
 
 ## Stack
 
-Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4, Zod, `react-markdown` with GFM, `rehype-highlight`, Supabase SSR/Auth clients for optional accounts, Wasmer JavaScript SDK for the optional browser-local C compiler, Vitest, and Playwright. Provider adapters make server-side requests so keys do not enter client bundles. No paid dependency is required for basic guest-mode development.
+Next.js 16 App Router, React 19, TypeScript, Tailwind CSS 4, Zod, `react-markdown` with GFM, `rehype-highlight`, Supabase SSR/Auth clients for optional accounts, Wasmer JavaScript SDK for the currently disabled browser-local C/C++ compiler, Vitest, and Playwright. Provider adapters make server-side requests so keys do not enter client bundles. No paid dependency is required for basic guest-mode development.
 
 ## Prerequisites
 

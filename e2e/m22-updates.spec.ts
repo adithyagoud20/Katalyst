@@ -10,39 +10,42 @@ async function ensureCourseDetails(page: import("@playwright/test").Page) {
 
 test.describe("Milestone M22 Featured Courses, Lazy Playground, Compiler Toggle & UI Polish", () => {
   test.beforeEach(async ({ page }) => {
-    // Fast mock for Wasmer SDK browser package
-    await page.route("**/vendor/wasmer-sdk/dist/index.js", async (route) => {
+    await page.route("**/lab-runner/c/runner.js", async (route) => {
       await route.fulfill({
         status: 200,
         contentType: "text/javascript",
-        body: `const output = (value = "") => ({ text: () => value, truncated: false });
-        export class Wasmer {
-          constructor() {
-            this.packages = { load: async () => ({ entrypoint: "clang" }) };
-            this.sandboxes = { create: async () => ({
-              command: (program, args) => ({ spawn: async () => {
-                const compiling = Array.isArray(args);
-                if (compiling) window.__capturedCompilerInvocation = { program, args };
-                let releaseInput;
-                const inputReceived = new Promise((resolve) => { releaseInput = resolve; });
-                return {
-                  stdin: { write: async (value) => { window.__capturedTerminalInput = value; releaseInput(); }, close: async () => { releaseInput(); } },
-                  stdout: null,
-                  stderr: null,
-                  wait: async () => {
-                    if (!compiling && window.__mockWaitForInput) await inputReceived;
-                    return { reason: "exited", exitCode: 0, stdout: output(!compiling && window.__mockWaitForInput ? "mock interactive output" : "mock C output"), stderr: output() };
-                  },
-                  kill: async () => {},
-                };
-              } }),
-              fs: { readFile: async () => new Uint8Array([1]) },
-              installPackage: async () => {},
-              close: async () => {},
-            }) };
-          }
-          async close() {}
-        }`,
+        body: String.raw`const expectedParent = document.querySelector('meta[name="c-lab-parent-origin"]').content;
+let token = "";
+let active = null;
+let ready = false;
+function send(type, requestId, payload = {}) { parent.postMessage({ version: 1, type, token, requestId, ...payload }, expectedParent); }
+function finish(requestId, stdout = "mock interactive output\n") {
+  send("OUTPUT", requestId, { channel: "stdout", text: stdout });
+  send("DONE", requestId, { outcome: "success", stdout, stderr: "", diagnostics: "", error: "", durationMs: 3, exitCode: 0 });
+  active = null;
+}
+window.addEventListener("message", (event) => {
+  if (event.source !== parent || event.origin !== expectedParent) return;
+  const message = event.data;
+  if (!message || message.version !== 1) return;
+  if (message.type === "INIT") {
+    token = message.token;
+    send("READY", message.requestId);
+    send("COMPILER_STATE", message.requestId, { state: "idle" });
+  } else if (message.token !== token) return;
+  else if (message.type === "RUN") {
+    active = message;
+    ready = true;
+    send("COMPILER_STATE", message.requestId, { state: "ready" });
+    send("PHASE", message.requestId, { phase: "compiling" });
+    send("PHASE", message.requestId, { phase: "running" });
+  } else if (message.type === "INPUT" && active?.requestId === message.requestId) finish(message.requestId);
+  else if (message.type === "STOP" && active?.requestId === message.requestId) {
+    send("DONE", message.requestId, { outcome: "stopped", stdout: "", stderr: "", diagnostics: "", error: "Run stopped.", durationMs: 1 });
+    active = null;
+  }
+});
+document.body.textContent = "Mock C runtime ready.";`,
       });
     });
   });
@@ -265,21 +268,12 @@ test.describe("Milestone M22 Featured Courses, Lazy Playground, Compiler Toggle 
     await editor.fill("#include <iostream>\nint main() { int value; std::cin >> value; std::cout << value; }");
     await expect(page.locator(".c-stdin-label")).toHaveCount(0);
     await expect(page.locator("#c-playground-stdin")).toHaveCount(0);
-    await page.evaluate(() => { (window as Window & { __mockWaitForInput?: boolean }).__mockWaitForInput = true; });
     await page.getByRole("button", { name: "Run", exact: true }).click();
     const terminalInput = page.getByLabel("Terminal standard input");
     await expect(terminalInput).toBeEnabled();
-    const compilerInvocation = await page.evaluate(() => (window as Window & { __capturedCompilerInvocation?: { program: string; args: string[] } }).__capturedCompilerInvocation);
-    expect(compilerInvocation?.program).toBe("clang");
-    expect(compilerInvocation?.args).toContain("--driver-mode=g++");
-    expect(compilerInvocation?.args).toContain("-x");
-    expect(compilerInvocation?.args).toContain("c++");
-    expect(compilerInvocation?.args).toContain("-std=c++17");
     await terminalInput.fill("42");
     await terminalInput.press("Enter");
     await expect(page.locator(".c-console-output")).toContainText("mock interactive output");
-    const sent = await page.evaluate(() => (window as Window & { __capturedTerminalInput?: string }).__capturedTerminalInput);
-    expect(sent).toBe("42\n");
   });
 
   test("shows dedicated board guides and the selected board pin references", async ({ page }) => {

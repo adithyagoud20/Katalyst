@@ -30,10 +30,7 @@ import {
 } from "lucide-react";
 import { AssistantMarkdown } from "@/components/assistant-markdown";
 import { KatTutor, type TutorLessonContext } from "@/components/kat-tutor";
-import { CodeWorkspace } from "@/components/code-workspace";
-import { MemoryVisualizer } from "@/components/simulators/memory-visualizer";
-import { CircuitSimulator } from "@/components/simulators/circuit-simulator";
-import { ImageLabVisualizer } from "@/components/simulators/image-lab-visualizer";
+import dynamic from "next/dynamic";
 import { SimulatorErrorBoundary } from "@/components/simulators/simulator-error-boundary";
 import type { ExecutionLanguage } from "@/lib/execution/types";
 import {
@@ -45,16 +42,19 @@ import {
 import {
   findLesson,
   flattenLessons,
-  learningSubjects,
   resolveLessonExecution,
   resolveLessonHints,
   resolveLessonType,
-  type LearningCourseDetail,
-  type LearningCourseSummary,
-  type LearningLessonDetail,
-  type LearningSection,
-  type LessonType,
-} from "@/lib/learning-curriculum";
+} from "@/lib/learning-model";
+import { learningSubjects } from "@/data/curriculum/learning-index";
+import type {
+  LearningCourseDetail,
+  LearningCourseSummary,
+  LearningExercise,
+  LearningLessonDetail,
+  LearningSection,
+  LessonType,
+} from "@/lib/learning-model";
 import { defaultCProgram, extractCCode, makeRunnableCProgram } from "@/lib/c-playground";
 import {
   completeLesson,
@@ -82,7 +82,8 @@ import {
   type WorkspaceLayout,
 } from "@/lib/workspace-layout";
 
-import { CPlayground, defaultCppProgram, type PendingExample, type PlaygroundRuntimeSelection } from "@/components/c-playground";
+import type { PendingExample, PlaygroundRuntimeSelection } from "@/components/c-playground";
+import { defaultCppProgram } from "@/lib/playground-templates";
 import { SupermemoryHeroGraphic } from "@/components/supermemory-hero-graphic";
 import type { CloudflareRequestMode } from "@/lib/providers/client-request-headers";
 
@@ -95,6 +96,27 @@ def main():
 if __name__ == "__main__":
     main()
 `;
+
+const CodeWorkspace = dynamic(() => import("@/components/code-workspace").then((module) => module.CodeWorkspace), {
+  ssr: false,
+  loading: () => <div className="lab-component-loading" aria-busy="true">Loading code editor…</div>,
+});
+const CPlayground = dynamic(() => import("@/components/c-playground").then((module) => module.CPlayground), {
+  ssr: false,
+  loading: () => <div className="lab-component-loading" aria-busy="true">Loading browser playground…</div>,
+});
+const CircuitSimulator = dynamic(() => import("@/components/simulators/circuit-simulator").then((module) => module.CircuitSimulator), {
+  ssr: false,
+  loading: () => <div className="lab-component-loading" aria-busy="true">Loading circuit simulator…</div>,
+});
+const MemoryVisualizer = dynamic(() => import("@/components/simulators/memory-visualizer").then((module) => module.MemoryVisualizer), {
+  ssr: false,
+  loading: () => <div className="lab-component-loading" aria-busy="true">Loading memory visualizer…</div>,
+});
+const ImageLabVisualizer = dynamic(() => import("@/components/simulators/image-lab-visualizer").then((module) => module.ImageLabVisualizer), {
+  ssr: false,
+  loading: () => <div className="lab-component-loading" aria-busy="true">Loading image lab…</div>,
+});
 
 const defaultJavaScriptProgram = `// JavaScript Sandbox
 // Write ES2024 JavaScript below and click "Run"
@@ -462,6 +484,48 @@ export function LearningExperience({
   const practiceCourseFilter = userPracticeFilter ?? course.id;
   const setPracticeCourseFilter = setUserPracticeFilter;
   const [practiceDifficultyFilter, setPracticeDifficultyFilter] = useState<string>("all");
+  const [practiceExerciseDetails, setPracticeExerciseDetails] = useState<Record<string, Record<string, LearningExercise>>>({});
+  const [practiceExerciseLoading, setPracticeExerciseLoading] = useState(false);
+  const [practiceExerciseIssue, setPracticeExerciseIssue] = useState("");
+
+  useEffect(() => {
+    if (section !== "practice") return;
+    const targetIds = practiceCourseFilter === "all" ? courses.map((item) => item.id) : [practiceCourseFilter];
+    const missingIds = targetIds.filter((id) => !practiceExerciseDetails[id]);
+    if (missingIds.length === 0) {
+      const timer = window.setTimeout(() => {
+        setPracticeExerciseLoading(false);
+        setPracticeExerciseIssue("");
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+
+    const controller = new AbortController();
+    const loadingTimer = window.setTimeout(() => {
+      setPracticeExerciseLoading(true);
+      setPracticeExerciseIssue("");
+    }, 0);
+    Promise.all(missingIds.map(async (courseId) => {
+      const response = await fetch(`/api/curriculum/lesson?courseId=${encodeURIComponent(courseId)}&mode=exercises`, { signal: controller.signal });
+      if (!response.ok) throw new Error(`Exercise data request failed (${response.status}).`);
+      const data = await response.json() as { exercises: Array<{ lessonId: string; exercise: LearningExercise }> };
+      return [courseId, Object.fromEntries(data.exercises.map((item) => [item.lessonId, item.exercise]))] as const;
+    }))
+      .then((entries) => {
+        setPracticeExerciseDetails((current) => ({ ...current, ...Object.fromEntries(entries) }));
+        setPracticeExerciseLoading(false);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        setPracticeExerciseIssue(error instanceof Error ? error.message : "Practice exercises could not be loaded.");
+        setPracticeExerciseLoading(false);
+      });
+
+    return () => {
+      window.clearTimeout(loadingTimer);
+      controller.abort();
+    };
+  }, [courses, practiceCourseFilter, practiceExerciseDetails, section]);
 
   const practiceEntries = useMemo(() => {
     const targetCourses =
@@ -473,6 +537,10 @@ export function LearningExperience({
         const isEnrolled = progress.enrollments.some((e) => e.pathId === c.id);
         return flattenLessons(c).map((entry) => ({
           ...entry,
+          lesson: {
+            ...entry.lesson,
+            exercise: { ...entry.lesson.exercise, ...practiceExerciseDetails[c.id]?.[entry.lesson.id] },
+          },
           course: c,
           status: isEnrolled
             ? getExerciseProgress(progress, c.id, entry.lesson.exercise.id)
@@ -488,7 +556,7 @@ export function LearningExperience({
         }
         return true;
       });
-  }, [courses, practiceCourseFilter, practiceDifficultyFilter, progress]);
+  }, [courses, practiceCourseFilter, practiceDifficultyFilter, practiceExerciseDetails, progress]);
   const tutorContext: TutorLessonContext | undefined = tutorEntry
     ? { path: course, module: tutorEntry.module, lesson: tutorEntry.lesson, exerciseStatus: tutorExerciseStatus }
     : undefined;
@@ -928,7 +996,7 @@ export function LearningExperience({
 
           <div className="learning-section-head home-tracks-heading">
             <div><span className="eyebrow">SELECT A STARTING POINT</span><h2>Featured engineering tracks</h2></div>
-            <button className="learning-text-button" onClick={() => onNavigate("paths")}><span>Explore all 14 courses</span><ArrowRight size={14} /></button>
+            <button className="learning-text-button" onClick={() => onNavigate("paths")}><span>Explore all {courses.length} courses</span><ArrowRight size={14} /></button>
           </div>
 
           <section className="courses-choice-grid" aria-label="Featured engineering tracks">
@@ -1058,7 +1126,7 @@ export function LearningExperience({
           <header className="learning-page-heading">
             <span className="eyebrow">EXPLORE LEARNING PATHS</span>
             <h1>Build a foundation</h1>
-            <p>Browse 14 learning paths in systems, web, AI, data, and hardware. Open a course to preview lessons and outcomes before you start.</p>
+            <p>Browse {courses.length} learning paths in systems, web, AI, data, and hardware. Open a course to preview lessons and outcomes before you start.</p>
           </header>
           <div
             className="explore-category-filter"
@@ -1388,7 +1456,9 @@ export function LearningExperience({
             </div>
           </div>
 
-          <div className="practice-list">
+          {practiceExerciseLoading ? <div className="practice-list" aria-busy="true"><p className="loading-state">Loading exercises for this course…</p></div>
+            : practiceExerciseIssue ? <div className="practice-list" role="alert"><p>{practiceExerciseIssue}</p></div>
+              : <div className="practice-list">
             {practiceEntries.map((entry, index) => {
               const exerciseStatus = entry.status;
               const hints = resolveLessonHints(entry.lesson.exercise);
@@ -1412,7 +1482,7 @@ export function LearningExperience({
                     </p>
                     {entry.lesson.exercise.starterCode && (
                       <details>
-                        <summary><span>View starter code</span><ChevronRight size={14} /></summary>
+                        <summary><span>View starter code{entry.lesson.exercise.language ? ` · ${entry.lesson.exercise.language === "javascript" ? "JavaScript" : entry.lesson.exercise.language.toUpperCase()}` : ""}</span><ChevronRight size={14} /></summary>
                         <pre className="practice-starter-code"><code>{entry.lesson.exercise.starterCode}</code></pre>
                       </details>
                     )}
@@ -1470,7 +1540,7 @@ export function LearningExperience({
                 </article>
               );
             })}
-          </div>
+          </div>}
         </>
       )}
 
@@ -2010,7 +2080,7 @@ export function LearningExperience({
                 <p className="exercise-outcome"><strong>Practice goal:</strong> {lesson.exercise.expectedOutcome}</p>
                 {lesson.exercise.starterCode && (
                   <details className="exercise-starter-details">
-                    <summary><span>Starter code</span><ChevronRight size={14} /></summary>
+                    <summary><span>Starter code{lesson.exercise.language ? ` · ${lesson.exercise.language === "javascript" ? "JavaScript" : lesson.exercise.language.toUpperCase()}` : ""}</span><ChevronRight size={14} /></summary>
                     <pre className="practice-starter-code"><code>{lesson.exercise.starterCode}</code></pre>
                   </details>
                 )}

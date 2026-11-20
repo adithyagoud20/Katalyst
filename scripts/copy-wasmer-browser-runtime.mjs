@@ -1,4 +1,4 @@
-import { cp, mkdir } from "node:fs/promises";
+import { cp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -12,3 +12,14 @@ await Promise.all([
   cp(resolve(packageRoot, "pkg"), resolve(publicRoot, "pkg"), { recursive: true, force: true }),
   cp(resolve(packageRoot, "LICENSE"), resolve(publicRoot, "LICENSE"), { force: true }),
 ]);
+
+const browserEntryPath = resolve(publicRoot, "dist/index.js");
+const browserEntry = await readFile(browserEntryPath, "utf8");
+const workerUrlSetup = 'setWorkerUrl(new URL("./browser-worker.js", import.meta.url).href);';
+if (!browserEntry.includes(workerUrlSetup)) {
+  throw new Error("Wasmer browser entry changed; review the isolated C worker URL patch before updating the SDK.");
+}
+await writeFile(browserEntryPath, browserEntry.replace(
+  workerUrlSetup,
+  '// Opaque sandbox origins require the C lab to provide a blob worker bootstrap.\n        setWorkerUrl(globalThis.__katalystCLabWorkerUrl ?? new URL("./browser-worker.js", import.meta.url).href);',
+));

@@ -2005,6 +2005,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Model the sequential setup and looping execution flow of an embedded sketch.",
               "prompt": "Write a function `runSketch(iterations)` that returns an array of strings representing execution logs. The first element must be `'SETUP: READY'`. Then, for each cycle from 1 up to `iterations`, add `'LOOP: TICK ' + i`. Print the output formatted as JSON for 2 iterations.",
               "objectiveId": "ard-sketch-lifecycle",
+              "language": "javascript",
               "starterCode": "function runSketch(iterations) {\n  // Return setup and loop log entries\n  return [];\n}\n\nconsole.log(JSON.stringify(runSketch(2)));"
             },
             "checkpoint": {
@@ -2037,6 +2038,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Apply bitwise operations to simulate hardware register configuration.",
               "prompt": "Write a function `setPinInPort(currentPort, pinBit, state)` where `currentPort` is an 8-bit integer (0-255), `pinBit` is 0-7, and `state` is boolean (`true` for HIGH, `false` for LOW). If state is true, set that bit to 1 using bitwise OR. If false, clear that bit to 0 using bitwise AND with inverted mask. Return the new port value. Test with currentPort = 0x00, pinBit = 5, state = true. Print the hex string formatted as `0x` followed by uppercase hex (e.g. `0x20`).",
               "objectiveId": "ard-digital-io",
+              "language": "javascript",
               "starterCode": "function setPinInPort(currentPort, pinBit, state) {\n  // Apply bitmask operation\n  return 0;\n}\n\nconst val = setPinInPort(0x00, 5, true);\nconsole.log(\"0x\" + val.toString(16).toUpperCase());"
             },
             "checkpoint": {
@@ -2077,6 +2079,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Filter transient mechanical switch noise to produce a stable digital state.",
               "prompt": "Write a function `filterBounce(readings, threshold)` where `readings` is an array of raw logic values `[0, 1]` sampled at 1ms intervals, and `threshold` is the number of identical consecutive readings required to validate a state change. Start with confirmed state = 1. Return the final confirmed state after processing the array. Test with `readings = [1, 0, 0, 1, 0, 0, 0, 0]` and `threshold = 3`. Print the result.",
               "objectiveId": "ard-pullup-inputs",
+              "language": "javascript",
               "starterCode": "function filterBounce(readings, threshold) {\n  // Implement debouncing state filter\n  return 1;\n}\n\nconsole.log(filterBounce([1, 0, 0, 1, 0, 0, 0, 0], 3));"
             },
             "checkpoint": {
@@ -2109,6 +2112,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Convert discrete 10-bit ADC integer readings to real-world electrical quantities.",
               "prompt": "Write a function `rawToMillivolts(rawCount, vRefVolts)` that calculates the measured potential in millivolts rounded to the nearest integer. Formula: `Math.round((rawCount * (vRefVolts * 1000)) / 1023)`. Calculate the millivolts for rawCount = 512 with vRef = 5.0V. Print the result.",
               "objectiveId": "ard-adc-analog",
+              "language": "javascript",
               "starterCode": "function rawToMillivolts(rawCount, vRefVolts) {\n  // Convert count to millivolts\n  return 0;\n}\n\nconsole.log(rawToMillivolts(512, 5.0));"
             },
             "checkpoint": {
@@ -2149,6 +2153,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Calculate 8-bit timer register duty cycles for proportional power modulation.",
               "prompt": "Write a function `targetVoltageToPwm(targetVolts, vSupply)` that computes the 8-bit integer PWM value (0 to 255) needed to produce a desired average voltage. Clamp output between 0 and 255: `Math.min(255, Math.max(0, Math.round((targetVolts / vSupply) * 255)))`. Calculate PWM for 3.3V on a 5.0V supply. Print the resulting integer.",
               "objectiveId": "ard-pwm-serial",
+              "language": "javascript",
               "starterCode": "function targetVoltageToPwm(targetVolts, vSupply) {\n  // Return clamped 8-bit PWM value\n  return 0;\n}\n\nconsole.log(targetVoltageToPwm(3.3, 5.0));"
             },
             "checkpoint": {
@@ -2181,6 +2186,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Model cyclic finite state machines for predictable embedded automation.",
               "prompt": "Write a function `simulateTrafficLight(ticks)` that advances a state machine through states `'GREEN'`, `'YELLOW'`, `'RED'`. Duration rules: GREEN lasts 3 ticks, YELLOW lasts 1 tick, RED lasts 2 ticks. Starting at tick 0 in GREEN, run for `ticks` transitions and return an array of the active state at each tick from 0 to ticks - 1. Test with `ticks = 7`. Print as JSON.",
               "objectiveId": "ard-millis-fsm",
+              "language": "javascript",
               "starterCode": "function simulateTrafficLight(ticks) {\n  // Simulate timed traffic state machine\n  return [];\n}\n\nconsole.log(JSON.stringify(simulateTrafficLight(7)));"
             },
             "checkpoint": {
@@ -2270,6 +2276,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Evaluate voltage divider circuit parameters to protect 3.3V ESP32 silicon.",
               "prompt": "Write a function `isSafeForEsp32(vIn, r1, r2)` that returns `true` if the attenuated voltage `vIn * (r2 / (r1 + r2))` is less than or equal to `3.6` volts, and `false` if it exceeds 3.6V. Test with `vIn = 5.0, r1 = 1000, r2 = 2000` (safe) and `vIn = 5.0, r1 = 500, r2 = 2000` (overvoltage). Print the two boolean results joined by a comma.",
               "objectiveId": "esp-dual-core-logic",
+              "language": "javascript",
               "starterCode": "function isSafeForEsp32(vIn, r1, r2) {\n  // Check if output voltage <= 3.6V\n  return false;\n}\n\nconsole.log(isSafeForEsp32(5.0, 1000, 2000) + \",\" + isSafeForEsp32(5.0, 500, 2000));"
             },
             "checkpoint": {
@@ -2302,6 +2309,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Filter ESP32 GPIOs based on hardware capabilities and silicon constraints.",
               "prompt": "Write a function `canPinOutput(gpio)` that returns `true` if the GPIO pin is capable of driving an output, and `false` if it is an input-only pin (34, 35, 36, 39) or connected to internal flash memory (6, 7, 8, 9, 10, 11). Test with GPIOs `[4, 34, 7, 21]` and print the results as JSON.",
               "objectiveId": "esp-gpio-strapping",
+              "language": "javascript",
               "starterCode": "function canPinOutput(gpio) {\n  // Return true if pin can output\n  return false;\n}\n\nconst testPins = [4, 34, 7, 21];\nconsole.log(JSON.stringify(testPins.map(canPinOutput)));"
             },
             "checkpoint": {
@@ -2342,6 +2350,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Calculate calibrated voltage measurements from 12-bit ADC data.",
               "prompt": "Write a function `adcCountToMillivolts(rawCount, maxMillivolts)` that converts a 12-bit ADC reading (0 to 4095) into millivolts rounded to the nearest integer. Formula: `Math.round((rawCount * maxMillivolts) / 4095)`. Calculate for rawCount = 2048 with maxMillivolts = 3120 (11dB attenuation). Print the result.",
               "objectiveId": "esp-12bit-adc",
+              "language": "javascript",
               "starterCode": "function adcCountToMillivolts(rawCount, maxMillivolts) {\n  // Convert 12-bit count to millivolts\n  return 0;\n}\n\nconsole.log(adcCountToMillivolts(2048, 3120));"
             },
             "checkpoint": {
@@ -2374,6 +2383,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Calculate hardware timer register boundaries across arbitrary PWM resolutions.",
               "prompt": "Write a function `maxDutyForResolution(bits)` that returns the maximum duty cycle integer: `(1 << bits) - 1`. For bits = 10 (10-bit resolution), the result is `1023`. Test with bits = 10 and bits = 12. Print the two values joined by a comma.",
               "objectiveId": "esp-ledc-pwm",
+              "language": "javascript",
               "starterCode": "function maxDutyForResolution(bits) {\n  // Compute max duty count\n  return 0;\n}\n\nconsole.log(maxDutyForResolution(10) + \",\" + maxDutyForResolution(12));"
             },
             "checkpoint": {
@@ -2414,6 +2424,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Serialize embedded sensor data into standard JSON format for cloud APIs.",
               "prompt": "Write a function `formatTelemetry(deviceId, tempC, lightLux)` that returns a valid JSON string with keys `\"id\"`, `\"temp\"`, and `\"lux\"`. Values should be `deviceId` (string), `tempC` (rounded to 1 decimal place), and `lightLux` (integer). Test with `formatTelemetry(\"node-alpha\", 23.456, 450)`. Print the JSON string.",
               "objectiveId": "esp-wifi-telemetry",
+              "language": "javascript",
               "starterCode": "function formatTelemetry(deviceId, tempC, lightLux) {\n  // Format JSON payload\n  return \"\";\n}\n\nconsole.log(formatTelemetry(\"node-alpha\", 23.456, 450));"
             },
             "checkpoint": {
@@ -2446,6 +2457,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Calculate weighted average power consumption across active and deep sleep operational duty cycles.",
               "prompt": "Write a function `calcAverageCurrent(activeMa, activeSec, sleepUa, sleepSec)` that calculates the average current in milliamperes rounded to 3 decimal places. Formula: `(activeSec * activeMa + sleepSec * (sleepUa / 1000)) / (activeSec + sleepSec)`. Compute for activeMa = 120, activeSec = 2, sleepUa = 15, sleepSec = 58. Print the rounded number.",
               "objectiveId": "esp-deep-sleep",
+              "language": "javascript",
               "starterCode": "function calcAverageCurrent(activeMa, activeSec, sleepUa, sleepSec) {\n  // Return average current in mA\n  return 0;\n}\n\nconsole.log(calcAverageCurrent(120, 2, 15, 58));"
             },
             "checkpoint": {
@@ -2534,6 +2546,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Model breadboard spring clip connectivity rules.",
               "prompt": "Write a function `isNodeConnected(rowA, colA, rowB, colB)` that returns `true` if two breadboard coordinates share the same electrical clip, and `false` otherwise. Rule: rowA must equal rowB, and both colA and colB must either be on the left side ('a'-'e') or both on the right side ('f'-'j'). Test with `('15', 'b', '15', 'e')` (connected) and `('15', 'b', '15', 'g')` (separated by trench). Print the two boolean results joined by a comma.",
               "objectiveId": "bb-bus-continuity",
+              "language": "javascript",
               "starterCode": "function isNodeConnected(rowA, colA, rowB, colB) {\n  // Return true if points are connected\n  return false;\n}\n\nconsole.log(isNodeConnected(15, 'b', 15, 'e') + \",\" + isNodeConnected(15, 'b', 15, 'g'));"
             },
             "checkpoint": {
@@ -2566,6 +2579,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Detect power delivery interruptions caused by breadboard bus split gaps.",
               "prompt": "Write a function `isRailContinuous(hasBridgeJumper, boardIndex)` where `boardIndex` is a column number from 1 to 60. On a split breadboard, indices 1 to 30 are on the left section and 31 to 60 are on the right section. If power is fed at index 1, return `true` if `boardIndex <= 30` OR if `hasBridgeJumper` is true. Test for `boardIndex = 45` with `hasBridgeJumper = false` and `true`. Print the two booleans joined by a comma.",
               "objectiveId": "bb-power-rails",
+              "language": "javascript",
               "starterCode": "function isRailContinuous(hasBridgeJumper, boardIndex) {\n  // Check if target point receives power\n  return false;\n}\n\nconsole.log(isRailContinuous(false, 45) + \",\" + isRailContinuous(true, 45));"
             },
             "checkpoint": {
@@ -2606,6 +2620,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Apply Ohm's law to size embedded circuit protection components.",
               "prompt": "Write a function `sizeLedResistor(vSupply, vForward, targetCurrentMa)` that computes the ideal resistance in ohms rounded to the nearest integer. Formula: `Math.round((vSupply - vForward) / (targetCurrentMa / 1000))`. Compute for a 5.0V supply driving a Green LED (forward voltage 2.2V) at 14mA. Print the resulting integer.",
               "objectiveId": "bb-led-resistors",
+              "language": "javascript",
               "starterCode": "function sizeLedResistor(vSupply, vForward, targetCurrentMa) {\n  // Compute resistor value\n  return 0;\n}\n\nconsole.log(sizeLedResistor(5.0, 2.2, 14));"
             },
             "checkpoint": {
@@ -2638,6 +2653,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Interpret digital input logic levels across pull-up and pull-down circuit topologies.",
               "prompt": "Write a function `getSwitchAction(topology, rawReading)` where `topology` is either `'PULLUP'` or `'PULLDOWN'`, and `rawReading` is `0` or `1`. Return `'PRESSED'` or `'RELEASED'`. For `'PULLUP'`, reading `0` is `'PRESSED'`. For `'PULLDOWN'`, reading `1` is `'PRESSED'`. Test with `('PULLUP', 0)` and `('PULLDOWN', 0)`. Print both results separated by a comma.",
               "objectiveId": "bb-switch-pullups",
+              "language": "javascript",
               "starterCode": "function getSwitchAction(topology, rawReading) {\n  // Return 'PRESSED' or 'RELEASED'\n  return \"\";\n}\n\nconsole.log(getSwitchAction('PULLUP', 0) + \",\" + getSwitchAction('PULLDOWN', 0));"
             },
             "checkpoint": {
@@ -2678,6 +2694,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Calculate intermediate node voltages in passive resistor divider networks.",
               "prompt": "Write a function `dividerVoltage(vIn, r1, r2)` that returns the output voltage rounded to 2 decimal places: `Number((vIn * (r2 / (r1 + r2))).toFixed(2))`. Compute the output for `vIn = 5.0, r1 = 10000, r2 = 10000` (equal resistors) and `vIn = 5.0, r1 = 1000, r2 = 2000`. Print both results separated by a comma.",
               "objectiveId": "bb-voltage-dividers",
+              "language": "javascript",
               "starterCode": "function dividerVoltage(vIn, r1, r2) {\n  // Calculate divider voltage\n  return 0;\n}\n\nconsole.log(dividerVoltage(5.0, 10000, 10000) + \",\" + dividerVoltage(5.0, 1000, 2000));"
             },
             "checkpoint": {
@@ -2710,6 +2727,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "expectedOutcome": "Apply systematic troubleshooting logic to isolate physical circuit failures.",
               "prompt": "Write a function `diagnoseFault(vMeasured, continuityGnd, ledOriented)` where `vMeasured` is a number (measured volts), `continuityGnd` is boolean, and `ledOriented` is boolean. Return `'NO_GROUND'` if continuityGnd is false. Otherwise, return `'VOLTAGE_SAG'` if vMeasured < 4.5. Otherwise, return `'REVERSED_LED'` if ledOriented is false. Otherwise return `'HEALTHY'`. Test with `(5.0, true, true)` and `(3.2, true, true)`. Print both results separated by a comma.",
               "objectiveId": "bb-troubleshooting",
+              "language": "javascript",
               "starterCode": "function diagnoseFault(vMeasured, continuityGnd, ledOriented) {\n  // Return diagnostic outcome string\n  return \"\";\n}\n\nconsole.log(diagnoseFault(5.0, true, true) + \",\" + diagnoseFault(3.2, true, true));"
             },
             "checkpoint": {

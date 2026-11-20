@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { findLesson, flattenLessons, learningPaths, type LearningPath } from "./learning-curriculum";
+import { findLesson, flattenLessons } from "./learning-model";
+import type { LearningPath } from "./learning-model";
+import { learningPaths } from "@/data/curriculum/learning-index";
 
 export const LEARNING_PROGRESS_KEY = "katalyst.learning.v1";
 export const MAX_LEARNING_PROGRESS_BYTES = 256_000;

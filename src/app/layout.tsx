@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Geist, JetBrains_Mono } from "next/font/google";
 import { PwaRegister } from "@/components/pwa-register";
+import { LegacyHashRedirect } from "@/components/legacy-hash-redirect";
 import { getSiteOrigin } from "@/lib/site-origin";
 import "./globals.css";
 
@@ -78,6 +79,8 @@ export const viewport: Viewport = {
 
 const themeInitializer = `(function() {
   try {
+    var zodConfig = globalThis.__zod_globalConfig || (globalThis.__zod_globalConfig = {});
+    zodConfig.jitless = true;
     var raw = localStorage.getItem("katalyst.preferences.v1");
     var theme = "system";
     if (raw) {
@@ -101,7 +104,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeInitializer }} />
         {structuredData.map((item) => <script nonce={nonce} key={item["@type"]} type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(item).replace(/</g, "\\u003c") }} />)}
       </head>
-      <body>{children}<PwaRegister /></body>
+      <body><LegacyHashRedirect />{children}<PwaRegister /></body>
     </html>
   );
 }

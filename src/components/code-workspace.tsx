@@ -340,6 +340,7 @@ export function CodeWorkspace({
     const state = EditorState.create({
       doc: initialCode,
       extensions: [
+        EditorView.cspNonce.of(document.querySelector<HTMLScriptElement>("script[nonce]")?.nonce ?? ""),
         lineNumbers(),
         highlightActiveLineGutter(),
         foldGutter(),
@@ -610,17 +611,7 @@ export function CodeWorkspace({
               sandbox="allow-scripts"
               srcDoc={source}
               title="HTML Sandbox Live Preview"
-              className="html-preview-frame transition-all duration-200"
-              style={{
-                width: previewMode === "mobile" ? "min(375px, 100%)" : "100%",
-                maxWidth: previewMode === "mobile" ? "375px" : "100%",
-                minHeight: "320px",
-                height: "100%",
-                background: "#ffffff",
-                borderRadius: "8px",
-                border: "1px solid var(--border-subtle)",
-                boxShadow: previewMode === "mobile" ? "0 4px 20px rgba(0,0,0,0.15)" : "none",
-              }}
+              className={`html-preview-frame transition-all duration-200 ${previewMode === "mobile" ? "html-preview-frame--mobile" : "html-preview-frame--desktop"}`}
             />
           </div>
         </div>

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getServerLesson } from "@/data/curriculum/server-catalog";
+import { loadCourseDetail } from "@/data/curriculum/course-loader";
 
 const querySchema = z.object({
   courseId: z.string().trim().min(1, "courseId is required"),
-  lessonId: z.string().trim().min(1, "lessonId is required"),
+  lessonId: z.string().trim().min(1).optional(),
+  mode: z.enum(["lesson", "exercises"]).default("lesson"),
 });
 
 export async function GET(request: Request) {
@@ -13,6 +14,7 @@ export async function GET(request: Request) {
     const parsed = querySchema.safeParse({
       courseId: searchParams.get("courseId"),
       lessonId: searchParams.get("lessonId"),
+      mode: searchParams.get("mode") ?? "lesson",
     });
 
     if (!parsed.success) {
@@ -22,8 +24,16 @@ export async function GET(request: Request) {
       );
     }
 
-    const { courseId, lessonId } = parsed.data;
-    const lesson = getServerLesson(courseId, lessonId);
+    const { courseId, lessonId, mode } = parsed.data;
+    const course = await loadCourseDetail(courseId);
+    if (mode === "exercises") {
+      if (!course) return NextResponse.json({ error: "Course not found" }, { status: 404 });
+      return NextResponse.json({
+        exercises: course.modules.flatMap((module) => module.lessons.map((lesson) => ({ lessonId: lesson.id, exercise: lesson.exercise }))),
+      }, { headers: { "Cache-Control": "public, max-age=3600, stale-while-revalidate=86400" } });
+    }
+    if (!lessonId) return NextResponse.json({ error: "lessonId is required" }, { status: 400 });
+    const lesson = course?.modules.flatMap((module) => module.lessons).find((item) => item.id === lessonId);
 
     if (!lesson) {
       return NextResponse.json(

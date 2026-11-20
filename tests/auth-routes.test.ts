@@ -10,7 +10,7 @@ vi.mock("@supabase/ssr", () => ({ createServerClient }));
 vi.mock("next/headers", () => ({ cookies: vi.fn(async () => cookieStore) }));
 vi.mock("@/lib/legal-consent", () => ({ LEGAL_CONSENT_COOKIE: "katalyst_legal_consent", recordLegalConsent }));
 
-import { GET as authCallback } from "@/app/auth/callback/route";
+import { GET as authCallback } from "@/app/(app)/auth/callback/route";
 import { getVerifiedSupabaseUser } from "@/lib/supabase/server";
 
 describe("Supabase OAuth callback and session verification", () => {

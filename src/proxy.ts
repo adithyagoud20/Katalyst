@@ -1,21 +1,45 @@
 import { createServerClient } from "@supabase/ssr";
 import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
+import { getCLabRequestOrigin, isCLabRunnerEmbedRoute, resolveCLabRunnerOrigin } from "@/lib/c-lab-runner-config";
+import { getCLabRunnerAssetContentSecurityPolicy } from "@/lib/c-lab-runner-security";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 
-function createCsp(nonce: string, allowWasmerWorkerEval = false): string {
-  const isDev = process.env.NODE_ENV === "development";
+export const C_LAB_RUNNER_PATH = "/lab-runner/c";
+
+function needsBrowserWasm(pathname: string): boolean {
+  return pathname === "/playground"
+    || pathname === "/paths"
+    || pathname === "/practice"
+    || pathname === "/vendor/wasmer-sdk/dist/browser-worker.js";
+}
+
+function isPublicCoursePage(pathname: string): boolean {
+  return pathname === "/courses" || pathname.startsWith("/courses/");
+}
+
+function createCsp(nonce: string, pathname: string, appOrigin = "https://katalyst.invalid"): string {
+  const hasBrowserWasm = needsBrowserWasm(pathname);
+  const isPublicCourse = isPublicCoursePage(pathname);
+  const embedsCLabRunner = isCLabRunnerEmbedRoute(pathname);
+  const runnerOrigin = resolveCLabRunnerOrigin(appOrigin);
+  const runnerFrameSource = runnerOrigin === appOrigin ? "'self'" : runnerOrigin;
+  const wasmConnectSources = hasBrowserWasm
+    ? " https://registry.wasmer.io https://cdn.wasmer.io https://cdn.jsdelivr.net"
+    : "";
+  const labPreviewSources = hasBrowserWasm ? " blob: data:" : "";
   return [
     "default-src 'self'",
-    `script-src 'self' https://challenges.cloudflare.com 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${isDev || allowWasmerWorkerEval ? " 'unsafe-eval'" : ""}`,
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+    `script-src 'self' https://challenges.cloudflare.com 'nonce-${nonce}' 'strict-dynamic'${hasBrowserWasm ? " 'wasm-unsafe-eval'" : ""}`,
+    isPublicCourse ? `style-src 'self' 'nonce-${nonce}'` : "style-src 'self' 'unsafe-inline'",
+    ...(isPublicCourse ? ["style-src-attr 'none'"] : []),
+    `img-src 'self' data: https:${hasBrowserWasm ? " blob:" : ""}`,
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://registry.wasmer.io https://cdn.wasmer.io https://cdn.jsdelivr.net https://challenges.cloudflare.com http://localhost:11434 ws://localhost:11434",
+    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com http://localhost:11434 ws://localhost:11434${wasmConnectSources}`,
     // Admin-scheduled launch videos are hosted on the operator's HTTPS media host.
     "media-src 'self' blob: https:",
-    "frame-src 'self' blob: data: https://challenges.cloudflare.com",
-    "worker-src 'self' blob:",
+    `frame-src https://challenges.cloudflare.com${embedsCLabRunner ? ` ${runnerFrameSource}` : ""}${labPreviewSources}`,
+    `worker-src 'self'${hasBrowserWasm ? " blob:" : ""}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -25,13 +49,23 @@ function createCsp(nonce: string, allowWasmerWorkerEval = false): string {
 }
 
 export function getContentSecurityPolicy(nonce: string, pathname: string): string {
-  const isWasmerRuntimeWorker = pathname === "/vendor/wasmer-sdk/dist/browser-worker.js";
-  return createCsp(nonce, isWasmerRuntimeWorker);
+  return createCsp(nonce, pathname);
 }
 
 export async function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname === C_LAB_RUNNER_PATH) {
+    // This document is a stateless runtime shell. Do not inspect app auth cookies.
+    return NextResponse.next();
+  }
+  if (request.nextUrl.pathname.startsWith(`${C_LAB_RUNNER_PATH}/wasmer/`)) {
+    // Worker/module assets get eval only under this runner namespace, without refreshing app auth.
+    const response = NextResponse.next();
+    const runnerOrigin = resolveCLabRunnerOrigin(getCLabRequestOrigin(request));
+    response.headers.set("Content-Security-Policy", getCLabRunnerAssetContentSecurityPolicy(runnerOrigin));
+    return response;
+  }
   const nonce = randomBytes(18).toString("base64");
-  const contentSecurityPolicy = getContentSecurityPolicy(nonce, request.nextUrl.pathname);
+  const contentSecurityPolicy = createCsp(nonce, request.nextUrl.pathname, request.nextUrl.origin);
   const createResponse = () => {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-nonce", nonce);

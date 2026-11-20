@@ -179,6 +179,9 @@ describe("C Playground inputs, compiler infrastructure and execution limits", ()
       expect(defaultJsProgram).toContain("computeFibonacci");
       expect(defaultSqlProgram).toContain("CREATE TABLE engineers");
       expect(defaultHtmlProgram).toContain("<!DOCTYPE html>");
+      expect(defaultHtmlProgram).not.toMatch(/\son[a-z]+\s*=/i);
+      expect(defaultHtmlProgram).toContain('<details class="interaction-demo">');
+      expect(defaultHtmlProgram).toContain("<summary>Test Interaction</summary>");
     });
   });
 });
