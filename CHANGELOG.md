@@ -2,6 +2,7 @@
 
 ## Unreleased — MVP operations, announcement scheduling, and launch media
 
+- Stage 3: Advanced Arduino & ESP32 Engine with hardware interrupts (INT0/INT1), Web Audio piezo tone synthesis, 50 Hz RC servo motor positioning, I2C Wire protocol and SSD1306 OLED frame decoding, 1024-byte virtual EEPROM, ESP32 dual-core FreeRTOS task and queue simulation, and mock MQTT telemetry publishing.
 - Stage 2: Deepened all 14 foundational engineering courses from 123 to 186 lessons (+63 lessons, +51.2% content expansion) with complete theory sections, code examples in C, interactive simulation demos, progressive hints, and runnable test cases across systems programming, embedded AVR/ESP32, digital logic, data structures, and web architecture.
 
 - Repositioned C++ course and compiler launcher below working tracks with clear "Coming soon" badging, and updated runtime status to "C++ compiler coming soon" while preserving lesson readability and sitemap routes.

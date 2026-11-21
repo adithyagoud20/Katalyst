@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Cpu, Zap, Code } from "lucide-react";
+import { Cpu, Zap, Code, Volume2, VolumeX, Activity, Radio, Compass, Monitor } from "lucide-react";
 import { getHardwareSketchPreset, runHardwareSketch, type HardwareSketchPreset } from "@/lib/hardware-sketch-interpreter";
 
 export type CircuitSimulatorMode = "digital" | "analog" | "breadboard" | "arduino" | "esp32";
@@ -47,6 +47,35 @@ export function CircuitSimulator({
   const [buttonPressed, setButtonPressed] = useState<boolean>(false); // Digital Input D2
   const [analogValue, setAnalogValue] = useState<number>(512); // 10-bit: 0-1023 or 12-bit: 0-4095
   const [selectedBoardPart, setSelectedBoardPart] = useState("controller");
+
+  // Advanced hardware simulator states
+  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [activeTone, setActiveTone] = useState<{ pin: string; frequency: number; duration: number } | null>(null);
+  const [servos, setServos] = useState<Record<string, { angle: number; pulseUs: number }>>({});
+  const [oledLines, setOledLines] = useState<string[]>([]);
+  const [interruptEvents, setInterruptEvents] = useState<Array<{ pin: string; isr: string; count: number }>>([]);
+  const [freeRtosLog, setFreeRtosLog] = useState<Array<{ tick: number; core: number; task: string; message: string }>>([]);
+  const [mqttMessages, setMqttMessages] = useState<Array<{ topic: string; payload: string }>>([]);
+
+  const playWebAudioTone = (freq: number, durationMs = 250) => {
+    try {
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime);
+      gain.gain.setValueAtTime(0.04, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + durationMs / 1000);
+    } catch {
+      // AudioContext blocked by browser policy
+    }
+  };
 
   // Digital evaluation
   const evaluateGate = (gate: string, a: number, b: number): number => {
@@ -150,9 +179,16 @@ export function CircuitSimulator({
         ["3V3", "Regulated 3.3 V rail"], ["VIN / 5V", "DevKit supply input; regulator depends on board"], ["GND", "Ground reference"], ["EN", "Enable/reset the module"],
       ];
 
-  const runSketch = () => {
+  const runSketch = (pulseTriggerPin?: number) => {
     try {
-      const result = runHardwareSketch(sketchSource, { target: mcuTarget, analogValue: clampedAdc, buttonPressed, serialInput, cycles: 4 });
+      const result = runHardwareSketch(sketchSource, {
+        target: mcuTarget,
+        analogValue: clampedAdc,
+        buttonPressed,
+        serialInput,
+        cycles: 4,
+        pulseTriggerPin,
+      });
       const levelFor = (label: string) => {
         const pin = pinFor(label);
         return pin ? (result.digitalPins[pin] ?? (result.pwmPins[pin] ? 1 : 0)) > 0 : false;
@@ -161,6 +197,17 @@ export function CircuitSimulator({
       setPinD13(levelFor(outputPinLabels[0]));
       setPinD12(levelFor(outputPinLabels[1]));
       setPinD11(levelFor(outputPinLabels[2]));
+      setActiveTone(result.tone ?? null);
+      setServos(result.servos);
+      setOledLines(result.oledLines);
+      setInterruptEvents(result.interruptEvents);
+      setFreeRtosLog(result.freeRtosLog);
+      setMqttMessages(result.mqttMessages);
+
+      if (result.tone && audioEnabled) {
+        playWebAudioTone(result.tone.frequency, result.tone.duration || 250);
+      }
+
       const serialText = result.serial || "(no serial output)";
       setSketchOutput(`${serialText}${serialText.endsWith("\n") ? "" : "\n"}\n${result.cycles} loop cycles · ${result.elapsedMs.toFixed(0)} ms simulated`);
       setSketchStatus(`Completed · ${result.elapsedMs.toFixed(0)} ms simulated`);
@@ -820,6 +867,41 @@ export function CircuitSimulator({
                       <span>{buttonPressed ? `Button Pressed (${buttonPinLabel} = LOW)` : `Press & Hold Pushbutton (${buttonPinLabel})`}</span>
                     </button>
                   </div>
+
+                  {/* Advanced Hardware Controls */}
+                  <div className="pt-2 border-t border-[var(--border-subtle)] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[var(--text-secondary)]">External Pulse (INT0 / Pin 2)</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          runSketch(2);
+                        }}
+                        className="px-2.5 py-1 rounded text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-500/40 hover:bg-amber-600/30 flex items-center gap-1.5 transition-colors"
+                      >
+                        <Activity size={12} /> Fire INT0 Pulse
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-[var(--text-secondary)]">Piezo Tone Audio</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = !audioEnabled;
+                          setAudioEnabled(next);
+                          if (next && activeTone) playWebAudioTone(activeTone.frequency, 250);
+                        }}
+                        className={`px-2.5 py-1 rounded text-xs font-semibold border flex items-center gap-1.5 transition-colors ${
+                          audioEnabled
+                            ? "bg-emerald-600 text-white border-emerald-500"
+                            : "bg-[var(--surface-primary)] text-[var(--text-secondary)] border-[var(--border-subtle)]"
+                        }`}
+                      >
+                        {audioEnabled ? <Volume2 size={12} /> : <VolumeX size={12} />}
+                        <span>{audioEnabled ? "Audio On" : "Audio Muted"}</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -854,21 +936,27 @@ export function CircuitSimulator({
                   <option value="button">Button + LED</option>
                   <option value="sensor">ADC + Serial</option>
                   <option value="pwm">PWM fade</option>
+                  <option value="interrupt">INT0 Interrupt</option>
+                  <option value="tone">Tone / Buzzer</option>
+                  <option value="servo">Servo 50Hz PWM</option>
+                  <option value="i2c">I2C OLED Display</option>
+                  {mcuTarget === "esp32" && <option value="freertos">FreeRTOS Tasks & Queues</option>}
+                  {mcuTarget === "esp32" && <option value="mqtt">MQTT Telemetry</option>}
                 </select>
-                <button type="button" onClick={runSketch} className="min-h-9 rounded-md bg-blue-600 px-3 font-semibold text-white hover:bg-blue-500">Run sketch</button>
+                <button type="button" onClick={() => runSketch()} className="min-h-9 rounded-md bg-blue-600 px-3 font-semibold text-white hover:bg-blue-500">Run sketch</button>
                 <button type="button" onClick={() => { setSketchSource(getHardwareSketchPreset(mcuTarget, sketchPreset)); setSketchOutput("Sketch reset to preset."); setSketchStatus("Ready"); }} className="min-h-9 rounded-md border border-[var(--border-subtle)] px-3 text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)]">Reset</button>
               </div>
               <textarea
                 aria-label={`${mcuTarget === "arduino" ? "Arduino Uno" : "ESP32"} firmware sketch editor`}
                 spellCheck={false}
                 value={sketchSource}
-                onChange={(event) => setSketchSource(event.target.value.slice(0, 12_000))}
+                onChange={(event) => setSketchSource(event.target.value.slice(0, 15_000))}
                 onKeyDown={(event) => { if ((event.ctrlKey || event.metaKey) && event.key === "Enter") { event.preventDefault(); runSketch(); } }}
                 className="min-h-[230px] w-full flex-1 resize-y rounded-md border border-[var(--border-subtle)] bg-[#090b10] p-3 font-mono text-[11px] leading-5 text-slate-100 outline-none focus:border-blue-500"
                 aria-describedby="hardware-sketch-help"
               />
               <p id="hardware-sketch-help" className="mt-2 text-[10px] leading-4 text-[var(--text-secondary)]">
-                Safe deterministic subset: pinMode, digital/analog I/O, delay, millis, bounded for/while loops, if/else, and Serial input/output. Serial input is provided before a run; Ctrl/⌘ + Enter runs four loop cycles. This does not execute arbitrary C++ or connect to physical hardware.
+                Safe deterministic subset: pinMode, digital/analog I/O, interrupts, tone, Servo, I2C Wire, EEPROM, FreeRTOS tasks/queues, MQTT telemetry, delay, millis, and Serial. Serial input is provided before a run; Ctrl/⌘ + Enter runs four loop cycles.
               </p>
               <div className="mt-3 overflow-hidden rounded-md border border-[var(--border-subtle)] bg-[#090b10]">
                 <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
@@ -882,6 +970,88 @@ export function CircuitSimulator({
                 </div>
                 <pre aria-label="Serial monitor output" aria-live="polite" className="max-h-36 min-h-16 overflow-auto whitespace-pre-wrap break-words px-3 py-2 font-mono text-[11px] leading-5 text-emerald-200">{sketchOutput}</pre>
               </div>
+
+              {/* Advanced Peripherals Display */}
+              {interruptEvents.length > 0 && (
+                <div className="mt-2 rounded border border-amber-500/30 bg-amber-950/20 p-2 text-xs flex items-center justify-between text-amber-200">
+                  <span className="flex items-center gap-1.5">
+                    <Activity size={13} className="text-amber-400" />
+                    ISR Edge Handled: {interruptEvents.map((ev) => `Pin ${ev.pin} -> ${ev.isr}() (${ev.count} pulse)`).join(", ")}
+                  </span>
+                </div>
+              )}
+
+              {activeTone && (
+                <div className="mt-2 rounded border border-blue-500/30 bg-blue-950/20 p-2 text-xs flex items-center justify-between text-blue-200">
+                  <span className="flex items-center gap-1.5">
+                    <Volume2 size={13} className="text-blue-400" />
+                    Piezo Buzzer (Pin {activeTone.pin}): <strong>{activeTone.frequency} Hz</strong>
+                  </span>
+                  {audioEnabled && <span className="text-[10px] bg-blue-500/30 px-1.5 py-0.5 rounded text-blue-300">Live Chime</span>}
+                </div>
+              )}
+
+              {Object.keys(servos).length > 0 && (
+                <div className="mt-2 rounded border border-purple-500/30 bg-purple-950/20 p-2.5 text-xs text-purple-200 space-y-1.5">
+                  <div className="flex items-center justify-between font-semibold">
+                    <span className="flex items-center gap-1.5"><Compass size={13} /> RC Servo Motor (50 Hz PWM)</span>
+                    <span className="font-mono text-[10px] text-purple-300">Closed-Loop</span>
+                  </div>
+                  {Object.entries(servos).map(([sName, sData]) => (
+                    <div key={sName} className="flex items-center justify-between font-mono text-[11px] bg-black/30 p-1.5 rounded">
+                      <span>{sName}</span>
+                      <span className="text-purple-300">{sData.angle}° ({sData.pulseUs} µs)</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {oledLines.length > 0 && (
+                <div className="mt-2 rounded border border-cyan-500/30 bg-[#040914] p-2.5 text-xs text-cyan-200 space-y-1">
+                  <div className="flex items-center justify-between font-semibold text-cyan-400">
+                    <span className="flex items-center gap-1.5"><Monitor size={13} /> SSD1306 OLED (I2C 0x3C)</span>
+                    <span className="font-mono text-[10px] text-cyan-500">128x64 Canvas</span>
+                  </div>
+                  <div className="rounded bg-black/60 p-2 font-mono text-[11px] text-cyan-300 border border-cyan-900/40">
+                    {oledLines.map((line, idx) => (
+                      <div key={idx} className="whitespace-pre">{line}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {freeRtosLog.length > 0 && (
+                <div className="mt-2 rounded border border-emerald-500/30 bg-emerald-950/20 p-2.5 text-xs text-emerald-200 space-y-1">
+                  <div className="flex items-center justify-between font-semibold text-emerald-400">
+                    <span className="flex items-center gap-1.5"><Activity size={13} /> FreeRTOS Dual-Core Execution Log</span>
+                    <span className="font-mono text-[10px] text-emerald-500">Tick Slices</span>
+                  </div>
+                  <div className="max-h-24 overflow-auto rounded bg-black/60 p-1.5 font-mono text-[10px] text-emerald-300 space-y-0.5">
+                    {freeRtosLog.slice(-6).map((log, idx) => (
+                      <div key={idx} className="flex justify-between">
+                        <span className="text-emerald-500">{log.tick}ms [Core {log.core}] {log.task}:</span>
+                        <span>{log.message}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {mqttMessages.length > 0 && (
+                <div className="mt-2 rounded border border-amber-500/30 bg-amber-950/20 p-2.5 text-xs text-amber-200 space-y-1">
+                  <div className="flex items-center justify-between font-semibold text-amber-400">
+                    <span className="flex items-center gap-1.5"><Radio size={13} /> Mock MQTT Broker</span>
+                    <span className="font-mono text-[10px] text-amber-500">Live Telemetry</span>
+                  </div>
+                  <div className="max-h-24 overflow-auto rounded bg-black/60 p-1.5 font-mono text-[10px] text-amber-300 space-y-0.5">
+                    {mqttMessages.slice(-4).map((msg, idx) => (
+                      <div key={idx} className="truncate">
+                        <span className="text-amber-500">PUB [{msg.topic}]:</span> {msg.payload}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
