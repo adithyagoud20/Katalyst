@@ -39,6 +39,7 @@ const routeSlugPattern = /^[a-z0-9-]{1,100}$/;
 
 export function applicationViewFromPathname(pathname: string): ApplicationView | null {
   if (pathname === "/") return "home";
+  if (/^\/courses\/[^/]+\/[^/]+$/.test(pathname)) return "lesson";
   for (const [view, path] of Object.entries(applicationPaths)) {
     if (path === pathname) return view as ApplicationView;
   }

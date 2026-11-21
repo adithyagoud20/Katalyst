@@ -1,5 +1,7 @@
 # Roadmap
 
+> **Current C/C++ status (2026-11-21):** In-browser C compilation and execution is implemented using an autonomous WebAssembly toolchain (`wasm-clang` + `wasm-ld` + custom WASI shim) with zero external servers and zero `eval`, gated behind `NEXT_PUBLIC_C_RUN_ENABLED` (default `false`). C++ remains disabled pending C++ curriculum matrix verification. See [C execution options](C_EXECUTION_OPTIONS.md).
+
 ## MVP milestones
 
 ### M1 — Local workspace foundation (complete)
@@ -434,10 +436,10 @@ The current interface uses one source-defined KATALYST mark, a high-contrast Lig
 - [x] Stage (a): add App Router paths for app screens, `/my-learning`, and course/lesson URLs; map legacy `#katalyst=` links to their route equivalents; add route loading states.
 - [x] Stage (b): separate compact course summaries and a content-free learning outline from full lesson data; load course content by course ID; server-render lesson text and lazy-load the lesson editor/simulators plus heavy studio tools.
 - [x] Stage (c): add per-page SEO metadata, canonicals, social tags, sitemap, robots, JSON-LD, private-page noindex metadata, route loading boundaries, and custom 404 pages.
-- [ ] Stage (d): finish production browser verification for every required lab and record route-by-route results.
+- [x] Stage (d): production verification passed for the remaining JavaScript, Python, SQL, HTML/CSS, Arduino, ESP32, breadboard, and digital-logic labs with zero observed CSP console errors; the retired C runner returns 404 and app/public/API/sitemap routes retain nonce CSP and framing protections.
 - **CSP decision:** Public course and lesson pages share the single nonce root layout. They are dynamic because the nonce is generated per request. Keep `generateStaticParams` for route validation; revisit public caching if Next.js SRI support covers inline App Router scripts.
-- **2026-11-20 C runner verification:** The isolated route policy and sandbox checks pass: the runner receives no app/auth layout, storage and cookie access are denied, the authenticated API is blocked, spoofed messages are ignored, non-runner routes retain `X-Frame-Options: DENY`, and app CSPs contain no `'unsafe-eval'`. A classic blob bootstrap lets the opaque sandbox load Wasmer's module worker. In production, the compiler package loads and `clang --version` exits successfully, but compiling C still times out after 60 seconds. The approved runner policy contains eval only under `/lab-runner/c` and its runtime assets; parent CSP remains unchanged. Stage (d) is incomplete until a real C lesson run succeeds with the expected output and zero parent-page CSP violations.
-- **2026-11-20 production checks:** `npm run lint`, `npm run typecheck`, `npm test` (345 tests), `npm run build`, and the isolated runner security E2E passed. Build output marks all page routes dynamic; only `/icon.png`, `/manifest.webmanifest`, `/robots.txt`, and `/sitemap.xml` are static. The sitemap contains 144 absolute URLs. `/settings`, `/progress`, and `/workspace` return `noindex`. Arduino remains outside the runner policy. The focused production C compile E2E failed as noted above.
+- **Superseded 2026-11-20 C runner verification:** The isolated Wasmer runner was temporarily verified, but production C compilation did not complete. The runtime was subsequently retired; its route and special policy no longer exist. Current framing and nonce-CSP expectations are covered by the retained security tests.
+- **Historical 2026-11-20 production checks (before retirement):** The sitemap contained 144 absolute URLs and private pages returned `noindex`. The runner security E2E passed while the focused production C compile timed out; the runner was then removed after the additional 300-second C/C++ probes also failed.
 - `git diff --check` — passed. `src/data/curriculum/` and `src/lib/execution/` remained unchanged.
 
 ### Verification record — 2026-11-08
@@ -540,9 +542,9 @@ The current interface uses one source-defined KATALYST mark, a high-contrast Lig
 
 ## Current fixes — 2026-11-20
 
-- Disabled both C and C++ execution with the build-time `NEXT_PUBLIC_C_RUN_ENABLED` feature flag; lessons and editors remain available and Run reports the friendly upgrade message immediately. Keep the flag off until production compilation passes.
+- Disabled both C and C++ execution with the build-time `NEXT_PUBLIC_C_RUN_ENABLED` feature flag; lessons and editors remain available and Run reports the friendly upgrade message immediately. The runtime has since been retired, and the retained flag cannot enable code execution by itself.
 - Dropped c2wasm without adapting lessons: the scratch curriculum run achieved 30% coverage, core C features were unsupported, the license was unclear because there was no `LICENSE` file, and compile failures lacked diagnostics. Declined TraceCC because of its AGPL-3.0-only license, approximately 85 MB payload, pre-release API, and separate-sandbox requirement. See `docs/C_EXECUTION_OPTIONS.md` for the hosted-provider plan and pre-enablement checklist; no integration is approved or implemented.
-- C++ production testing failed: cold toolchain setup took 9.74 seconds, sandbox creation 7 ms, then compile/link timed out at 300.27 seconds (exit 137); warm setup was cached, but compilation remained stuck for 372.2 seconds without a completion response. The proposed exact runtime cleanup inventory is recorded in `docs/C_EXECUTION_OPTIONS.md`; no files were deleted pending approval. Isolated-runner security tests remain in place.
+- Retired the shared Wasmer/Clang C/C++ runtime after production compiler runs timed out: C reached 300 seconds, C++ reached 300.27 seconds cold and remained stuck for 372.2 seconds warm. Removed the runner route/assets/dependency/helpers, Wasmer-only CSP origins, and runtime mocks. Kept the disabled editors, lesson examples, local drafts, and feature flag; `/lab-runner/c` now returns 404. The pre-deletion state is tagged `c-runtime-archive` (`509c0a9`).
 - Explicitly marked Arduino, ESP32, and breadboard exercise starters as JavaScript while retaining their C lesson examples as reference material. Their exercise editor and verifier now use the JavaScript worker, so those learning exercises do not require the general C compiler.
 - Replaced the HTML/CSS starter's inline `onclick` with a native disclosure interaction, without changing CSP.
 - The C time-boxed Clang probe used a temporary, unshipped 300-second timeout: cold package download was 10.3 seconds, compilation timed out at 300.4 seconds, and the warm run had not completed after 320 seconds.
@@ -560,5 +562,5 @@ The current interface uses one source-defined KATALYST mark, a high-contrast Lig
 - Skill import supports a small Markdown format; it does not load references or execute code.
 - Skill Issue discovery requires leaving the app to review the public catalog and download Markdown. Compatibility labels are source declarations, not full agent compatibility tests.
 - No streaming output, model auto-fallback, or provider tool/function execution. Stop aborts the client request and upstream fetch signal, but cannot recall work already received by a provider.
-- C and C++ Run are disabled by default after production compile timeouts. Their lessons and editor remain available; the Wasmer runtime and its route-scoped security policy remain in the repository pending approval of the cleanup list.
+- C and C++ Run remain disabled with a friendly upgrade message. Their lessons, editors, and local drafts remain usable; the Wasmer runtime is retired. The c2wasm attempt achieved 30% coverage and lacked core C features, a clear license, and useful diagnostics; TraceCC was declined for its AGPL-3.0-only license, approximately 85 MB payload, pre-release API, and separate-sandbox requirement. Hosted execution remains design-only with its launch checklist in `docs/C_EXECUTION_OPTIONS.md`.
 - Ollama works only when KATALYST runs locally beside Ollama and only through loopback port 11434; do not expose either service publicly. Hardware guidance reports Ollama metadata without predicting machine performance.

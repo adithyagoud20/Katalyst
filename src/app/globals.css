@@ -825,6 +825,7 @@ button:disabled { cursor: not-allowed; }
 .learning-view.learning-playground .c-source-editor-host .cm-editor { height: 100%; min-height: 0; }
 .learning-view.learning-playground .c-output-pane { height: auto; min-height: 0; }
 .learning-view.learning-playground .c-stdin-description { margin: 0 11px 5px; color: var(--text-muted); font-size: 10px; line-height: 1.4; }
+.c-vfs-notice { margin-top: 0.5rem; font-size: 0.75rem; opacity: 0.85; }
 .learning-view.learning-playground .c-stdin-editor { min-height: 48px; max-height: 80px; resize: vertical; }
 .learning-view.learning-playground .c-console-output { min-height: 76px; max-height: none; }
 .sitemap-route-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 24px; margin: 10px 0 0; padding: 0; list-style: none; }
@@ -977,6 +978,7 @@ button:disabled { cursor: not-allowed; }
 .home-next-feature h3 { margin-top: 17px; font-size: 21px; }
 .progress-track { height: 5px; overflow: hidden; border-radius: 5px; background: var(--surface-accent-soft); }
 .progress-track > span { height: 100%; display: block; border-radius: inherit; background: var(--surface-brand); transition: width .25s ease; }
+.progress-track > span.zero-progress { width: 0%; }
 .progress-caption { display: flex; justify-content: space-between; gap: 10px; margin-top: 7px; color: var(--text-muted); font-size: 9px; }
 .progress-caption strong { color: var(--text-primary); font-weight: 650; }
 .feature-link { display: flex; align-items: center; gap: 7px; margin-top: 15px; border: 0; background: transparent; padding: 2px 0; color: var(--accent-text); font-size: 10px; font-weight: 650; cursor: pointer; text-align: left; }
@@ -2369,6 +2371,26 @@ button:disabled { cursor: not-allowed; }
   display: flex;
   flex-direction: column;
   border-right: 0;
+}
+.learning-view.learning-lesson .learning-workspace-grid:not(.kat-open) .learning-kat-panel {
+  display: none;
+}
+.learning-view.learning-lesson .learning-workspace-grid:not(.has-custom-layout):not(.learning-workspace-grid-no-code):not(.kat-open) .learning-panel {
+  flex: 0 0 50%;
+}
+.learning-view.learning-lesson .learning-workspace-grid:not(.has-custom-layout):not(.learning-workspace-grid-no-code):not(.kat-open) .learning-code-panel {
+  flex: 0 0 50%;
+}
+.learning-view.learning-lesson .learning-workspace-grid:not(.has-custom-layout):not(.learning-workspace-grid-no-code).kat-open .learning-panel {
+  flex: 0 0 35%;
+}
+.learning-view.learning-lesson .learning-workspace-grid:not(.has-custom-layout):not(.learning-workspace-grid-no-code).kat-open .learning-code-panel {
+  flex: 0 0 35%;
+}
+.learning-view.learning-lesson .learning-workspace-grid:not(.has-custom-layout):not(.learning-workspace-grid-no-code).kat-open .learning-kat-panel {
+  display: flex;
+  flex: 0 0 30%;
+  flex-direction: column;
 }
 .learning-view.learning-lesson .integrated-tutor-panel {
   width: 100% !important;

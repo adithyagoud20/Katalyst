@@ -1,11 +1,6 @@
 export const C_PLAYGROUND_STORAGE_KEY = "katalyst.c.playground.v1";
 export const C_PLAYGROUND_SOURCE_LIMIT = 12_000;
 export const C_PLAYGROUND_STDIN_LIMIT = 2_000;
-export const C_PLAYGROUND_OUTPUT_LIMIT = 64_000;
-export const C_PLAYGROUND_RUN_TIMEOUT_MS = 8_000;
-export const C_PLAYGROUND_INTERACTIVE_RUN_TIMEOUT_MS = 60_000;
-export const C_PLAYGROUND_COMPILE_TIMEOUT_MS = 15_000;
-export const C_PLAYGROUND_COMPILER_PACKAGE = "clang/clang@=0.160000.1";
 
 export const defaultCProgram = `#include <stdio.h>
 
@@ -60,33 +55,12 @@ export function makeRunnableCProgram(example: string): string {
   return `${hasStdio ? "" : "#include <stdio.h>\n\n"}int main(void) {\n${body}\n    return 0;\n}\n`;
 }
 
-export function programExpectsStdin(source: string): boolean {
-  return /\b(scanf|getchar|getline|getdelim)\s*\(|\b(fgets|fgetc|getc|fread|fscanf)\s*\([^)]*\bstdin\b|\bcin\s*>>/.test(source);
-}
-
 export function normalizeStdin(stdin: string): string {
   if (!stdin) return "";
   const normalized = stdin.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   return normalized.endsWith("\n") ? normalized : `${normalized}\n`;
 }
 
-export function getCPlaygroundRunTimeoutMs(source: string, stdin: string): number {
-  return programExpectsStdin(source) && !normalizeStdin(stdin)
-    ? C_PLAYGROUND_INTERACTIVE_RUN_TIMEOUT_MS
-    : C_PLAYGROUND_RUN_TIMEOUT_MS;
-}
-
-export function getOutputText(output: { stdout: { text: () => string; truncated: boolean }; stderr: { text: () => string; truncated: boolean } }): string {
-  const stdout = output.stdout.text();
-  const stderr = output.stderr.text();
-  const combined = [stdout, stderr && stderr !== stdout ? stderr : ""].filter(Boolean).join("\n").trim();
-  return `${combined}${output.stdout.truncated || output.stderr.truncated ? "\n\nOutput was cut off at the 64 KB limit." : ""}`;
-}
-
-export function getOutputChannels(output: { stdout: { text: () => string; truncated: boolean }; stderr: { text: () => string; truncated: boolean } }): { stdout: string; stderr: string } {
-  const truncated = "\n[Output cut off at the 64 KB limit.]";
-  return {
-    stdout: `${output.stdout.text()}${output.stdout.truncated ? truncated : ""}`,
-    stderr: `${output.stderr.text()}${output.stderr.truncated ? truncated : ""}`,
-  };
+export function programExpectsStdinC(source: string): boolean {
+  return /\b(scanf|getchar|fgetc|fgets|fscanf|gets|readline)\s*\(/.test(source);
 }

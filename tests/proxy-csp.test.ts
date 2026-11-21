@@ -1,55 +1,68 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { getContentSecurityPolicy } from "@/proxy";
-import { getCLabRunnerAssetContentSecurityPolicy, getCLabRunnerContentSecurityPolicy } from "@/lib/c-lab-runner-security";
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("production content security policy for browser compilation", () => {
-  it("scopes Wasm runtime permissions to lab routes without unsafe eval", () => {
+function scriptDirective(policy: string): string {
+  return policy.split(";").find((directive) => directive.trim().startsWith("script-src")) ?? "";
+}
+
+describe("nonce content security policy", () => {
+  it("keeps the main app and public course pages on nonce-authorized scripts", () => {
     vi.stubEnv("NODE_ENV", "production");
+    const appPolicy = getContentSecurityPolicy("app-nonce", "/settings");
+    const publicPolicy = getContentSecurityPolicy("public-nonce", "/courses/c-programming-foundations/source-to-output");
 
-    const appPolicy = getContentSecurityPolicy("test-nonce", "/");
-    const playgroundPolicy = getContentSecurityPolicy("test-nonce", "/playground");
-    const publicCoursePolicy = getContentSecurityPolicy("test-nonce", "/courses/c-programming-foundations/source-to-output");
-    const courseOverviewPolicy = getContentSecurityPolicy("test-nonce", "/courses/c-programming-foundations");
-    const nonLabCoursePolicy = getContentSecurityPolicy("test-nonce", "/courses/arduino-embedded/arduino-sketch-lifecycle");
-    const sdkPolicy = getContentSecurityPolicy("test-nonce", "/vendor/wasmer-sdk/dist/index.js");
-    const workerPolicy = getContentSecurityPolicy("test-nonce", "/vendor/wasmer-sdk/dist/browser-worker.js");
+    for (const policy of [appPolicy, publicPolicy]) {
+      const scripts = scriptDirective(policy);
+      expect(scripts).toContain("'nonce-");
+      expect(scripts).toContain("'strict-dynamic'");
+      expect(scripts).not.toContain("'unsafe-inline'");
+      expect(scripts).not.toContain("'unsafe-eval'");
+      expect(policy).toContain("frame-ancestors 'none'");
+    }
+    expect(publicPolicy).not.toContain("'unsafe-inline'");
+  });
 
-    expect(appPolicy).not.toContain("'unsafe-eval'");
+  it("limits browser-Wasm permissions to the existing in-browser lab screens", () => {
+    const appShellPolicy = getContentSecurityPolicy("shell-nonce", "/");
+    const playgroundPolicy = getContentSecurityPolicy("lab-nonce", "/playground");
+    const pathsPolicy = getContentSecurityPolicy("paths-nonce", "/paths");
+    const practicePolicy = getContentSecurityPolicy("practice-nonce", "/practice");
+    const pythonLessonPolicy = getContentSecurityPolicy("python-nonce", "/courses/python-programming-foundations/py-source-to-interpreter");
+    const javascriptLessonPolicy = getContentSecurityPolicy("javascript-nonce", "/courses/js-systems-algorithms/js-array-buffer-views");
+    const appPolicy = getContentSecurityPolicy("app-nonce", "/settings");
+    const lessonPolicy = getContentSecurityPolicy("lesson-nonce", "/courses/arduino-embedded/arduino-sketch-lifecycle");
+
+    for (const policy of [appShellPolicy, playgroundPolicy, pathsPolicy, practicePolicy]) {
+      expect(policy).toContain("'wasm-unsafe-eval'");
+      expect(policy).toContain("worker-src 'self' blob:");
+      expect(policy).toContain("blob: data:");
+      expect(policy).toContain("https://cdn.jsdelivr.net");
+      expect(scriptDirective(policy)).not.toContain("'unsafe-eval'");
+    }
     expect(appPolicy).not.toContain("'wasm-unsafe-eval'");
-    expect(appPolicy).not.toContain("frame-src 'self'");
-    expect(sdkPolicy).not.toContain("'unsafe-eval'");
-    expect(playgroundPolicy).toContain("frame-src https://challenges.cloudflare.com 'self'");
-    expect(playgroundPolicy).not.toContain("'unsafe-eval'");
-    expect(publicCoursePolicy).toContain("frame-src https://challenges.cloudflare.com 'self'");
-    expect(publicCoursePolicy).not.toContain("'wasm-unsafe-eval'");
-    expect(publicCoursePolicy).not.toContain("worker-src 'self' blob:");
-    expect(publicCoursePolicy).not.toContain("https://registry.wasmer.io");
-    expect(publicCoursePolicy).not.toContain("'unsafe-inline'");
-    expect(publicCoursePolicy).not.toContain("'unsafe-eval'");
-    expect(courseOverviewPolicy).not.toContain("'wasm-unsafe-eval'");
-    expect(courseOverviewPolicy).not.toContain("frame-src 'self'");
-    expect(nonLabCoursePolicy).not.toContain("'wasm-unsafe-eval'");
-    expect(nonLabCoursePolicy).not.toContain("frame-src 'self'");
-    expect(nonLabCoursePolicy).not.toContain("blob: data:");
-    expect(workerPolicy).toContain("'wasm-unsafe-eval'");
-    expect(workerPolicy).not.toContain("'unsafe-eval'");
+    expect(appPolicy).not.toContain("worker-src 'self' blob:");
+    for (const policy of [appPolicy, lessonPolicy]) {
+      expect(policy).not.toContain("https://registry.wasmer.io");
+      expect(policy).not.toContain("https://cdn.wasmer.io");
+    }
+    expect(lessonPolicy).not.toContain("'wasm-unsafe-eval'");
+    expect(lessonPolicy).toContain("worker-src 'self' blob:");
+    expect(pythonLessonPolicy).toContain("'wasm-unsafe-eval'");
+    expect(pythonLessonPolicy).toContain("https://cdn.jsdelivr.net");
+    expect(pythonLessonPolicy).toContain("worker-src 'self' blob:");
+    expect(pythonLessonPolicy).not.toContain("frame-src https://challenges.cloudflare.com blob: data:");
+    expect(javascriptLessonPolicy).toContain("worker-src 'self' blob:");
+    expect(javascriptLessonPolicy).not.toContain("'wasm-unsafe-eval'");
+    expect(javascriptLessonPolicy).not.toContain("https://cdn.jsdelivr.net");
+  });
 
-    const runnerPolicy = getCLabRunnerContentSecurityPolicy("https://katalyst.invalid", "https://katalyst.invalid");
-    const runnerAssetPolicy = getCLabRunnerAssetContentSecurityPolicy("https://katalyst.invalid");
-    expect(runnerPolicy).toContain("/lab-runner/c/runner.js");
-    expect(runnerPolicy).toContain("/lab-runner/c/wasmer/dist/");
-    expect(runnerPolicy).toContain("'unsafe-eval' 'wasm-unsafe-eval'");
-    expect(runnerPolicy).toContain("sandbox allow-scripts");
-    expect(runnerPolicy).toContain("frame-ancestors 'self'");
-    expect(runnerPolicy).not.toContain("'unsafe-inline'");
-    expect(runnerPolicy).not.toContain("connect-src 'self'");
-    expect(runnerAssetPolicy).toContain("/lab-runner/c/wasmer/dist/");
-    expect(runnerAssetPolicy).toContain("'unsafe-eval' 'wasm-unsafe-eval'");
-    expect(runnerAssetPolicy).not.toContain("connect-src 'self'");
-    expect(getContentSecurityPolicy("test-nonce", "/lab-runner/c/wasmer/dist/browser-worker.js")).not.toContain("'unsafe-eval'");
+  it("does not vary CSP to authorize the retired C runner route", () => {
+    expect(getContentSecurityPolicy("same-nonce", "/lab-runner/c")).toBe(
+      getContentSecurityPolicy("same-nonce", "/settings")
+    );
   });
 });

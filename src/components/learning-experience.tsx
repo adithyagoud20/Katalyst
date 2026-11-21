@@ -306,6 +306,15 @@ export function LearningExperience({
   const [katOpen, setKatOpen] = useState<boolean>(() => layout.katOpen ?? false);
   const [compilerOpen, setCompilerOpen] = useState<boolean>(true);
   const [katDraftPrompt, setKatDraftPrompt] = useState<string>("");
+  const isDefaultLayout = useMemo(() => {
+    return (
+      layout.twoPanelWidths[0] === 50 &&
+      layout.twoPanelWidths[1] === 50 &&
+      layout.threePanelWidths[0] === 35 &&
+      layout.threePanelWidths[1] === 35 &&
+      layout.threePanelWidths[2] === 30
+    );
+  }, [layout]);
   const isDraggingRef = useRef<{ index: number; startX: number; startWidths: number[] } | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const exampleRequestId = useRef(0);
@@ -897,7 +906,11 @@ export function LearningExperience({
       aria-valuemin={0}
       aria-valuemax={100}
     >
-      <span style={{ width: pathState.completionPercent + "%" }} />
+      {pathState.completionPercent > 0 ? (
+        <span style={{ width: pathState.completionPercent + "%" }} />
+      ) : (
+        <span className="zero-progress" />
+      )}
     </div>
   );
 
@@ -1827,11 +1840,11 @@ export function LearningExperience({
                 <Bot size={15} />Kat
               </button>
           </div>
-          <div ref={gridRef} className={`learning-workspace-grid${showCompiler ? "" : " learning-workspace-grid-no-code"}${!showCompiler && !katOpen ? " learning-workspace-wide" : ""}`}>
+          <div ref={gridRef} className={`learning-workspace-grid${showCompiler ? "" : " learning-workspace-grid-no-code"}${!showCompiler && !katOpen ? " learning-workspace-wide" : ""}${katOpen ? " kat-open" : ""}${!isDefaultLayout ? " has-custom-layout" : ""}`}>
             <aside
               id="learning-panel"
               style={
-                !smallWorkspace
+                !smallWorkspace && !isDefaultLayout
                   ? {
                       flex: showCompiler
                         ? "0 0 " + (katOpen ? layout.threePanelWidths[0] : layout.twoPanelWidths[0]) + "%"
@@ -2340,7 +2353,7 @@ export function LearningExperience({
                 <section
                   id="code-panel"
                   style={
-                    !smallWorkspace
+                    !smallWorkspace && !isDefaultLayout
                       ? {
                           display: compilerOpen ? "flex" : "none",
                           flex: `0 0 ${
@@ -2419,7 +2432,7 @@ export function LearningExperience({
             <section
               id="kat-panel"
               style={
-                !smallWorkspace
+                !smallWorkspace && !isDefaultLayout
                   ? {
                       display: katOpen ? "flex" : "none",
                       flex: showCompiler

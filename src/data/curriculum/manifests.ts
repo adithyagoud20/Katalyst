@@ -88,7 +88,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
     "version": "1.0.0",
     "prerequisites": [
       "No prior C experience is required.",
-      "The browser C Playground runs C11 programs locally in a WebAssembly sandbox."
+      "C lesson examples remain editable in the browser; C/C++ execution is currently unavailable."
     ],
     "objectives": [
       {

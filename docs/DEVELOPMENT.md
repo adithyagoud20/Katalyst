@@ -74,9 +74,9 @@ npm run test:e2e
 npm run build
 ```
 
-Run Playwright tests with `npm run test:e2e` after browser installation (`npx playwright install chromium`). Provider requests and catalog discovery in the automated tests use mocks and need no API credentials; the Playwright server starts with cloud provider environment credentials cleared. If port 3000 is already in use, select a free port with `KATALYST_E2E_PORT=3010 npm run test:e2e`. The default browser suite skips the C toolchain download; to verify a real compile and run in Chromium, use `RUN_C_PLAYGROUND_INTEGRATION=1 npm run test:e2e -- --grep 'compiles and runs a C program'`. The first compiler package download can take several minutes and requires internet access. Later runs use the SDK's browser cache.
+Run Playwright tests with `npm run test:e2e` after browser installation (`npx playwright install chromium`). Provider requests and catalog discovery in the automated tests use mocks and need no API credentials; the Playwright server starts with cloud provider environment credentials cleared. If port 3000 is already in use, select a free port with `KATALYST_E2E_PORT=3010 npm run test:e2e`. C/C++ tests verify the editors remain usable while Run is disabled and `/lab-runner/c` returns 404. The production-only lab regression can be run after `npm run build` with `KATALYST_E2E_PRODUCTION=true KATALYST_E2E_PORT=3311 npm run test:e2e -- e2e/labs-production.spec.ts`.
 
-The C playground is split into a client chunk and the compiler package is fetched on demand. Use `npm run build` output to compare route first-load JavaScript and lazy chunks when changing large client components. The app currently ships one compact local curriculum path; measure before moving course content to remote hosting.
+The C/C++ editor is split into a client chunk; its compiler package and runtime are retired. Use `npm run build` output to compare route first-load JavaScript and lazy chunks when changing large client components. The app currently ships one compact local curriculum path; measure before moving course content to remote hosting.
 
 ## Troubleshooting
 
@@ -86,7 +86,7 @@ The C playground is split into a client chunk and the compiler package is fetche
 - If guest migration cannot back up local data, browser storage may be full. Export the local workspace backup and make room before retrying; KATALYST will not replace the guest records without first saving the on-device copy.
 - If TypeScript cannot find generated Next.js types, run `npm run dev` once or `npx next typegen`.
 - Project and chat data live in this browser's local storage. Clearing site data removes it.
-- The browser C compiler needs cross-origin isolation. Use `npm run dev` or `npm run build && npm start` so the configured COOP/COEP headers are present; a reverse proxy must preserve them. First use downloads the compiler package, so wait for its progress message or stop the run if the download is not appropriate for the current connection.
+- COOP/COEP headers support the remaining browser-side Python, SQL, and worker labs. C/C++ execution is retired; the editor stays available and its Run action displays the upgrade message.
 
 ## Contributions
 

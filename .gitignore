@@ -11,5 +11,6 @@ test-results/
 .env.local
 .agents/skills/
 public/vendor/wasmer-sdk/
+public/vendor/c-toolchain/
 work/
 desktop/site-config.json

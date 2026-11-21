@@ -2,18 +2,29 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { loadCourseDetail } from "@/data/curriculum/course-loader";
 
-const querySchema = z.object({
+const lessonQuerySchema = z.object({
+  courseId: z.string().trim().min(1, "courseId is required"),
+  lessonId: z.string().trim().min(1, "lessonId is required"),
+  mode: z.literal("lesson").default("lesson"),
+});
+
+const exercisesQuerySchema = z.object({
   courseId: z.string().trim().min(1, "courseId is required"),
   lessonId: z.string().trim().min(1).optional(),
-  mode: z.enum(["lesson", "exercises"]).default("lesson"),
+  mode: z.literal("exercises"),
 });
+
+const querySchema = z.discriminatedUnion("mode", [
+  lessonQuerySchema,
+  exercisesQuerySchema,
+]);
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const parsed = querySchema.safeParse({
-      courseId: searchParams.get("courseId"),
-      lessonId: searchParams.get("lessonId"),
+      courseId: searchParams.get("courseId") ?? undefined,
+      lessonId: searchParams.get("lessonId") ?? undefined,
       mode: searchParams.get("mode") ?? "lesson",
     });
 

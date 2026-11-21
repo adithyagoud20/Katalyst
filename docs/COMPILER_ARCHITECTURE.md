@@ -1,5 +1,7 @@
 # KATALYST Hybrid Compiler & Simulation Execution Architecture
 
+> **Status update (2026-11-21):** This document records an earlier compiler evaluation. The Wasmer/Clang C and C++ runtime has since been retired after production compilation timed out (C at 300 seconds; C++ at 300.27 seconds cold and 372.2 seconds warm). The C/C++ editor and lessons remain, but Run is disabled and `/lab-runner/c` returns 404. The c2wasm spike achieved 30% curriculum coverage and lacked core C features, clear licensing, and useful diagnostics. See [C execution options](C_EXECUTION_OPTIONS.md) for the current hosted-API design and safeguards.
+
 ## Executive Summary
 
 KATALYST is a learning-first engineering platform. Providing safe, fast, and accessible code execution across multiple languages (C/C++, Python, Java, JavaScript, HTML/CSS) and electronics/circuit simulation is essential to our curriculum. However, as a small team prioritizing privacy, security, and local-first reliability, KATALYST must avoid burdensome server infrastructure, unpredictable compute bills, and high-risk remote code execution vectors.
@@ -12,8 +14,8 @@ This document presents a comprehensive evaluation of browser-based WebAssembly r
 
 | Technology | Target Use Case | Recommended Primary Runner | Fallback / Hybrid Option |
 | :--- | :--- | :--- | :--- |
-| **C / C11** | Core systems programming, algorithms, memory management | **Browser WebAssembly** (`clang` via Wasmer SDK) | Remote sandbox for advanced POSIX/sockets |
-| **C++ / C++17** | Object-oriented systems, STL algorithms | **Browser WebAssembly** (`clang++` via Wasmer SDK) | Remote sandbox for multi-file cmake projects |
+| **C / C11** | Core systems programming, algorithms, memory management | **Editor only**; execution retired | Hosted API design only; no provider selected |
+| **C++ / C++17** | Object-oriented systems, STL algorithms | **Editor only**; execution retired | Hosted API design only; no provider selected |
 | **Python 3** | Scripting, data structures, scientific computing | **Browser WebAssembly** (Pyodide / MicroPython WASM) | Remote sandbox for native C extensions (`numpy`, `scipy`) |
 | **Java** | Object-oriented patterns, data structures | **Remote Sandboxed MicroVM** (OpenJDK 21 via Piston/Judge0) | CheerpJ 3.0 (browser JVM WASM, ~20MB download) |
 | **JavaScript** | Web scripting, algorithmic logic, ES2024 | **Browser Isolated Web Worker / Iframe** | Not needed (browser native) |
@@ -27,7 +29,7 @@ This document presents a comprehensive evaluation of browser-based WebAssembly r
 ### Option A: Browser-Based Execution (Client-Side WebAssembly & Web Workers)
 
 - **How it works**: Code compiles and executes directly inside the user's browser sandbox using WebAssembly (Wasm) runtimes:
-  - C/C++: Clang/LLVM compiled to WASI bytecode executed by `@wasmer/sdk/browser`.
+  - C/C++: historical Wasmer/Clang option, retired after production compile timeouts; editors remain available.
   - Python: **Pyodide** (CPython 3.12 compiled to WebAssembly) or **MicroPython** (~300 KB).
   - JavaScript / HTML: Executed inside isolated Web Workers or restricted `<iframe sandbox="allow-scripts">`.
   - Circuit Simulation: **Falstad circuit engine** (JavaScript port) and **ngspice-wasm** (Berkeley SPICE compiled to Wasm). Microcontroller simulation using **Wokwi Web Components** (AVR / ESP32 Wasm core).
@@ -49,8 +51,8 @@ This document presents a comprehensive evaluation of browser-based WebAssembly r
 
 We evaluated both self-hosted open-source sandboxes and commercial execution APIs:
 
-#### 1. Browser WebAssembly (Wasmer & Pyodide) — *Adopted Primary*
-- **Architecture**: Zero-server client-side execution. C/C++ via `@wasmer/sdk/browser` (Clang/LLVM WASI binary); Python 3.12 via Pyodide WebAssembly micro-runtime.
+#### 1. Browser WebAssembly (Wasmer & Pyodide) — *Historical evaluation; C/C++ retired*
+- **Architecture**: Python 3.12 uses Pyodide WebAssembly. The former C/C++ `@wasmer/sdk/browser` (Clang/LLVM WASI) runtime was removed after production compilation timed out.
 - **Cost**: **$0.00**. No servers, no egress fees, zero marginal cost per learner code run.
 - **Security**: Bound to browser sandbox; no user code touches KATALYST servers.
 - **Offline**: 100% offline once runtime packages are cached in browser storage.
@@ -133,7 +135,7 @@ KATALYST aims to provide hands-on electronics engineering education alongside em
 4. **Provider-neutral execution contracts.**
 
 ### Phase 1 (M16 — Immediate): Browser-First Foundation
-- Keep and stabilize the Wasmer C11 WebAssembly runner for C programming lessons.
+- Keep C/C++ lesson examples and editors available with Run disabled until a reliable, separately approved option is implemented.
 - Implement the provider-neutral execution interface (`src/lib/execution/types.ts` and `src/lib/execution/runner.ts`).
 - Support JavaScript and HTML/CSS playgrounds using native isolated browser iframes and Web Workers.
 - Prepare circuit simulation components using Falstad / ngspice-wasm canvas integrations.
@@ -250,7 +252,7 @@ A critical part of M17.3 was evaluating modern web-based code editor solutions t
 ### 9.3 Unified 6-Runtime Playground Workbench
 - **Location**: `src/components/c-playground.tsx`.
 - **Supported Runtimes**:
-  1. `C (C11)`: Clang/LLVM WebAssembly compiler via Wasmer SDK with stdin support.
+  1. `C (C11)`: editable lesson workbench; execution is retired.
   2. `Python (3.12)`: CPython WebAssembly micro-runtime via Pyodide.
   3. `JavaScript (ES2024)`: Isolated Web Worker execution with console stream capture.
   4. `SQL (WASM)`: SQLite 3 WebAssembly engine with schema pre-seeding and table formatting.

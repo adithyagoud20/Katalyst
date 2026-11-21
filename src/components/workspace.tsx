@@ -222,7 +222,14 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
   const [katModelId, setKatModelId] = useState("");
   const [katProviderId, setKatProviderId] = useState<"cloudflare" | "gemini" | "">("");
   const [inferenceState, setInferenceState] = useState<InferenceState>({});
-  const [routeLessonId, setRouteLessonId] = useState(initialLessonId ?? "");
+  const [routeLessonId, setRouteLessonId] = useState(() => {
+    if (initialLessonId) return initialLessonId;
+    if (typeof window !== "undefined") {
+      const match = window.location.pathname.match(/^\/courses\/[^/]+\/([^/]+)$/);
+      if (match) return match[1];
+    }
+    return "";
+  });
   const [skillTab, setSkillTab] = useState<"installed" | "available">("installed");
   const [skillSearch, setSkillSearch] = useState("");
   const [backupMode, setBackupMode] = useState<ImportMode>("merge");
@@ -364,7 +371,11 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
       if (!nextView) return;
       setViewState(nextView);
       const search = new URLSearchParams(window.location.search);
-      const nextLessonId = search.get("lesson") ?? "";
+      let nextLessonId = search.get("lesson") ?? "";
+      if (nextView === "lesson" && !nextLessonId) {
+        const match = window.location.pathname.match(/^\/courses\/[^/]+\/([^/]+)$/);
+        if (match) nextLessonId = match[1];
+      }
       setRouteLessonId(nextLessonId);
       const directPlaygroundSelection = nextView === "playground"
         ? playgroundSelectionFromSearch(window.location.search)

@@ -71,9 +71,9 @@ To use the owner’s Gemini API key for shared Kat, set `KATALYST_SHARED_AI_PROV
 
 ---
 
-## 3. Compiler Runtime Requirements
+## 3. C and C++ Run status
 
-C and C++ run locally in the browser. On a browser profile's first use, Wasmer downloads the pinned Clang package (about 106 MiB) from `registry.wasmer.io`; later uses can read it from the browser cache. The app CSP allowlists registry.wasmer.io for package metadata and cdn.wasmer.io for the compiler download. Production hosts and reverse proxies must preserve `Cross-Origin-Opener-Policy: same-origin` and `Cross-Origin-Embedder-Policy: require-corp`, and the first-use network must allow HTTPS requests to the Wasmer registry. The guest program itself still runs with network access disabled. If package setup fails, the Code tab shows a specific retryable setup message.
+C/C++ lesson text and editors remain available, but Run is disabled. The previous Wasmer/Clang runtime was retired after production compile attempts timed out; no C/C++ compiler package is downloaded and the app provides no C execution endpoint. `NEXT_PUBLIC_C_RUN_ENABLED` remains fail-closed and cannot re-enable a missing runtime. The hosted execution choices are design-only in `C_EXECUTION_OPTIONS.md` and require a separate privacy, security, and cost review before integration.
 
 ## 4. Platform Configuration Instructions
 
@@ -102,7 +102,7 @@ The AI gateway migrations create the atomic credit ledger and shared request-rat
    - `GUEST_SESSION_SECRET` (Environment: Production, Preview)
    - Enable Vercel system environment variables and set `NEXT_PUBLIC_SITE_URL` to the exact production `.vercel.app` origin. `VERCEL_PROJECT_PRODUCTION_URL` is a fallback only when Vercel selects its project alias rather than a custom production host.
    - `NEXT_PUBLIC_LEGAL_ENTITY`, `NEXT_PUBLIC_LEGAL_JURISDICTION`, and `NEXT_PUBLIC_SUPPORT_EMAIL` (Production only, after operator/legal review)
-4. Trigger a deployment. Verify the build command runs `prebuild` (`node scripts/copy-wasmer-browser-runtime.mjs`). The site-origin resolver fails the production build if it cannot determine a `.vercel.app` project alias.
+4. Trigger a deployment. Verify the build command runs the remaining SQL.js asset copy and curriculum manifest generation hooks. The site-origin resolver fails the production build if it cannot determine a `.vercel.app` project alias.
 
 ### Docker / Standalone Node.js Deployment
 When building and running in a container or standalone Linux server:
@@ -129,7 +129,7 @@ docker run -d \
 ## 5. Header & Runtime Requirements
 
 ### Cross-Origin Isolation (COOP & COEP)
-The browser-based WebAssembly and Web Worker sandboxes (Wasmer C11 clang, Pyodide 3.12, and JavaScript isolated workers) require `SharedArrayBuffer` and clean process isolation in modern browsers. The first C/C++ setup also downloads the pinned ~106 MiB compiler package from `registry.wasmer.io`; that download is cached in the browser after it succeeds, so first use requires an accessible network connection. Next.js is preconfigured in `next.config.ts` to output:
+The remaining Pyodide, JavaScript worker, and SQL WebAssembly labs use browser-side isolation in modern browsers. C/C++ execution has been retired and has no runtime download. Next.js is preconfigured in `next.config.ts` to output:
 - `Cross-Origin-Opener-Policy: same-origin`
 - `Cross-Origin-Embedder-Policy: require-corp`
 
