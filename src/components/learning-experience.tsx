@@ -290,13 +290,22 @@ export function LearningExperience({
   const [progressIssue, setProgressIssue] = useState("");
   const [aiRequests, setAIRequests] = useState<AIRequestActivity[]>([]);
   const [aiActivityIssue, setAIActivityIssue] = useState("");
-  const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id ?? "");
+  const [selectedCourseId, setSelectedCourseId] = useState(() => {
+    if (routeLessonId) {
+      const routeCourse = courses.find((candidate) => findLesson(candidate, routeLessonId));
+      if (routeCourse) return routeCourse.id;
+    }
+    return courses[0]?.id ?? "";
+  });
   const [courseDetailOpen, setCourseDetailOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<CourseCategory>("All");
   const course = courses.find((item) => item.id === selectedCourseId) ?? courses[0]!;
   const courseSubject = learningSubjects.find((item) => item.id === course.subjectId);
   const courseMark = (courseSubject?.title ?? course.title).slice(0, 1).toUpperCase();
-  const [activeLessonId, setActiveLessonId] = useState(flattenLessons(courses[0]!)[0]?.lesson.id ?? "");
+  const [activeLessonId, setActiveLessonId] = useState(() => {
+    if (routeLessonId) return routeLessonId;
+    return flattenLessons(courses[0]!)[0]?.lesson.id ?? "";
+  });
   const [tutorLessonId, setTutorLessonId] = useState("");
   const [workspacePanel, setWorkspacePanel] = useState<"learn" | "code" | "kat">("learn");
   const [smallWorkspace, setSmallWorkspace] = useState(false);

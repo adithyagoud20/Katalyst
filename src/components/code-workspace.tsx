@@ -288,6 +288,11 @@ export function CodeWorkspace({
   const editorContainerRef = useRef<HTMLDivElement | null>(null);
   const editorViewRef = useRef<EditorView | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const initialCodeRef = useRef(initialCode);
+
+  useEffect(() => {
+    initialCodeRef.current = initialCode;
+  }, [initialCode]);
 
   const filename =
     language === "python"
@@ -338,7 +343,7 @@ export function CodeWorkspace({
         : cpp();
 
     const state = EditorState.create({
-      doc: initialCode,
+      doc: initialCodeRef.current,
       extensions: [
         EditorView.cspNonce.of(document.querySelector<HTMLScriptElement>("script[nonce]")?.nonce ?? ""),
         lineNumbers(),
@@ -400,7 +405,17 @@ export function CodeWorkspace({
       view.destroy();
       editorViewRef.current = null;
     };
-  }, [language, initialCode]);
+  }, [language]);
+
+  // Sync editor content when initialCode changes externally (e.g. example reset)
+  useEffect(() => {
+    const editor = editorViewRef.current;
+    if (!editor || editor.state.doc.toString() === initialCode) return;
+    editor.dispatch({
+      changes: { from: 0, to: editor.state.doc.length, insert: initialCode },
+    });
+    setSource(initialCode);
+  }, [initialCode]);
 
   const handleRun = useCallback(async () => {
     if (language === "html") {

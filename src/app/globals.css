@@ -2329,7 +2329,7 @@ button:disabled { cursor: not-allowed; }
 .learning-view.learning-lesson {
   min-height: 0;
   flex: 1 1 0%;
-  overflow-y: auto;
+  overflow: hidden !important;
   height: auto;
   padding: 0;
 }
@@ -2391,6 +2391,19 @@ button:disabled { cursor: not-allowed; }
   display: flex;
   flex: 0 0 30%;
   flex-direction: column;
+}
+.learning-view.learning-lesson .learning-workspace-grid-no-code .learning-code-panel {
+  display: none !important;
+}
+.learning-view.learning-lesson .learning-workspace-grid-no-code:not(.kat-open) .learning-panel {
+  flex: 1 1 100% !important;
+  max-width: 100% !important;
+}
+.learning-view.learning-lesson .learning-workspace-grid-no-code.kat-open .learning-panel {
+  flex: 1 1 0% !important;
+}
+.learning-view.learning-lesson .learning-workspace-grid-no-code.kat-open .learning-kat-panel {
+  flex: 0 0 min(38vw, 420px) !important;
 }
 .learning-view.learning-lesson .integrated-tutor-panel {
   width: 100% !important;
@@ -4554,7 +4567,7 @@ body { background: var(--canvas); color: var(--text-primary); font-family: var(-
   :root[data-theme="system"] .sidebar .nav-item.selected, .app-shell[data-theme="system"] .sidebar .nav-item.selected { background: rgb(56 189 248 / 12%) !important; color: #38bdf8 !important; }
 }
 .learning-view { background-color: var(--surface-canvas); color: var(--text-primary); }
-.learning-view.learning-lesson { flex: 1 1 0%; min-height: 0; height: auto; overflow-x: hidden; overflow-y: auto; }
+.learning-view.learning-lesson { flex: 1 1 0%; min-height: 0; height: auto; overflow: hidden !important; }
 .learning-view.learning-lesson > .learning-workspace { min-height: 0; }
 .settings-view { width: 100%; max-width: none; color: var(--text-primary); font-size: 15px; }
 .settings-layout-grid { grid-template-columns: 224px minmax(0, 1fr); gap: clamp(20px, 2.5vw, 36px); }
@@ -5056,6 +5069,7 @@ html, body { width: 100%; max-width: 100%; overflow-x: clip; }
 /* Admin-controlled, scheduled public messaging. Content is rendered as text, never HTML. */
 .brand-mark { border-radius: 20%; overflow: hidden; }
 .site-content-notices { z-index: 30; display: flex; flex: 0 0 auto; flex-direction: column; gap: 7px; padding: 0 clamp(8px, 1.2vw, 16px); }
+.site-content-notices:empty { display: none !important; }
 .site-announcement { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto 30px; align-items: center; gap: 10px; min-width: 0; border: 1px solid var(--border-subtle); border-radius: 10px; background: var(--surface-primary); padding: 9px 10px; color: var(--text-primary); box-shadow: 0 4px 18px rgb(0 0 0 / 5%); animation: announcement-arrive .24s ease-out both; }
 .site-announcement-important { border-color: color-mix(in srgb, var(--accent-primary) 40%, var(--border-subtle)); background: var(--surface-accent-soft); }
 .site-announcement-icon { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 8px; background: var(--surface-subtle); color: var(--accent-text); }
