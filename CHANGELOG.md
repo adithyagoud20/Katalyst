@@ -2,6 +2,7 @@
 
 ## Unreleased — MVP operations, announcement scheduling, and launch media
 
+- Repositioned C++ course and compiler launcher below working tracks with clear "Coming soon" badging, and updated runtime status to "C++ compiler coming soon" while preserving lesson readability and sitemap routes.
 - Completed Stage 0 content audit and plan (`docs/CONTENT_PLAN.md`): cataloged baseline 14 courses and 123 lessons, mapped out hardware interpreter and circuit simulator capability matrix, and established technical architecture for multi-track engineering expansion (advanced embedded, circuits/EEE core, DSA in C, control systems, and career practice).
 - Implemented autonomous in-browser C compilation and execution using client-side WebAssembly (`binji/wasm-clang` + `wasm-ld` + in-memory MemFS with custom WASI preview-1 shim), enabled by default (`NEXT_PUBLIC_C_RUN_ENABLED` defaults to enabled). Runs with zero external server/API calls and zero `eval`/`new Function` under strict nonce Content Security Policy.
 - Resolved CodeMirror single-letter focus loss across all workbench and lesson editors, ensuring uninterrupted typing.

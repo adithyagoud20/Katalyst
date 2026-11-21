@@ -2982,6 +2982,14 @@ button:disabled { cursor: not-allowed; }
   color: var(--text-muted);
 }
 
+.course-level-tag.status-coming-soon {
+  color: var(--accent-text);
+  background: var(--surface-accent-soft);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
 .course-card-unified h3 {
   margin: 0;
   font-size: 17px;

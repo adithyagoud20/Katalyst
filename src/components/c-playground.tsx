@@ -37,7 +37,7 @@ const C_RUN_FLAG_ENABLED = process.env.NEXT_PUBLIC_C_RUN_ENABLED !== "false";
 const C_RUN_RUNTIME_AVAILABLE = true;
 const C_RUN_ENABLED = C_RUN_FLAG_ENABLED && C_RUN_RUNTIME_AVAILABLE;
 const C_RUN_UNAVAILABLE_MESSAGE = "C run is being upgraded, lesson is readable.";
-const CPP_RUN_UNAVAILABLE_MESSAGE = "C++ run is being upgraded, lesson is readable.";
+const CPP_RUN_UNAVAILABLE_MESSAGE = "C++ compiler coming soon";
 const NATIVE_RUN_UNAVAILABLE = (language: PlaygroundLanguage) =>
   language === "cpp" ? true : language === "c" && !C_RUN_ENABLED;
 
@@ -995,11 +995,11 @@ export function CPlayground({
             >
               <optgroup label="Programming Runtimes">
                 <option value="code:c">C (C11 editor)</option>
-                <option value="code:cpp">C++ (C++17 editor)</option>
                 <option value="code:python">Python (3.12 · WASM)</option>
                 <option value="code:javascript">JavaScript (ES2024)</option>
                 <option value="code:sql">SQL (SQLite WASM)</option>
                 <option value="code:html">HTML &amp; CSS Sandbox</option>
+                <option value="code:cpp">C++ (C++17 editor · Coming soon)</option>
               </optgroup>
               <optgroup label="Hardware Labs &amp; Simulators">
                 <option value="circuit:arduino">Arduino Uno Lab</option>
@@ -1056,31 +1056,6 @@ export function CPlayground({
               </div>
               <div className="launcher-card-action">
                 <span>Launch C Workbench</span>
-                <ArrowRight size={14} />
-              </div>
-            </div>
-
-            <div
-              className="launcher-card"
-              role="button"
-              tabIndex={0}
-              onClick={() => switchLanguage("cpp")}
-              onKeyDown={(e) => e.key === "Enter" && switchLanguage("cpp")}
-            >
-              <div className="launcher-card-top">
-                <div className="launcher-card-icon-row">
-                  <div className="launcher-icon-box text-indigo-500">
-                    <Code2 size={20} />
-                  </div>
-                  <span className="runtime-badge badge-wasm">WebAssembly · Clang C++17</span>
-                </div>
-                <h3>C++ (C++17 · WebAssembly)</h3>
-                <p>
-                  Practice C++17 language features, templates, and systems concepts with live standard input and browser-local WebAssembly execution.
-                </p>
-              </div>
-              <div className="launcher-card-action">
-                <span>Launch C++ Workbench</span>
                 <ArrowRight size={14} />
               </div>
             </div>
@@ -1181,6 +1156,31 @@ export function CPlayground({
               </div>
               <div className="launcher-card-action">
                 <span>Launch Web Sandbox</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("cpp")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("cpp")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-indigo-500">
+                    <Code2 size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">Coming soon</span>
+                </div>
+                <h3>C++ (C++17 · Coming soon)</h3>
+                <p>
+                  Practice C++17 language features, templates, and systems concepts. Full lessons are readable; in-browser C++ compiler coming soon.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Preview C++ Workbench</span>
                 <ArrowRight size={14} />
               </div>
             </div>

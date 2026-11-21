@@ -44,10 +44,14 @@ export default async function CoursesIndexPage() {
         <header className="course-public-header"><Link href="/" className="legal-brand"><BrandMark className="brand-mark" /><span>KATALYST</span></Link><Link href="/login">Sign in</Link></header>
         <div className="course-public-intro"><span className="eyebrow">LEARNING CATALOG / {String(publishedCourseSummaries.length).padStart(2, "0")} PATHS</span><h1>Many disciplines.<br /><em>One place to explore.</em></h1><p>Build practical understanding across software, physical computing, data, AI, circuits, and digital media. Each path includes focused lessons and an interactive way to test what you learn.</p></div>
         <section className="public-course-grid" aria-label="Published learning courses">
-          {publishedCourseSummaries.map((course, index) => {
+          {[
+            ...publishedCourseSummaries.filter((c) => c.slug !== "cpp-programming"),
+            ...publishedCourseSummaries.filter((c) => c.slug === "cpp-programming"),
+          ].map((course, index) => {
+            const isComingSoon = course.slug === "cpp-programming";
             return <Link key={course.id} className="public-course-card" href={"/courses/" + course.slug}>
-              <span className="home-mono-label">{String(index + 1).padStart(3, "0")} / {course.subjectTitle.toUpperCase()}</span>
-              <h2>{course.title}</h2><p>{course.description}</p><span className="public-course-meta">{course.level} · {course.lessonCount} lessons · {course.moduleCount} modules</span><span className="public-course-open">View course <span aria-hidden="true">→</span></span>
+              <span className="home-mono-label">{String(index + 1).padStart(3, "0")} / {course.subjectTitle.toUpperCase()}{isComingSoon ? " · COMING SOON" : ""}</span>
+              <h2>{course.title}</h2><p>{course.description}</p><span className="public-course-meta">{course.level} · {course.lessonCount} lessons · {course.moduleCount} modules{isComingSoon ? " (Compiler coming soon)" : ""}</span><span className="public-course-open">View course <span aria-hidden="true">→</span></span>
             </Link>;
           })}
         </section>

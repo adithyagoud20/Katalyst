@@ -147,7 +147,7 @@ function extractLessonCode(
 }
 
 export function getCourseBadgeText(courseId: string): string {
-  if (courseId === "cpp-programming" || courseId.includes("cpp")) return "C++17";
+  if (courseId === "cpp-programming" || courseId.includes("cpp")) return "C++17 (Coming soon)";
   if (courseId.includes("c-programming") || courseId === "c11") return "C11";
   if (courseId.includes("python")) return "PYTHON 3.12";
   if (courseId.includes("ai-app") || courseId.includes("ai-web")) return "AI & WEB";
@@ -165,7 +165,7 @@ export function getCourseBadgeText(courseId: string): string {
 }
 
 function getCourseRuntimeText(courseId: string): string {
-  if (courseId === "cpp-programming" || courseId.includes("cpp")) return "C++17 · WebAssembly";
+  if (courseId === "cpp-programming" || courseId.includes("cpp")) return "C++17 · Coming soon";
   if (courseId.includes("c-programming") || courseId === "c11") return "C11 · WebAssembly";
   if (courseId.includes("python")) return "Python 3.12 · Pyodide";
   if (courseId.includes("arduino") || courseId.includes("esp32")) return "Embedded simulator · browser";
@@ -480,8 +480,12 @@ export function LearningExperience({
   }, [progress, courses]);
 
   const filteredCourses = useMemo(() => {
-    if (selectedCategory === "All") return courses;
-    return courses.filter((item) => matchesCourseCategory(item.id, selectedCategory));
+    const list = selectedCategory === "All"
+      ? courses
+      : courses.filter((item) => matchesCourseCategory(item.id, selectedCategory));
+    const working = list.filter((item) => item.id !== "cpp-programming");
+    const cpp = list.filter((item) => item.id === "cpp-programming");
+    return [...working, ...cpp];
   }, [courses, selectedCategory]);
 
   const currentExerciseStatus: ExerciseProgressStatus = lesson && enrolled
@@ -1197,8 +1201,12 @@ export function LearningExperience({
                 const isEnrolled = Boolean(itemState.enrollment);
                 const isComplete = isEnrolled && itemState.completedCount === itemState.totalLessons && itemState.totalLessons > 0;
                 const inProgress = isEnrolled && itemState.completedCount > 0 && !isComplete;
-                const statusText = isComplete ? "Completed" : inProgress ? "In progress" : isEnrolled ? "Started" : "Not started";
-                const statusClass = isComplete ? "completed" : inProgress ? "in-progress" : isEnrolled ? "started" : "not-started";
+                const statusText = item.id === "cpp-programming"
+                  ? "Coming soon"
+                  : isComplete ? "Completed" : inProgress ? "In progress" : isEnrolled ? "Started" : "Not started";
+                const statusClass = item.id === "cpp-programming"
+                  ? "coming-soon"
+                  : isComplete ? "completed" : inProgress ? "in-progress" : isEnrolled ? "started" : "not-started";
 
                 return (
                   <button
