@@ -353,7 +353,7 @@ As of Milestone M21, the KATALYST catalog features 9 comprehensive engineering a
 
 | Course ID | Title | Subject | Modules | Lessons | Execution Language / Runtime |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| `c-programming-foundations` | C Programming Foundations | `c-programming` | 6 | 16 | `c` (Wasmer C11 WebAssembly) |
+| `c-programming-foundations` | C Programming Foundations | `c-programming` | 6 | 16 | `c` (C reference examples; browser Run currently unavailable) |
 | `python-programming-foundations` | Python Programming Foundations | `python-programming` | 7 | 19 | `python` (Pyodide 3.12 WebAssembly) |
 | `js-systems-algorithms` | JavaScript & Algorithmic Systems | `js-programming` | 4 | 10 | `javascript` (Isolated Web Worker) |
 | `digital-logic-circuits` | Digital Logic & Circuit Foundations | `digital-circuits` | 3 | 8 | `circuit` (Interactive SVG Simulators) |

@@ -3,19 +3,47 @@ import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseConfig } from "@/lib/supabase/config";
 
-function createCsp(nonce: string, allowWasmerWorkerEval = false): string {
-  const isDev = process.env.NODE_ENV === "development";
+function isBrowserLabShell(pathname: string): boolean {
+  // Legacy hash navigation keeps the app shell on `/` while opening labs.
+  return pathname === "/"
+    || pathname === "/playground"
+    || pathname === "/paths"
+    || pathname === "/practice";
+}
+
+function isPublicLessonPage(pathname: string): boolean {
+  return /^\/courses\/[^/]+\/[^/]+$/.test(pathname);
+}
+
+function needsBrowserWasm(pathname: string): boolean {
+  const [, , courseId] = pathname.split("/");
+  const isWasmCourse = (courseId === "python-programming-foundations" || courseId === "c-programming-foundations") && isPublicLessonPage(pathname);
+  return isBrowserLabShell(pathname) || isWasmCourse || pathname.startsWith("/vendor/c-toolchain/");
+}
+
+function isPublicCoursePage(pathname: string): boolean {
+  return pathname === "/courses" || pathname.startsWith("/courses/");
+}
+
+function createCsp(nonce: string, pathname: string): string {
+  const hasBrowserWasm = needsBrowserWasm(pathname);
+  const hasLabPreview = isBrowserLabShell(pathname);
+  const needsBlobWorker = hasLabPreview || isPublicLessonPage(pathname);
+  const isPublicCourse = isPublicCoursePage(pathname);
+  const wasmConnectSources = hasBrowserWasm ? " https://cdn.jsdelivr.net" : "";
+  const labPreviewSources = hasLabPreview ? " blob: data:" : "";
   return [
     "default-src 'self'",
-    `script-src 'self' https://challenges.cloudflare.com 'nonce-${nonce}' 'strict-dynamic' 'wasm-unsafe-eval'${isDev || allowWasmerWorkerEval ? " 'unsafe-eval'" : ""}`,
-    "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+    `script-src 'self' https://challenges.cloudflare.com 'nonce-${nonce}' 'strict-dynamic'${hasBrowserWasm ? " 'wasm-unsafe-eval'" : ""}`,
+    isPublicCourse ? `style-src 'self' 'nonce-${nonce}'` : "style-src 'self' 'unsafe-inline'",
+    ...(isPublicCourse ? ["style-src-attr 'none'"] : []),
+    `img-src 'self' data: https:${hasLabPreview ? " blob:" : ""}`,
     "font-src 'self' data:",
-    "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://registry.wasmer.io https://cdn.wasmer.io https://cdn.jsdelivr.net https://challenges.cloudflare.com http://localhost:11434 ws://localhost:11434",
+    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://challenges.cloudflare.com http://localhost:11434 ws://localhost:11434${wasmConnectSources}`,
     // Admin-scheduled launch videos are hosted on the operator's HTTPS media host.
     "media-src 'self' blob: https:",
-    "frame-src 'self' blob: data: https://challenges.cloudflare.com",
-    "worker-src 'self' blob:",
+    `frame-src https://challenges.cloudflare.com${labPreviewSources}`,
+    `worker-src 'self'${needsBlobWorker ? " blob:" : ""}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
@@ -25,13 +53,12 @@ function createCsp(nonce: string, allowWasmerWorkerEval = false): string {
 }
 
 export function getContentSecurityPolicy(nonce: string, pathname: string): string {
-  const isWasmerRuntimeWorker = pathname === "/vendor/wasmer-sdk/dist/browser-worker.js";
-  return createCsp(nonce, isWasmerRuntimeWorker);
+  return createCsp(nonce, pathname);
 }
 
 export async function proxy(request: NextRequest) {
   const nonce = randomBytes(18).toString("base64");
-  const contentSecurityPolicy = getContentSecurityPolicy(nonce, request.nextUrl.pathname);
+  const contentSecurityPolicy = createCsp(nonce, request.nextUrl.pathname);
   const createResponse = () => {
     const requestHeaders = new Headers(request.headers);
     requestHeaders.set("x-nonce", nonce);

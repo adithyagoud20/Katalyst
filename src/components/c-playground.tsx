@@ -8,23 +8,18 @@ import { bracketMatching, foldGutter, HighlightStyle, indentOnInput, syntaxHighl
 import { tags } from "@lezer/highlight";
 import { EditorView, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
 import { ArrowLeft, ArrowRight, Check, Code2, Copy, Cpu, Database, Globe, Laptop, LayoutGrid, LoaderCircle, Play, RotateCcw, RotateCw, Smartphone, Sparkles, Square, Terminal } from "lucide-react";
-import type { Package, Process, Sandbox, Wasmer } from "@wasmer/sdk/browser";
 import { CircuitSimulator, type CircuitSimulatorMode } from "@/components/simulators/circuit-simulator";
 import { SimulatorErrorBoundary } from "@/components/simulators/simulator-error-boundary";
+import { defaultCppProgram } from "@/lib/playground-templates";
+export { defaultCppProgram } from "@/lib/playground-templates";
 import {
-  C_PLAYGROUND_COMPILER_PACKAGE,
-  C_PLAYGROUND_COMPILE_TIMEOUT_MS,
-  C_PLAYGROUND_OUTPUT_LIMIT,
   C_PLAYGROUND_SOURCE_LIMIT,
   C_PLAYGROUND_STDIN_LIMIT,
   C_PLAYGROUND_STORAGE_KEY,
   defaultCProgram,
-  getCPlaygroundRunTimeoutMs,
-  getOutputChannels,
-  getOutputText,
   limitCPlaygroundRecord,
   normalizeStdin,
-  programExpectsStdin,
+  programExpectsStdinC,
 } from "@/lib/c-playground";
 import {
   PYTHON_PLAYGROUND_STORAGE_KEY,
@@ -38,14 +33,13 @@ import {
 import { executeProgram } from "@/lib/execution/runner";
 import { pythonStreamParser, sqlStreamParser, htmlStreamParser } from "./code-workspace";
 
-const CPP_PLAYGROUND_COMPILE_TIMEOUT_MS = 60_000;
-
-function isWasmerSchedulerShutdown(error: unknown): boolean {
-  const message = error instanceof Error
-    ? `${error.message} ${error.cause instanceof Error ? error.cause.message : ""}`
-    : String(error);
-  return /thread pool is shut down|scheduler is dead/i.test(message);
-}
+const C_RUN_FLAG_ENABLED = process.env.NEXT_PUBLIC_C_RUN_ENABLED !== "false";
+const C_RUN_RUNTIME_AVAILABLE = true;
+const C_RUN_ENABLED = C_RUN_FLAG_ENABLED && C_RUN_RUNTIME_AVAILABLE;
+const C_RUN_UNAVAILABLE_MESSAGE = "C run is being upgraded, lesson is readable.";
+const CPP_RUN_UNAVAILABLE_MESSAGE = "C++ run is being upgraded, lesson is readable.";
+const NATIVE_RUN_UNAVAILABLE = (language: PlaygroundLanguage) =>
+  language === "cpp" ? true : language === "c" && !C_RUN_ENABLED;
 
 export type PlaygroundLanguage = "c" | "cpp" | "python" | "javascript" | "sql" | "html" | "circuit";
 export type PlaygroundRuntimeSelection = {
@@ -73,21 +67,6 @@ int main() {
   int value = 0;
   printf("Enter an integer: ");
   if (scanf("%d", &value) != 1) return 1;
-  printf("Twice: %d\\n", doubleValue(value));
-  return 0;
-}
-`;
-
-export const defaultCppProgram = `// C++17 browser workbench: templates
-#include <stdio.h>
-
-template <typename T>
-T doubleValue(T value) {
-  return value + value;
-}
-
-int main() {
-  const int value = 21;
   printf("Twice: %d\\n", doubleValue(value));
   return 0;
 }
@@ -150,7 +129,8 @@ export const defaultHtmlProgram = `<!DOCTYPE html>
     }
     h1 { margin-top: 0; color: #60a5fa; font-size: 1.5rem; }
     p { color: #94a3b8; font-size: 0.95rem; line-height: 1.6; }
-    button {
+    .interaction-demo summary {
+      display: inline-block;
       background: #2563eb;
       color: white;
       border: none;
@@ -159,15 +139,22 @@ export const defaultHtmlProgram = `<!DOCTYPE html>
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
+      list-style: none;
     }
-    button:hover { background: #1d4ed8; }
+    .interaction-demo summary::-webkit-details-marker { display: none; }
+    .interaction-demo summary:hover,
+    .interaction-demo summary:focus-visible { background: #1d4ed8; }
+    .interaction-demo p { margin: 12px 0 0; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>KATALYST Web Sandbox</h1>
     <p>Live, client-side HTML5 &amp; CSS3 preview. Edits in the editor appear here instantly.</p>
-    <button onclick="alert('Hello from KATALYST!')">Test Interaction</button>
+    <details class="interaction-demo">
+      <summary>Test Interaction</summary>
+      <p>Hello from KATALYST!</p>
+    </details>
   </div>
 </body>
 </html>
@@ -196,7 +183,6 @@ export type PlaygroundProps = {
 };
 
 type RunStage = "idle" | "compiling" | "running";
-type CompilerState = "idle" | "initializing" | "ready" | "failed";
 type RunOutcome = "none" | "success" | "compile-error" | "runtime-error" | "timeout";
 
 const cSyntaxHighlight = HighlightStyle.define([
@@ -208,19 +194,6 @@ const cSyntaxHighlight = HighlightStyle.define([
   { tag: [tags.definition(tags.variableName), tags.variableName], color: "var(--code-foreground)" },
   { tag: [tags.operator, tags.punctuation], color: "var(--code-name)" },
 ]);
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 1) return "0 MiB";
-  return `${(bytes / (1024 * 1024)).toFixed(bytes >= 10 * 1024 * 1024 ? 0 : 1)} MiB`;
-}
-
-function describeProgress(phase: string, downloaded: number, total: number | null): string {
-  const amount = total && total > 0 ? `${formatBytes(downloaded)} of ${formatBytes(total)}` : formatBytes(downloaded);
-  if (phase === "resolving") return "Finding the C toolchain…";
-  if (phase === "downloading") return `Downloading the C toolchain · ${amount}`;
-  if (phase === "loading") return "Preparing the compiler…";
-  return "Preparing the local compiler…";
-}
 
 function getPlaygroundStorageKey(lang: PlaygroundLanguage): string {
   switch (lang) {
@@ -297,13 +270,14 @@ function readDraftForLang(lang: PlaygroundLanguage): { source: string; stdin: st
 export function CPlayground({
   pendingExample = null,
   onReturnToLesson = () => undefined,
-  autoInitialize = false,
+  autoInitialize: _autoInitialize = false,
   compact = false,
   initialLanguage = "c",
   initialSelection = null,
   onSelectionChange,
   onActivityChange,
 }: PlaygroundProps) {
+  void _autoInitialize;
   const [activeLanguage, setActiveLanguage] = useState<PlaygroundLanguage>(initialSelection?.language ?? initialLanguage);
   const [playgroundMode, setPlaygroundMode] = useState<"code" | "circuits">(
     initialSelection?.mode ?? (initialLanguage === "circuit" ? "circuits" : "code")
@@ -311,10 +285,11 @@ export function CPlayground({
   const [circuitInitialMode, setCircuitInitialMode] = useState<CircuitSimulatorMode>(initialSelection?.circuitMode ?? "digital");
   const [isLauncherOpen, setIsLauncherOpen] = useState<boolean>(initialSelection?.launcherOpen ?? (!pendingExample && !compact));
   const [outputOpen, setOutputOpen] = useState(compact);
-  const [terminalLine, setTerminalLine] = useState("");
-  const [terminalTranscript, setTerminalTranscript] = useState("");
-  const [terminalInputClosed, setTerminalInputClosed] = useState(false);
   const [source, setSource] = useState(getDefaultProgramForLang(initialSelection?.language ?? initialLanguage));
+  const sourceRef = useRef(source);
+  useEffect(() => {
+    sourceRef.current = source;
+  }, [source]);
   const [stdin, setStdin] = useState("");
   const [storageReady, setStorageReady] = useState(false);
   const [storageMessage, setStorageMessage] = useState("");
@@ -327,49 +302,31 @@ export function CPlayground({
   const [diagnostics, setDiagnostics] = useState("");
   const [error, setError] = useState("");
   const [copyLabel, setCopyLabel] = useState("Copy code");
-  const [compilerState, setCompilerState] = useState<CompilerState>("idle");
-  const [downloadProgress, setDownloadProgress] = useState("");
   const [activeLesson, setActiveLesson] = useState<Pick<PendingExample, "lessonId" | "lessonTitle"> | null>(null);
   const [needsStdinConfirm, setNeedsStdinConfirm] = useState(false);
   const [previewMode, setPreviewMode] = useState<"desktop" | "mobile">("desktop");
   const [previewKey, setPreviewKey] = useState(0);
 
   const editorHostRef = useRef<HTMLDivElement>(null);
-  const terminalInputRef = useRef<HTMLInputElement>(null);
   const terminalOutputRef = useRef<HTMLDivElement>(null);
   const ideRunRef = useRef<(forceEmptyStdin?: boolean) => Promise<void>>(async () => undefined);
   const ideStopRef = useRef<() => void>(() => undefined);
   const editorViewRef = useRef<EditorView | null>(null);
   const [languageCompartment] = useState(() => new Compartment());
-  const clientRef = useRef<Wasmer | null>(null);
-  const compilerRef = useRef<Package | null>(null);
-  const compilerPromiseRef = useRef<Promise<Package> | null>(null);
-  const sandboxRef = useRef<Sandbox | null>(null);
-  const processRef = useRef<Process | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const runIdRef = useRef(0);
   const handledExampleRef = useRef(0);
-  const aliveRef = useRef(true);
   const isSwitchingRef = useRef(false);
-  const schedulerRecoveryAttemptsRef = useRef(0);
-  const retryAfterSchedulerShutdownRef = useRef(false);
-
-  useEffect(() => {
-    if (stage === "running" && (activeLanguage === "c" || activeLanguage === "cpp")) {
-      terminalInputRef.current?.focus();
-    }
-  }, [activeLanguage, stage]);
 
   useEffect(() => {
     const terminal = terminalOutputRef.current;
     if (!terminal) return;
     const wasNearBottom = terminal.scrollHeight - terminal.scrollTop - terminal.clientHeight < 48;
     if (wasNearBottom) terminal.scrollTop = terminal.scrollHeight;
-  }, [stdout, stderr, terminalTranscript]);
+  }, [stdout, stderr]);
 
   // Initialize drafts from localStorage
   useEffect(() => {
-    aliveRef.current = true;
     const timer = window.setTimeout(() => {
       try {
         const saved = readDraftForLang(activeLanguage);
@@ -413,81 +370,6 @@ export function CPlayground({
   useEffect(() => {
     updateSourceRef.current = updateSource;
   }, [updateSource]);
-
-  const ensureCompiler = useCallback(async (): Promise<Package> => {
-    if (compilerRef.current) return compilerRef.current;
-    if (compilerPromiseRef.current) return compilerPromiseRef.current;
-    setCompilerState("initializing");
-    setStatus(`Preparing the browser-based ${activeLanguage === "cpp" ? "C++17" : "C11"} compiler. First setup downloads about 106 MiB once; you can keep reading while it loads.`);
-    setError("");
-    setDownloadProgress("");
-    const pending = (async () => {
-      try {
-        if (!window.crossOriginIsolated || typeof SharedArrayBuffer === "undefined") {
-          throw new Error("This browser needs HTTPS and the COOP/COEP isolation headers before local C/C++ compilation can run.");
-        }
-        const sdkUrl = new URL("/vendor/wasmer-sdk/dist/index.js", window.location.href).href;
-        const { Wasmer } = (await import(/* webpackIgnore: true */ sdkUrl)) as typeof import("@wasmer/sdk/browser");
-        if (!aliveRef.current) throw new DOMException("Compiler initialization was interrupted.", "AbortError");
-        const client = clientRef.current ?? new Wasmer({ cache: { namespace: "katalyst-c-playground" }, outputBytes: C_PLAYGROUND_OUTPUT_LIMIT });
-        clientRef.current = client;
-        const compiler = await client.packages.load(C_PLAYGROUND_COMPILER_PACKAGE, {
-          signal: AbortSignal.timeout(5 * 60_000),
-          onProgress: (progress) => {
-            if (aliveRef.current) {
-              setDownloadProgress(describeProgress(progress.phase, progress.download.downloadedBytes, progress.download.totalBytes));
-            }
-          },
-        });
-        if (!aliveRef.current) throw new DOMException("Compiler initialization was interrupted.", "AbortError");
-        compilerRef.current = compiler;
-        setCompilerState("ready");
-        setStatus(`${activeLanguage === "cpp" ? "C++17" : "C11"} compiler ready. Your code stays in this browser.`);
-        setDownloadProgress("");
-        setError("");
-        return compiler;
-      } catch (initializationError) {
-        if (aliveRef.current) {
-          const schedulerStopped = isWasmerSchedulerShutdown(initializationError);
-          if (schedulerStopped) {
-            const staleClient = clientRef.current;
-            clientRef.current = null;
-            compilerRef.current = null;
-            void staleClient?.close().catch(() => undefined);
-          }
-          const timedOut = initializationError instanceof DOMException && initializationError.name === "TimeoutError";
-          setCompilerState("failed");
-          setStatus(schedulerStopped
-            ? "The local compiler worker stopped. Restart the compiler and try again."
-            : `The ${activeLanguage === "cpp" ? "C++17" : "C11"} compiler could not be initialized.`);
-          const errorText = initializationError instanceof Error ? initializationError.message : "";
-          const needsIsolation = /cross-origin isolated|COOP\/COEP/i.test(errorText);
-          const registryUnavailable = /registry\.wasmer\.io|graphql|fetch|network|unable to load package/i.test(errorText);
-          setError(
-            schedulerStopped
-              ? "The browser stopped the C/C++ runtime worker. The stale runtime was cleared; retry compiler setup to start a fresh one."
-              : needsIsolation
-              ? "Local C/C++ compilation needs a secure page and cross-origin isolation. Open the HTTPS site and check that its COOP and COEP response headers are present."
-              : timedOut || registryUnavailable
-                ? "Wasmer could not download the compiler package. First setup needs access to registry.wasmer.io and downloads about 106 MiB; after a successful setup it is cached in this browser. Check the network or firewall, then retry."
-                : "Could not prepare the local C/C++ compiler. Check the browser console and retry; your lesson and source code are still available."
-          );
-          setDownloadProgress("");
-        }
-        throw initializationError;
-      } finally {
-        compilerPromiseRef.current = null;
-      }
-    })();
-    compilerPromiseRef.current = pending;
-    return pending;
-  }, [activeLanguage]);
-
-  useEffect(() => {
-    if ((activeLanguage === "c" || activeLanguage === "cpp") && autoInitialize && compilerState === "idle" && !isLauncherOpen) {
-      void ensureCompiler().catch(() => undefined);
-    }
-  }, [activeLanguage, autoInitialize, compilerState, ensureCompiler, isLauncherOpen]);
 
   // Handle incoming lesson example
   useEffect(() => {
@@ -566,12 +448,13 @@ export function CPlayground({
     if (isLauncherOpen) return;
     const host = editorHostRef.current;
     if (!host || editorViewRef.current) return;
-    const initialDoc = source || (activeLanguage === "python" ? defaultPythonProgram : defaultCProgram);
+    const initialDoc = sourceRef.current || (activeLanguage === "python" ? defaultPythonProgram : defaultCProgram);
     const editor = new EditorView({
       parent: host,
       state: EditorState.create({
         doc: initialDoc,
         extensions: [
+          EditorView.cspNonce.of(document.querySelector<HTMLScriptElement>("script[nonce]")?.nonce ?? ""),
           lineNumbers(),
           highlightActiveLineGutter(),
           foldGutter(),
@@ -609,7 +492,7 @@ export function CPlayground({
       editor.destroy();
       editorViewRef.current = null;
     };
-  }, [activeLanguage, isLauncherOpen, languageCompartment, source]);
+  }, [activeLanguage, isLauncherOpen, languageCompartment]);
 
   // Sync editor content when source state changes externally
   useEffect(() => {
@@ -623,17 +506,10 @@ export function CPlayground({
     onActivityChange?.({ source, diagnostics, output });
   }, [diagnostics, onActivityChange, output, source]);
 
-  // Teardown
+  // Stop local browser executions when this workbench unmounts.
   useEffect(() => () => {
-    aliveRef.current = false;
     runIdRef.current += 1;
     abortRef.current?.abort(new DOMException("Run stopped.", "AbortError"));
-    if (processRef.current && typeof processRef.current.kill === "function") void processRef.current.kill();
-    if (sandboxRef.current && typeof sandboxRef.current.close === "function") void sandboxRef.current.close();
-    if (clientRef.current && typeof clientRef.current.close === "function") void clientRef.current.close();
-    clientRef.current = null;
-    compilerRef.current = null;
-    compilerPromiseRef.current = null;
   }, []);
 
   const switchLanguage = (targetLang: PlaygroundLanguage, circuitMode?: CircuitSimulatorMode) => {
@@ -696,17 +572,9 @@ export function CPlayground({
       } else if (targetLang === "python") {
         setStatus("Python 3.12 runtime ready. Code executes in browser WebAssembly.");
       } else if (targetLang === "cpp") {
-        setStatus(
-          compilerState === "ready"
-            ? "C++17 compiler ready. Your code stays in this browser."
-            : "C++17 compiler ready to prepare."
-        );
-      } else {
-        setStatus(
-          compilerState === "ready"
-            ? "C11 compiler ready. Your code stays in this browser."
-            : "C11 compiler ready to prepare."
-        );
+        setStatus(CPP_RUN_UNAVAILABLE_MESSAGE);
+      } else if (targetLang === "c") {
+        setStatus(C_RUN_ENABLED ? "Clang WebAssembly compiler ready." : C_RUN_UNAVAILABLE_MESSAGE);
       }
 
       // Reconfigure CodeMirror
@@ -750,50 +618,26 @@ export function CPlayground({
     runIdRef.current += 1;
     abortRef.current?.abort(new DOMException("Run stopped.", "AbortError"));
     abortRef.current = null;
-    if (processRef.current) void processRef.current.kill();
-    processRef.current = null;
-    setTerminalLine("");
-    if (sandboxRef.current) void sandboxRef.current.close();
-    sandboxRef.current = null;
     setStage("idle");
     setOutcome("none");
     setStatus("Run stopped.");
   }, []);
 
-  const submitTerminalLine = async () => {
-    const process = processRef.current;
-    if (!process?.stdin) return;
-    const line = terminalLine;
-    try {
-      await process.stdin.write(`${line}\n`);
-      setTerminalTranscript((current) => `${current}${current && !current.endsWith("\n") ? "\n" : ""}> ${line}\n`);
-      setTerminalLine("");
-      terminalInputRef.current?.focus();
-    } catch {
-      setError("This program has already closed standard input.");
-    }
-  };
-
-  const closeTerminalInput = async () => {
-    try {
-      await processRef.current?.stdin?.close();
-      setTerminalInputClosed(true);
-      setTerminalTranscript((current) => `${current}${current && !current.endsWith("\n") ? "\n" : ""}[stdin closed]\n`);
-    } catch {
-      setError("Standard input is already closed.");
-    }
-  };
-
   const runProgram = useCallback(async (forceEmptyStdin = false) => {
+    if (NATIVE_RUN_UNAVAILABLE(activeLanguage)) {
+      setOutputOpen(true);
+      const msg = activeLanguage === "cpp" ? CPP_RUN_UNAVAILABLE_MESSAGE : C_RUN_UNAVAILABLE_MESSAGE;
+      setError(msg);
+      setStatus(msg);
+      return;
+    }
     if (stage !== "idle") return;
 
-    const runStartedAt = performance.now();
     setOutputOpen(true);
-    setTerminalLine("");
-    setTerminalTranscript("");
-    setTerminalInputClosed(false);
 
-    const expectsInput = activeLanguage === "python" ? programExpectsStdinPython(source) : programExpectsStdin(source);
+    const expectsInput =
+      (activeLanguage === "python" && programExpectsStdinPython(source)) ||
+      (activeLanguage === "c" && programExpectsStdinC(source));
 
     if (activeLanguage === "circuit") {
       setStatus("Circuit simulation runs interactively.");
@@ -811,18 +655,20 @@ export function CPlayground({
       return;
     }
 
-    if (!forceEmptyStdin && expectsInput && !stdin.trim() && activeLanguage === "python") {
+    if (!forceEmptyStdin && expectsInput && !stdin.trim() && (activeLanguage === "python" || activeLanguage === "c")) {
       setNeedsStdinConfirm(true);
       setError(
-        "This program reads standard input (input()), but no input was provided in the Standard input box above. Enter your values or click “Run with empty input (EOF)”."
+        activeLanguage === "c"
+          ? "This program reads standard input (scanf/getchar/fgets), but no input was provided in the Standard input box above. Enter your values or click “Run with empty input (EOF)”."
+          : "This program reads standard input (input()), but no input was provided in the Standard input box above. Enter your values or click “Run with empty input (EOF)”."
       );
       setStatus("Input required before running.");
       return;
     }
     setNeedsStdinConfirm(false);
 
-    // Python, JavaScript, and SQL execution via unified executeProgram
-    if (activeLanguage === "python" || activeLanguage === "javascript" || activeLanguage === "sql") {
+    // C, Python, JavaScript, and SQL execution via unified executeProgram
+    if (activeLanguage === "c" || activeLanguage === "python" || activeLanguage === "javascript" || activeLanguage === "sql") {
       const runId = ++runIdRef.current;
       const controller = new AbortController();
       abortRef.current = controller;
@@ -831,7 +677,9 @@ export function CPlayground({
       setStage("running");
       setOutcome("none");
       setStatus(
-        activeLanguage === "sql"
+        activeLanguage === "c"
+          ? "Compiling and running C program in WebAssembly…"
+          : activeLanguage === "sql"
           ? "Executing query in SQLite WebAssembly…"
           : activeLanguage === "javascript"
           ? "Executing JavaScript in Web Worker…"
@@ -845,7 +693,9 @@ export function CPlayground({
 
       try {
         const filename =
-          activeLanguage === "sql"
+          activeLanguage === "c"
+            ? "main.c"
+            : activeLanguage === "sql"
             ? "query.sql"
             : activeLanguage === "javascript"
             ? "main.js"
@@ -858,7 +708,7 @@ export function CPlayground({
           signal: controller.signal,
           limits: {
             timeoutMs: 10_000,
-            compileTimeoutMs: 15_000,
+            compileTimeoutMs: 20_000,
             memoryLimitMb: 64,
             outputLimitBytes: PYTHON_PLAYGROUND_OUTPUT_LIMIT,
           },
@@ -873,18 +723,26 @@ export function CPlayground({
           result.ok && !result.stdout && !result.stderr ? "Program finished with no output." : "";
         setStdout(result.stdout || noOutputMessage);
         setStderr(result.stderr);
-        setOutput(
-          [result.stdout, result.stderr && `stderr:\n${result.stderr}`, noOutputMessage].filter(Boolean).join("\n")
-        );
+        if (result.diagnostics) {
+          setDiagnostics(result.diagnostics);
+        }
+
+        let fullOutput = [result.stdout, result.stderr && `stderr:\n${result.stderr}`, noOutputMessage].filter(Boolean).join("\n");
+        if (result.artifacts && result.artifacts.length > 0) {
+          const filesSummary = result.artifacts.map((a) => `[In-memory file: ${a.path} (${a.content.length} bytes)]`).join("\n");
+          fullOutput = fullOutput ? `${fullOutput}\n\n${filesSummary}` : filesSummary;
+        }
+        setOutput(fullOutput);
 
         if (result.ok) {
           setOutcome("success");
           setStatus(`Execution completed in ${result.executionTimeMs} ms in local sandbox.`);
         } else {
           const timedOut = result.stage === "timeout" || result.error?.includes("timeout");
-          setOutcome(timedOut ? "timeout" : "runtime-error");
+          const isCompile = result.stage === "compile";
+          setOutcome(timedOut ? "timeout" : isCompile ? "compile-error" : "runtime-error");
           setError(result.stderr || result.error || `Execution failed with status ${result.exitCode}.`);
-          setStatus(timedOut ? "Execution timed out." : `Execution finished with an error.`);
+          setStatus(timedOut ? "Execution timed out." : isCompile ? "Compilation failed." : `Execution finished with an error.`);
         }
       } catch (runErr) {
         if (!isCurrent()) return;
@@ -901,285 +759,7 @@ export function CPlayground({
       return;
     }
 
-    // C execution via Wasmer
-    if (compilerState !== "ready" || !compilerRef.current || !clientRef.current) {
-      if (compilerState === "failed") {
-        setStatus("Compiler initialization failed. Retry before running code.");
-        return;
-      }
-      if (compilerState === "idle") {
-        try {
-          await ensureCompiler();
-        } catch {
-          return;
-        }
-      } else {
-        setStatus("The C11 compiler is still initializing. Run is available when it is ready.");
-        return;
-      }
-    }
-
-    if (typeof window.crossOriginIsolated !== "boolean" || !window.crossOriginIsolated) {
-      setError("The C runtime needs a cross-origin-isolated page. Start KATALYST with its configured Next.js server headers, then reload.");
-      return;
-    }
-
-    const runId = ++runIdRef.current;
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const isCurrent = () => runIdRef.current === runId;
-    let client = clientRef.current;
-    let compiler = compilerRef.current;
-    if (!client || !compiler) {
-      try {
-        compiler = await ensureCompiler();
-        client = clientRef.current;
-      } catch {
-        return;
-      }
-    }
-    if (!client || !compiler) return;
-
-    const isCpp = activeLanguage === "cpp";
-    const srcFileName = isCpp ? "main.cpp" : "main.c";
-    const stdFlag = isCpp ? "-std=c++17" : "-std=c11";
-    const compileTimeoutMs = isCpp ? CPP_PLAYGROUND_COMPILE_TIMEOUT_MS : C_PLAYGROUND_COMPILE_TIMEOUT_MS;
-    let compileDeadlineExceeded = false;
-    let runningProcess: Process | null = null;
-
-    setStage("compiling");
-    setOutcome("none");
-    setStatus(isCpp ? "Compiling your C++17 program locally…" : "Compiling your C program locally…");
-    setOutput("");
-    setStdout("");
-    setStderr("");
-    setDiagnostics("");
-    setError("");
-
-    try {
-      const sandbox = await client.sandboxes.create({
-        packages: [compiler],
-        files: { [srcFileName]: source },
-        network: { mode: "disabled" },
-        signal: controller.signal,
-      });
-      if (!isCurrent()) {
-        await sandbox.close();
-        return;
-      }
-      sandboxRef.current = sandbox;
-
-      const compilerName = compiler.entrypoint ?? "clang";
-      const compilerArgs = [
-        ...(isCpp ? ["--driver-mode=g++", "-x", "c++"] : []),
-        stdFlag,
-        isCpp ? "-O0" : "-O1",
-        "-Wall",
-        "-Wextra",
-        `/workspace/${srcFileName}`,
-        "-lm",
-        "-o",
-        "/workspace/program.wasm",
-      ];
-      const compileProcess = await sandbox.command(compilerName, compilerArgs).spawn({
-        timeoutMs: compileTimeoutMs,
-        outputBytes: C_PLAYGROUND_OUTPUT_LIMIT,
-        stdin: "closed",
-        stdout: "capture",
-        stderr: "capture",
-      });
-      processRef.current = compileProcess;
-      if (!isCurrent()) {
-        await compileProcess.kill();
-        return;
-      }
-      const compileWatchdog = window.setTimeout(() => {
-        compileDeadlineExceeded = true;
-        void compileProcess.kill().catch(() => undefined);
-      }, compileTimeoutMs);
-      let compiled: Awaited<ReturnType<typeof compileProcess.wait>>;
-      try {
-        compiled = await compileProcess.wait({ check: false });
-      } finally {
-        window.clearTimeout(compileWatchdog);
-      }
-      processRef.current = null;
-      const compileDiagnostics = getOutputText(compiled);
-      setDiagnostics(compileDiagnostics);
-      if (compiled.reason !== "exited" || compiled.exitCode !== 0) {
-        if (isWasmerSchedulerShutdown(new Error(compileDiagnostics))) {
-          const staleClient = clientRef.current;
-          clientRef.current = null;
-          compilerRef.current = null;
-          compilerPromiseRef.current = null;
-          void staleClient?.close().catch(() => undefined);
-          setCompilerState("idle");
-          if (schedulerRecoveryAttemptsRef.current === 0) {
-            schedulerRecoveryAttemptsRef.current = 1;
-            retryAfterSchedulerShutdownRef.current = true;
-          }
-          setOutcome("runtime-error");
-          setError("The browser stopped the C/C++ compiler worker. The runtime was reset and this run will retry.");
-          setStatus("C/C++ compiler worker restarted; retrying your program…");
-          return;
-        }
-        const timedOut = compileDeadlineExceeded || compiled.reason === "timeout";
-        setOutcome(timedOut ? "timeout" : "compile-error");
-        setError(
-          timedOut
-            ? `Compilation took longer than ${Math.round(compileTimeoutMs / 1_000)} seconds. Shorten the example and try again.`
-            : isCpp
-            ? "The C++ compiler could not build this program. Review the compiler messages below."
-            : "The C compiler could not build this program. Review the compiler messages below."
-        );
-        setStatus(timedOut ? "Compilation timed out." : "Compilation failed.");
-        return;
-      }
-
-      const binary = await sandbox.fs.readFile("/workspace/program.wasm");
-      const program = await client.packages.load(new Uint8Array(binary), { signal: controller.signal });
-      await sandbox.installPackage(program);
-      if (!isCurrent()) return;
-
-      setStatus("Starting the compiled program in the browser sandbox…");
-      const normalizedInput = normalizeStdin(stdin);
-      const waitingForInput = expectsInput && !normalizedInput;
-      const runTimeoutMs = getCPlaygroundRunTimeoutMs(source, stdin);
-      const programProcess = await sandbox.command(program).spawn({
-        timeoutMs: runTimeoutMs,
-        outputBytes: C_PLAYGROUND_OUTPUT_LIMIT,
-        stdin: "pipe",
-        terminal: { columns: 100, rows: 32 },
-      });
-      runningProcess = programProcess;
-      processRef.current = programProcess;
-      if (!isCurrent()) {
-        await programProcess.kill();
-        return;
-      }
-      setStage("running");
-      setStatus(waitingForInput
-        ? "Program is waiting for standard input. Enter input below or stop the run."
-        : "Running the compiled program in the browser sandbox…");
-      if (normalizedInput) await programProcess.stdin?.write(normalizedInput);
-      const captureStream = async (stream: AsyncIterable<Uint8Array> | null, update: (value: string) => void) => {
-        if (!stream) return "";
-        const decoder = new TextDecoder();
-        let captured = "";
-        for await (const chunk of stream) {
-          captured = `${captured}${decoder.decode(chunk, { stream: true })}`;
-          if (captured.length > C_PLAYGROUND_OUTPUT_LIMIT) captured = captured.slice(-C_PLAYGROUND_OUTPUT_LIMIT);
-          update(captured);
-        }
-        captured += decoder.decode();
-        update(captured);
-        return captured;
-      };
-      let streamedStdout = "";
-      let streamedStderr = "";
-      let previousStdout = "";
-      let previousStderr = "";
-      const stdoutStream = captureStream(programProcess.stdout, (value) => {
-        if (!isCurrent()) return;
-        const delta = value.startsWith(previousStdout) ? value.slice(previousStdout.length) : value;
-        previousStdout = value;
-        if (delta) setTerminalTranscript((current) => `${current}${delta}`.slice(-C_PLAYGROUND_OUTPUT_LIMIT));
-        streamedStdout = value;
-        setStdout(value);
-        setOutput([value, streamedStderr && `stderr:\n${streamedStderr}`].filter(Boolean).join("\n"));
-      });
-      const stderrStream = captureStream(programProcess.stderr, (value) => {
-        if (!isCurrent()) return;
-        const delta = value.startsWith(previousStderr) ? value.slice(previousStderr.length) : value;
-        previousStderr = value;
-        if (delta) setTerminalTranscript((current) => `${current}${current ? "\n" : ""}[stderr]\n${delta}`.slice(-C_PLAYGROUND_OUTPUT_LIMIT));
-        streamedStderr = value;
-        setStderr(value);
-        setOutput([streamedStdout, value && `stderr:\n${value}`].filter(Boolean).join("\n"));
-      });
-      const result = await programProcess.wait({ check: false });
-      await Promise.all([stdoutStream, stderrStream]);
-      await programProcess.stdin?.close().catch(() => undefined);
-      processRef.current = null;
-      if (!isCurrent()) return;
-      const channels = getOutputChannels(result);
-      const liveStdout = await stdoutStream;
-      const liveStderr = await stderrStream;
-      const finalStdout = liveStdout || channels.stdout;
-      const finalStderr = liveStderr || channels.stderr;
-      if (!liveStdout && channels.stdout) setTerminalTranscript((current) => `${current}${channels.stdout}`.slice(-C_PLAYGROUND_OUTPUT_LIMIT));
-      if (!liveStderr && channels.stderr) setTerminalTranscript((current) => `${current}${current ? "\n" : ""}[stderr]\n${channels.stderr}`.slice(-C_PLAYGROUND_OUTPUT_LIMIT));
-      const noOutputMessage = result.reason === "exited" && result.exitCode === 0 && !finalStdout && !finalStderr ? "Program finished with no output." : "";
-      setStdout(finalStdout || noOutputMessage);
-      setStderr(finalStderr);
-      setOutput([finalStdout, finalStderr && `stderr:\n${finalStderr}`, noOutputMessage].filter(Boolean).join("\n"));
-      if (result.reason === "timeout") {
-        setOutcome("timeout");
-        setError(`The program exceeded the ${Math.round(runTimeoutMs / 1_000)} second run limit. Check its loop conditions and try again.`);
-        setStatus("Program timed out and was stopped.");
-      } else if (result.reason === "terminated") {
-        setOutcome("none");
-        setStatus("Run stopped.");
-      } else if (result.exitCode !== 0) {
-        setOutcome("runtime-error");
-        setError(`The program exited with status ${result.exitCode}. Check the output for details.`);
-        setStatus("Program finished with a runtime error.");
-      } else {
-        setOutcome("success");
-        schedulerRecoveryAttemptsRef.current = 0;
-        setStatus(`Program finished successfully in ${Math.round(performance.now() - runStartedAt)} ms in the local WebAssembly sandbox.`);
-      }
-    } catch (runError) {
-      if (!isCurrent()) return;
-      if (compileDeadlineExceeded) {
-        setOutcome("timeout");
-        setError(`Compilation took longer than ${Math.round(compileTimeoutMs / 1_000)} seconds. Shorten the example and try again.`);
-        setStatus("Compilation timed out.");
-        return;
-      }
-      const timedOut = controller.signal.reason instanceof DOMException && controller.signal.reason.name === "TimeoutError";
-      const stopped = controller.signal.aborted;
-      const schedulerStopped = !stopped && isWasmerSchedulerShutdown(runError);
-      if (schedulerStopped) {
-        const staleClient = clientRef.current;
-        clientRef.current = null;
-        compilerRef.current = null;
-        compilerPromiseRef.current = null;
-        void staleClient?.close().catch(() => undefined);
-        setCompilerState("idle");
-        if (schedulerRecoveryAttemptsRef.current === 0) {
-          schedulerRecoveryAttemptsRef.current = 1;
-          retryAfterSchedulerShutdownRef.current = true;
-        }
-      }
-      setOutcome(timedOut ? "timeout" : stopped ? "none" : "runtime-error");
-      setError(timedOut
-        ? "The C runtime took too long to finish. Check the program and try again."
-        : stopped
-          ? "Run stopped."
-          : schedulerStopped
-            ? "The browser stopped the C/C++ runtime worker. It has been reset; run again to start a fresh worker."
-            : runError instanceof Error ? runError.message.slice(0, 1_000) : "The C runtime could not start.");
-      setStatus(timedOut
-        ? "Program timed out and was stopped."
-        : stopped
-          ? "Run stopped."
-          : schedulerStopped
-            ? "C/C++ runtime reset. Run again to continue."
-            : "The C playground could not finish this run.");
-    } finally {
-      if (isCurrent()) {
-        abortRef.current = null;
-        processRef.current = null;
-        await runningProcess?.stdin?.close().catch(() => undefined);
-        if (sandboxRef.current) {
-          await sandboxRef.current.close();
-          sandboxRef.current = null;
-        }
-        setStage("idle");
-      }
-    }
-  }, [activeLanguage, compilerState, ensureCompiler, source, stage, stdin]);
+  }, [activeLanguage, source, stage, stdin]);
 
   const copySource = async () => {
     try {
@@ -1221,7 +801,6 @@ export function CPlayground({
 
   const clearOutput = () => {
     setOutput("");
-    setTerminalTranscript("");
     setStdout("");
     setStderr("");
     setDiagnostics("");
@@ -1230,32 +809,20 @@ export function CPlayground({
     setStatus("Output cleared.");
   };
 
-  const compilerStatus =
-    compilerState === "ready"
-      ? "Compiler ready"
-      : compilerState === "failed"
-      ? "Setup failed"
-      : compilerState === "initializing"
-      ? "Preparing compiler"
-      : "Compiler ready to prepare";
-
-  const isNativeCompiler = activeLanguage === "c" || activeLanguage === "cpp";
+  const isCOrCpp = activeLanguage === "c" || activeLanguage === "cpp";
+  const nativeRunUnavailable = NATIVE_RUN_UNAVAILABLE(activeLanguage);
+  const compilerStatus = nativeRunUnavailable
+    ? activeLanguage === "cpp"
+      ? "C++ run unavailable"
+      : "C run unavailable"
+    : "Ready";
   const isStandaloneIde = !compact && !isLauncherOpen;
-  const ideStatus = stage === "compiling" ? "Compiling…" : stage === "running" ? "Running…" : compilerState === "initializing" ? "Preparing runtime…" : compilerState === "failed" ? "Setup failed" : status;
+  const ideStatus = nativeRunUnavailable ? "Run unavailable" : stage === "running" ? "Running…" : status;
 
   useEffect(() => {
     ideRunRef.current = runProgram;
     ideStopRef.current = stopRun;
   }, [runProgram, stopRun]);
-
-  useEffect(() => {
-    if (stage !== "idle" || !retryAfterSchedulerShutdownRef.current) return;
-    retryAfterSchedulerShutdownRef.current = false;
-    const retryTimer = window.setTimeout(() => {
-      if (aliveRef.current) void ideRunRef.current(false);
-    }, 0);
-    return () => window.clearTimeout(retryTimer);
-  }, [compilerState, stage]);
 
   useEffect(() => {
     if (!isStandaloneIde) return;
@@ -1269,28 +836,24 @@ export function CPlayground({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isStandaloneIde, stage]);
 
-  const expectsInput = activeLanguage === "python" ? programExpectsStdinPython(source) : programExpectsStdin(source);
+  const expectsInput =
+    (activeLanguage === "python" && programExpectsStdinPython(source)) ||
+    (activeLanguage === "c" && programExpectsStdinC(source));
   const stdinDescription = activeLanguage === "python"
     ? "Each input() call reads the next line. Enter responses in order, one per line."
-    : activeLanguage === "c" || activeLanguage === "cpp"
-      ? (() => {
-          const format = source.match(/\b(?:scanf|fscanf)\s*\(\s*(?:stdin\s*,\s*)?["']([^"']+)["']/)?.[1];
-          const fields = format?.match(/%(?!%)[-+ #0]*(?:\d+|\*)?(?:\.(?:\d+|\*))?(?:hh|h|ll|l|j|z|t|L)?[diuoxXfFeEgGaAcsp]/g);
-          return fields?.length
-            ? `Detected ${fields.length} scanf value${fields.length === 1 ? "" : "s"} in read order: ${fields.join(", ")}. Separate values with spaces or new lines.`
-            : "Enter the values your program reads before running. Values are passed to stdin in order; separate them with spaces or new lines.";
-        })()
-      : activeLanguage === "sql"
-        ? "Optional SQL setup statements run before the selected query."
-        : "Enter any standard input your program reads before running; values are passed in order, one line at a time.";
+    : activeLanguage === "sql"
+      ? "Optional SQL setup statements run before the selected query."
+      : activeLanguage === "c"
+      ? "Enter standard input lines for scanf, getchar, or fgets before running; lines are read sequentially."
+      : "Enter any standard input your program reads before running; values are passed in order, one line at a time.";
   const stdinPlaceholder = activeLanguage === "sql"
     ? "Optional: CREATE TABLE or INSERT statements to run before the query."
     : activeLanguage === "python"
       ? "First input() response\nSecond input() response"
-      : activeLanguage === "c" || activeLanguage === "cpp"
-        ? "For scanf/cin, enter each value here. Example: 42\nAda"
-        : "Enter standard input values here, one per line.";
-  const showStdinGuidance = expectsInput || activeLanguage === "sql";
+      : activeLanguage === "c"
+      ? "e.g. 42 or first input line\nsecond input line"
+      : "Enter standard input values here, one per line.";
+  const showStdinGuidance = expectsInput || activeLanguage === "sql" || (activeLanguage === "c" && Boolean(stdin.trim()));
   const langDetails = {
     python: {
       eyebrow: "PYTHON PROGRAMMING · WORKBENCH",
@@ -1339,38 +902,30 @@ export function CPlayground({
     c: {
       eyebrow: "C PROGRAMMING · WORKBENCH",
       title: "C Workbench",
-      desc: "Write, compile, and run C11 in your browser.",
+      desc: C_RUN_ENABLED
+        ? "Compile and run C11 code directly in your browser via WebAssembly."
+        : "Edit C11 lesson examples in your browser. Running is being upgraded.",
       badge: "C · C11",
       filename: "main.c",
       tag: "C11",
-      engine: "Compiler package: clang/clang · Code is limited to 12 KB, input to 2 KB, output to 64 KB, compilation to 15 seconds, and each run to 8 seconds. Network access is disabled.",
-      notice:
-        compilerState === "ready"
-          ? "C11 is ready. Your code compiles to WebAssembly and runs in this browser tab; KATALYST does not upload it."
-          : compilerState === "failed"
-          ? "The C11 compiler could not be prepared. Your lesson is still available; retry setup when ready."
-          : compilerState === "initializing"
-          ? "The C11 compiler is preparing in the background. You can read and edit while it initializes; Run becomes available when setup finishes."
-          : "The C11 compiler is ready. Click Run to prepare and execute your code in this browser.",
-      poweredBy: "Powered by Wasmer",
+      engine: C_RUN_ENABLED
+        ? "Engine: Clang & LLD WebAssembly · In-browser compiler & WASI sandbox. Memory capped to 32 MB, run capped to 10s. Temporary in-memory virtual filesystem."
+        : C_RUN_UNAVAILABLE_MESSAGE,
+      notice: C_RUN_ENABLED
+        ? "C11 compiles and runs in this browser tab via Clang WebAssembly; KATALYST does not upload your code. File operations use an in-memory virtual filesystem."
+        : C_RUN_UNAVAILABLE_MESSAGE,
+      poweredBy: C_RUN_ENABLED ? "Powered by Clang WebAssembly" : "C execution paused",
     },
     cpp: {
       eyebrow: "C++ SYSTEMS · WORKBENCH",
       title: "C++17 Workbench",
-      desc: "Write and run C++17 programs with templates and interactive standard input in your browser.",
+      desc: "Edit C++17 lesson examples in your browser. Running is being upgraded.",
       badge: "C++ · C++17",
       filename: "main.cpp",
       tag: "C++17",
-      engine: "Compiler package: clang/clang · Code is limited to 16 KB, input to 4 KB, output to 64 KB, C++ compilation to 60 seconds, and each run to 8 seconds. Network access is disabled.",
-      notice:
-        compilerState === "ready"
-          ? "C++17 is ready. Code compiles and runs in this browser tab with live stdin; heavy standard-library headers may exceed the 60-second compile limit."
-          : compilerState === "failed"
-          ? "The C++17 compiler could not be prepared. Your lesson is still available; retry setup when ready."
-          : compilerState === "initializing"
-          ? "The C++17 compiler is preparing in the background. You can read and edit while it initializes; Run becomes available when setup finishes."
-          : "The C++17 compiler is ready. Click Run to prepare and execute your code in this browser.",
-      poweredBy: "Powered by Wasmer",
+      engine: CPP_RUN_UNAVAILABLE_MESSAGE,
+      notice: CPP_RUN_UNAVAILABLE_MESSAGE,
+      poweredBy: "C/C++ execution paused",
     },
   }[activeLanguage === "circuit" ? "c" : activeLanguage];
 
@@ -1378,7 +933,7 @@ export function CPlayground({
     <section
       className={`c-playground${compact ? " c-playground-compact" : ""}${isStandaloneIde && !outputOpen ? " ide-output-closed" : ""}`}
       aria-labelledby="c-playground-title"
-      data-compiler-state={(activeLanguage === "c" || activeLanguage === "cpp") ? compilerState : "ready"}
+      data-compiler-state={nativeRunUnavailable ? "disabled" : "ready"}
     >
       {!compact && !isLauncherOpen && (
         <div className="playground-runtime-header" role="region" aria-label="Runtime Controls">
@@ -1414,6 +969,8 @@ export function CPlayground({
                 ? "Web Worker"
                 : activeLanguage === "html"
                 ? "Live Preview"
+                : activeLanguage === "c" || activeLanguage === "cpp"
+                  ? "Run upgrading"
                 : "WebAssembly"}
             </span>
           </div>
@@ -1437,8 +994,8 @@ export function CPlayground({
               }}
             >
               <optgroup label="Programming Runtimes">
-                <option value="code:c">C (C11 · WASM)</option>
-                <option value="code:cpp">C++ (C++17 · WASM)</option>
+                <option value="code:c">C (C11 editor)</option>
+                <option value="code:cpp">C++ (C++17 editor)</option>
                 <option value="code:python">Python (3.12 · WASM)</option>
                 <option value="code:javascript">JavaScript (ES2024)</option>
                 <option value="code:sql">SQL (SQLite WASM)</option>
@@ -1453,10 +1010,10 @@ export function CPlayground({
             </select>
             <span className="ide-file-status" title={status}>
               <code>{playgroundMode === "circuits" ? "simulator" : langDetails.filename}</code>
-              <span className={`ide-status-indicator ${stage !== "idle" ? "active" : compilerState === "failed" ? "failed" : ""}`}>{ideStatus}</span>
+              <span className={`ide-status-indicator ${stage !== "idle" ? "active" : ""}`}>{ideStatus}</span>
             </span>
             {playgroundMode === "code" && <>
-              {stage === "idle" ? <button type="button" className="ide-action ide-run" onClick={() => void runProgram(false)} disabled={isNativeCompiler && compilerState === "initializing"} title="Run (Ctrl+Enter)"><Play size={13} /><span>Run</span></button> : <button type="button" className="ide-action ide-stop" onClick={stopRun}><Square size={12} /><span>Stop</span></button>}
+              {stage === "idle" ? <button type="button" className="ide-action ide-run" onClick={() => void runProgram(false)} disabled={nativeRunUnavailable} title={nativeRunUnavailable ? (activeLanguage === "cpp" ? CPP_RUN_UNAVAILABLE_MESSAGE : C_RUN_UNAVAILABLE_MESSAGE) : "Run (Ctrl+Enter)"}><Play size={13} /><span>{nativeRunUnavailable ? "Unavailable" : "Run"}</span></button> : <button type="button" className="ide-action ide-stop" onClick={stopRun}><Square size={12} /><span>Stop</span></button>}
               <button type="button" className="ide-action" onClick={resetSource} disabled={stage !== "idle"} title="Reset starter file"><RotateCcw size={13} /><span className="ide-action-label">Reset</span></button>
               <button type="button" className="ide-action" onClick={() => void copySource()} title="Copy source"><Copy size={13} /><span className="ide-action-label">Copy</span></button>
               <button type="button" className="ide-action" onClick={() => setOutputOpen((open) => !open)} aria-label={outputOpen ? "Hide output" : "Output"} aria-expanded={outputOpen} aria-controls="playground-output-panel"><Terminal size={13} /><span className="ide-action-label">{outputOpen ? "Hide output" : "Output"}</span></button>
@@ -1765,10 +1322,10 @@ export function CPlayground({
         <span className="c-playground-status-dot" />
         <p>
           {langDetails.notice}{" "}
-          {activeLanguage === "c" && "The runtime is cached in this browser."}
         </p>
         <span>{langDetails.poweredBy}</span>
       </div>
+      {nativeRunUnavailable && <div className="c-run-upgrade-message" role="status">{activeLanguage === "cpp" ? CPP_RUN_UNAVAILABLE_MESSAGE : C_RUN_UNAVAILABLE_MESSAGE}</div>}
       {storageMessage && <p className={`c-playground-storage${isStandaloneIde ? " ide-hidden-heading" : ""}`} role="status">{storageMessage}</p>}
 
       <div className="c-playground-grid">
@@ -1864,16 +1421,7 @@ export function CPlayground({
                 sandbox="allow-scripts"
                 srcDoc={source}
                 title="HTML Live Sandbox Preview"
-                style={{
-                  width: previewMode === "mobile" ? "min(375px, 100%)" : "100%",
-                  maxWidth: previewMode === "mobile" ? "375px" : "100%",
-                  minHeight: "360px",
-                  height: "100%",
-                  background: "#ffffff",
-                  borderRadius: "8px",
-                  border: "1px solid var(--border-subtle)",
-                  boxShadow: previewMode === "mobile" ? "0 4px 20px rgba(0,0,0,0.15)" : "none",
-                }}
+                className={`c-html-preview-frame ${previewMode === "mobile" ? "c-html-preview-frame--mobile" : "c-html-preview-frame--desktop"}`}
               />
             </div>
           </section>
@@ -1883,23 +1431,24 @@ export function CPlayground({
               <div>
                 <Terminal size={15} />
                 <strong>Terminal</strong>
-                <span>{(activeLanguage === "c" || activeLanguage === "cpp") ? compilerStatus : `${langDetails.tag} ready`}</span>
+                <span>{isCOrCpp ? compilerStatus : `${langDetails.tag} ready`}</span>
               </div>
               {stage === "idle" ? (
                 <div className="c-run-actions">
                   {needsStdinConfirm && (
-                    <button type="button" className="c-small-action c-run-eof-button" onClick={() => void runProgram(true)}>
+                    <button type="button" className="c-small-action c-run-eof-button" onClick={() => void runProgram(true)} disabled={nativeRunUnavailable}>
                       Run with empty input (EOF)
                     </button>
                   )}
                   <button
                     type="button"
-                    className="c-run-button"
+                    className={`c-run-button${nativeRunUnavailable ? " c-run-upgrading" : ""}`}
                     onClick={() => void runProgram(false)}
-                    disabled={(activeLanguage === "c" || activeLanguage === "cpp") && compilerState === "initializing"}
+                    disabled={nativeRunUnavailable}
+                    title={nativeRunUnavailable ? (activeLanguage === "cpp" ? CPP_RUN_UNAVAILABLE_MESSAGE : C_RUN_UNAVAILABLE_MESSAGE) : undefined}
                   >
                     <Play size={14} />
-                    {activeLanguage === "sql" ? "Execute SQL" : activeLanguage === "cpp" ? "Run C++" : expectsInput && stdin.trim() ? "Run with input" : "Run code"}
+                    {nativeRunUnavailable ? "Unavailable" : activeLanguage === "sql" ? "Execute SQL" : activeLanguage === "cpp" ? "Run C++" : expectsInput && stdin.trim() ? "Run with input" : "Run code"}
                   </button>
                 </div>
               ) : (
@@ -1909,26 +1458,12 @@ export function CPlayground({
                 </button>
               )}
             </div>
-            {(activeLanguage === "c" || activeLanguage === "cpp") && compilerState === "initializing" && (
-              <div className="c-compiler-progress" role="status">
-                <LoaderCircle size={14} className="c-loading-icon" />
-                <span>{downloadProgress || `Checking the browser cache and preparing ${activeLanguage === "cpp" ? "C++17" : "C11"}…`}</span>
-              </div>
-            )}
-            {(activeLanguage === "c" || activeLanguage === "cpp") && compilerState === "failed" && (
-              <div className="c-compiler-failure" role="alert">
-                <span>{error || "Compiler initialization failed."}</span>
-                <button type="button" className="secondary-button" onClick={() => void ensureCompiler().catch(() => undefined)}>
-                  Retry compiler setup
-                </button>
-              </div>
-            )}
-            {!isNativeCompiler && <label className="c-stdin-label" htmlFor="c-playground-stdin">
+            {activeLanguage !== "cpp" && <label className="c-stdin-label" htmlFor="c-playground-stdin">
               {activeLanguage === "sql" ? "Schema Setup & Input (Optional)" : "Standard input (stdin)"} <span>preloaded before run</span>
               {expectsInput && <span className="c-stdin-hint">Input expected</span>}
             </label>}
-            {!isNativeCompiler && showStdinGuidance && <p className="c-stdin-description" id="c-playground-stdin-description">{stdinDescription}</p>}
-            {!isNativeCompiler && <textarea
+            {activeLanguage !== "cpp" && showStdinGuidance && <p className="c-stdin-description" id="c-playground-stdin-description">{stdinDescription}</p>}
+            {activeLanguage !== "cpp" && <textarea
               id="c-playground-stdin"
               className={`c-stdin-editor${needsStdinConfirm ? " needs-input" : ""}`}
               value={stdin}
@@ -1965,8 +1500,8 @@ export function CPlayground({
             </div>
             <div className="c-console-output" aria-live="polite" aria-label="Program output">
               <div className="c-output-stream">
-                <span>{isStandaloneIde && isNativeCompiler ? "session" : "stdout"}</span>
-                <pre>{isStandaloneIde && isNativeCompiler ? terminalTranscript || (stage === "idle" ? "Run the program to open an interactive terminal." : "Waiting for program output…") : stdout || (stage === "idle" ? "Run the example to see its output here." : "Waiting for program output…")}</pre>
+                <span>{isStandaloneIde && nativeRunUnavailable ? "session" : "stdout"}</span>
+                <pre>{isStandaloneIde && nativeRunUnavailable ? (activeLanguage === "cpp" ? CPP_RUN_UNAVAILABLE_MESSAGE : C_RUN_UNAVAILABLE_MESSAGE) : stdout || (stage === "idle" ? "Run the example to see its output here." : "Waiting for program output…")}</pre>
               </div>
               {stderr && (
                 <div className="c-output-stream stderr">
@@ -1975,28 +1510,18 @@ export function CPlayground({
                 </div>
               )}
             </div>
-            {isNativeCompiler && <form className="terminal-input-row" onSubmit={(event) => { event.preventDefault(); void submitTerminalLine(); }}>
-              <span aria-hidden="true">›</span>
-              <input
-                ref={terminalInputRef}
-                value={terminalLine}
-                onChange={(event) => setTerminalLine(event.target.value)}
-                disabled={stage !== "running" || terminalInputClosed}
-                aria-label="Terminal standard input"
-                placeholder={stage !== "running" ? "Input is available while a program is running" : terminalInputClosed ? "Standard input is closed" : "Type program input and press Enter…"}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <button type="submit" disabled={stage !== "running"}>Send</button>
-              <button type="button" onClick={() => void closeTerminalInput()} disabled={stage !== "running" || terminalInputClosed} title="Close standard input (EOF)">EOF</button>
-            </form>}
+            {activeLanguage === "c" && C_RUN_ENABLED && (
+              <p className="c-stdin-description c-vfs-notice">
+                Note: File operations (fopen) use a temporary in-memory virtual filesystem for this session; files are not saved to your device.
+              </p>
+            )}
             {diagnostics && (
               <details className="c-compiler-diagnostics" open={outcome === "compile-error"}>
                 <summary>{outcome === "compile-error" ? "Compiler errors" : "Compiler messages"}</summary>
                 <pre>{diagnostics}</pre>
               </details>
             )}
-            {error && (activeLanguage !== "c" || compilerState !== "failed") && (
+            {error && (
               <div className="c-playground-error" role="alert">
                 {error}
               </div>
@@ -2007,6 +1532,7 @@ export function CPlayground({
       <p className="c-playground-footnote">
         {langDetails.engine}
       </p>
+
         </>
       )}
     </section>

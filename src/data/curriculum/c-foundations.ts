@@ -1016,7 +1016,7 @@ export const cProgrammingPath: LearningCourseDetail = {
   description: "Build a working foundation in C: compile a first program, handle input and data, control execution, and combine functions, collections, memory, records, and files in practical code.",
   level: "Beginner",
   version: "1.0.0",
-  prerequisites: ["No prior C experience is required.", "The browser C Playground runs C11 programs locally in a WebAssembly sandbox."],
+  prerequisites: ["No prior C experience is required.", "C lesson examples remain editable in the browser; C/C++ execution is currently unavailable."],
   objectives,
   learningOutcomes: [
     "Compile, run, and explain a small C11 program.",

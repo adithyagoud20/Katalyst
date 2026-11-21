@@ -326,15 +326,13 @@ export function ImageLabVisualizer({ initialFilter = "none" }: ImageLabVisualize
               ref={canvasRef}
               onMouseMove={handleMouseMove}
               onMouseLeave={() => setInspectedPixel(null)}
-              className="rounded max-w-full cursor-crosshair"
-              style={{ imageRendering: "pixelated" }}
+              className="image-lab-canvas rounded max-w-full cursor-crosshair"
             />
             {inspectedPixel && (
               <div className="absolute top-3 left-3 bg-black/80 backdrop-blur border border-white/20 text-white text-xs px-2 py-1 rounded shadow pointer-events-none flex items-center gap-2 font-mono">
-                <span
-                  className="w-3 h-3 rounded-full border border-white/40"
-                  style={{ backgroundColor: `rgb(${inspectedPixel.r}, ${inspectedPixel.g}, ${inspectedPixel.b})` }}
-                />
+                <svg className="image-lab-pixel-swatch" viewBox="0 0 12 12" aria-hidden="true">
+                  <circle cx="6" cy="6" r="5" fill={`rgb(${inspectedPixel.r}, ${inspectedPixel.g}, ${inspectedPixel.b})`} stroke="rgba(255,255,255,.4)" />
+                </svg>
                 <span>({inspectedPixel.x}, {inspectedPixel.y})</span>
                 <span>RGB({inspectedPixel.r}, {inspectedPixel.g}, {inspectedPixel.b})</span>
               </div>

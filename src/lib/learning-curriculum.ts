@@ -62,6 +62,7 @@ export type LearningExercise = {
   solution: string;
   objectiveId: string;
   difficulty: LearningDifficulty;
+  language?: ExecutionLanguage;
   starterCode?: string;
   expectedOutcome: string;
   testCases?: ExerciseTestCase[];
@@ -74,6 +75,7 @@ export type LearningExerciseSummary = {
   expectedOutcome: string;
   prompt?: string;
   objectiveId: string;
+  language?: ExecutionLanguage;
   starterCode?: string;
   hint?: string;
   hints?: string[];
@@ -281,6 +283,7 @@ const exerciseSchema: z.ZodType<LearningExercise> = z.object({
   solution: z.string().trim().min(1).max(4_000),
   objectiveId: idSchema,
   difficulty: difficultySchema,
+  language: executionLanguageSchema.optional(),
   starterCode: z.string().max(12_000).optional(),
   expectedOutcome: z.string().trim().min(1).max(1_000),
   testCases: z.array(exerciseTestCaseSchema).max(20).optional(),
@@ -427,6 +430,9 @@ export function resolveLessonExecution(
   if (course.subjectId === "python-programming") {
     return { language: "python", target: "browser-wasm" };
   }
+  if (lesson.exercise.language) {
+    return { language: lesson.exercise.language, target: "browser-wasm" };
+  }
   return null;
 }
 
@@ -487,6 +493,7 @@ export function toLessonSummary(lesson: LearningLessonDetail): LearningLessonSum
       expectedOutcome: lesson.exercise.expectedOutcome,
       prompt: lesson.exercise.prompt,
       objectiveId: lesson.exercise.objectiveId,
+      ...(lesson.exercise.language ? { language: lesson.exercise.language } : {}),
       ...(lesson.exercise.starterCode ? { starterCode: lesson.exercise.starterCode } : {}),
     },
     ...(lesson.interactiveDemo

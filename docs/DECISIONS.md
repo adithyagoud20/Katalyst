@@ -1,5 +1,11 @@
 # Decisions
 
+## C and C++ runtime retirement — 2026-11-21
+
+**Decision:** Retire the Wasmer/Clang C and C++ runtime. Keep C/C++ lesson examples, CodeMirror editors, local draft schemas/storage keys, disabled Run controls, and the fail-closed `NEXT_PUBLIC_C_RUN_ENABLED` flag. Remove the runner route, package, generated assets, helper code, runtime CSP exceptions, and runtime-only tests. The retired route returns 404 and no app route permits `'unsafe-eval'`.
+
+**Reason:** Production C compilation timed out at 300 seconds; C++ timed out at 300.27 seconds on a cold run and remained stuck for 372.2 seconds warm. The c2wasm investigation covered only 30% of curriculum examples, lacked core C features and useful diagnostics, and had unclear licensing. TraceCC was not adopted due to AGPL-3.0-only licensing, an approximately 85 MB payload, pre-release API, and separate sandbox needs. The pre-retirement source state is archived under git tag `c-runtime-archive` at commit `509c0a9`. Hosted compiler APIs remain a design-only option pending a separate implementation decision.
+
 ## Local-first storage for M1
 
 **Context:** A useful first workspace should start without a database, account, or paid hosting service.

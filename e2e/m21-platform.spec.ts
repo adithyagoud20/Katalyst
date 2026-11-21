@@ -1,32 +1,6 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Milestone M21 Architecture & Platform Expansion E2E Suite", () => {
-  test.beforeEach(async ({ page }) => {
-    // Fast mock for Wasmer SDK browser package
-    await page.route("**/vendor/wasmer-sdk/dist/index.js", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "text/javascript",
-        body: `export class Wasmer {
-          constructor() {
-            this.packages = { load: async () => ({ entrypoint: "clang" }) };
-            this.sandboxes = { create: async () => ({
-              command: () => ({ spawn: async () => ({
-                stdin: { write: async () => {}, close: async () => {} },
-                wait: async () => ({ reason: "exited", exitCode: 0, stdout: { text: () => "mock C output" }, stderr: { text: () => "" } }),
-                kill: async () => {},
-              }) }),
-              fs: { readFile: async () => new Uint8Array([1]) },
-              installPackage: async () => {},
-              close: async () => {},
-            }) };
-          }
-          async close() {}
-        }`,
-      });
-    });
-  });
-
   // Test 1: 9-Course Catalog & Category Filtering Pills
   test("filters 9-course catalog via category pills in Explore view", async ({ page }) => {
     await page.goto("/#katalyst=paths");

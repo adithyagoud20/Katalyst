@@ -9,32 +9,6 @@ async function ensureCourseDetails(page: import("@playwright/test").Page) {
 }
 
 test.describe("Milestone M19 Features & Architecture E2E Suite", () => {
-  test.beforeEach(async ({ page }) => {
-    // Fast mock for Wasmer SDK browser package
-    await page.route("**/vendor/wasmer-sdk/dist/index.js", async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: "text/javascript",
-        body: `export class Wasmer {
-          constructor() {
-            this.packages = { load: async () => ({ entrypoint: "clang" }) };
-            this.sandboxes = { create: async () => ({
-              command: () => ({ spawn: async () => ({
-                stdin: { write: async () => {}, close: async () => {} },
-                wait: async () => ({ reason: "exited", exitCode: 0, stdout: { text: () => "mock C output" }, stderr: { text: () => "" } }),
-                kill: async () => {},
-              }) }),
-              fs: { readFile: async () => new Uint8Array([1]) },
-              installPackage: async () => {},
-              close: async () => {},
-            }) };
-          }
-          async close() {}
-        }`,
-      });
-    });
-  });
-
   // Feature 1: 4-Course Catalog Discovery & Navigation
   test("discovers all 4 courses in the catalog and navigates into JavaScript course", async ({ page }) => {
     await page.goto("/#katalyst=paths");

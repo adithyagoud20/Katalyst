@@ -10,7 +10,7 @@ The video is loaded directly by the visitor's browser from the administrator-sup
 
 ## Browser security headers
 
-`src/proxy.ts` attaches a per-request nonce Content Security Policy to application responses and passes the nonce through request headers for the Next.js root layout. The policy restricts scripts to same-origin/nonce and approved WebAssembly use, blocks objects and framing, and limits network connections to the configured app dependencies plus the Wasmer registry origin required for first-use browser compiler downloads. Inline styles remain allowed for current UI components. Cross-origin isolation headers are configured separately in `next.config.ts` for browser-side compiler runtimes. This defense-in-depth policy does not replace output escaping, dependency maintenance, or review of external media and WASM packages. The CSP and production browser behavior still need verification on the final host.
+`src/proxy.ts` attaches a per-request nonce Content Security Policy to app and public responses and passes the nonce through request headers for the shared Next.js layout. Script policies use the nonce and `strict-dynamic`; no route allows the `'unsafe-eval'` or script `'unsafe-inline'` directives. The existing `wasm-unsafe-eval` allowance is scoped to browser lab screens that use WebAssembly. All routes retain `X-Frame-Options: DENY` and `frame-ancestors 'none'`. `next.config.ts` sets COOP/COEP for the browser features that require cross-origin isolation. The retired C runner route `/lab-runner/c` returns 404 and has no special CSP or framing exception.
 
 ## Credential handling
 
@@ -72,20 +72,20 @@ OpenAI requests set `store: false`. Gemini and OpenRouter requests use their off
 
 ## Code execution sandboxing and security boundary (M17.3)
 
-KATALYST provides interactive programming and simulation environments through a provider-neutral execution subsystem (`src/lib/execution/`). Code execution adheres to strict isolation boundaries:
+KATALYST provides local browser workbenches and interactive simulators. Python runs in Pyodide WebAssembly, JavaScript runs in a Web Worker, SQL uses in-memory SQLite WebAssembly, and HTML/CSS renders in a sandboxed iframe. Arduino/ESP32 and circuit lessons use browser-side simulators.
 
-1. **Client-Side WebAssembly Isolation (Wasmer & Pyodide)**:
-   - C/C++ compilation and execution run entirely inside the client's browser using `@wasmer/sdk/browser` (Clang/LLVM WebAssembly binary).
-   - Python 3.12 execution runs inside the client's browser via Pyodide WebAssembly micro-runtime.
-   - **Zero Data Leakage**: Learner source code, inputs, and execution outputs never leave the browser sandbox or touch KATALYST backend servers.
-   - **Process Boundary**: Execution is strictly bounded by browser tab memory limits and the WebAssembly sandbox. It cannot access the learner's local filesystem or host operating system.
-   - **Network Isolation**: Client-side WebAssembly runtimes cannot open raw TCP/UDP sockets or perform cross-origin network operations.
+In-browser C compilation and execution is provided via a client-side WebAssembly toolchain (`binji/wasm-clang` + `wasm-ld` + in-memory MemFS with a custom WASI preview-1 runner), gated behind `NEXT_PUBLIC_C_RUN_ENABLED` (default `false` until operator rollout). C++ remains disabled pending complete lesson matrix verification.
 
-2. **Server-Side Sandbox Boundary (Remote MicroVMs)**:
-   - When remote runners (such as Judge0 CE or Piston) are configured for heavy environments like OpenJDK Java, the Next.js server acts as a strictly validating proxy.
-   - Remote credentials (`JUDGE0_API_KEY`, `PISTON_API_URL`) remain server-side and are never exposed to browser bundles.
-   - Ephemeral container sandboxes enforce Linux cgroups, unprivileged execution users (`nobody`), read-only root filesystems, and strict timeouts (default 10 seconds, 128MB RAM limit).
-   - Code sent to Kat AI tutor remains untrusted context; Kat does not execute code, and tutor responses are never executed automatically.
+Key security controls for in-browser C execution:
+1. **Zero External Inference/Execution APIs**: Compilation and execution execute 100% inside the learner's browser. No learner source code, standard input, or runtime output is sent to any server or external API.
+2. **Zero Eval / Script Nonce Hardening**: No code path uses `eval()` or `new Function()`. The strict per-request nonce CSP remains intact without script `'unsafe-eval'` or `'unsafe-inline'`. WebAssembly compilation uses `'wasm-unsafe-eval'` exclusively on lesson and playground routes.
+3. **Dual-Worker Isolation**: Compilation runs in `compiler-worker.js` and user code executes in a separate ephemeral `execution-worker.js`. If a user program crashes or traps, the compiler worker and app thread remain unharmed.
+4. **Memory and Resource Limits**: Linker flags cap user WebAssembly linear memory at 32 MB (`--max-memory=33554432`) with a 1 MB stack. Out-of-bounds access or excessive heap allocations trap safely without crashing the tab. Output is capped at 64 KB and execution has a strict 10-second wall-clock timeout.
+5. **Virtual In-Memory Filesystem**: The WASI shim provides a sandboxed in-memory file table (`files` Map). File I/O (`fopen`, `fprintf`, `fclose`) operates entirely in ephemeral memory with zero access to the host disk or network.
+6. **User Abort Control**: A Stop button immediately terminates the active execution worker without restarting the compiler worker.
+7. **Prebuild Integrity Verification**: Toolchain binaries are not stored in Git. `scripts/download-c-toolchain.mjs` verifies SHA-256 checksums at prebuild time; any mismatch aborts the build.
+
+Execution for all local browser workbenches does not upload source to the KATALYST server. When a learner explicitly asks Kat to explain code, the bounded source and relevant lesson context may be sent to the selected AI provider as untrusted reference data. Imported skills do not run code.
 
 ## Assistant response rendering
 
@@ -129,16 +129,16 @@ Learning progress is stored separately in browser localStorage under `katalyst.l
 
 Kat sends a learner's message and, when launched from a lesson, lesson text/objectives/exercise to the selected provider using the established `/api/chat` protections. In the integrated lesson, an explicit code-help action may also send the current editor source (at most 7,000 characters), recent diagnostics (2,000 characters), and program output (2,000 characters). Editing, compiling, and running code alone does not send it. Lesson, source, diagnostics, and output are user-level untrusted context, not trusted system rules; the provider may process them under its own terms. Tutor conversations stay in page memory but still leave the browser when the learner sends a cloud provider request. No answer changes progress automatically. The four tutor modes are prompts, not behavioral guarantees. Do not include secrets in a question or imported lesson material.
 
-## C playground execution
+## C and C++ editor status
 
-The C playground compiles learner source in the browser with the pinned Wasmer JavaScript SDK and Clang registry package. The app fetches the compiler package on first use (110,713,421 bytes, about 106 MiB) and caches it in the browser profile; this is a third-party package download, not an app upload. Compiled C is run in a Wasmer WebAssembly sandbox with sandbox networking disabled. Editing, compiling, and running stay in the browser. If the learner explicitly asks Kat to explain or review code, the current bounded source, recent diagnostics, and output are sent to the selected provider as untrusted reference context. KATALYST does not execute imported skill files or native host executables. Cross-origin-isolation headers (`COOP: same-origin`, `COEP: require-corp`) are set on all routes because the SDK requires `SharedArrayBuffer`; external embedded resources may be blocked by that policy.
+C and C++ lessons, CodeMirror editors, and local versioned drafts under `katalyst.c.playground.v1` and `katalyst.cpp.playground.v1` remain available. Both Run buttons are disabled and show the friendly upgrade message. The `NEXT_PUBLIC_C_RUN_ENABLED` flag remains fail-closed, but setting it cannot restore execution because the runtime implementation and `/lab-runner/c` route have been removed. The decision followed repeated production compile timeouts; the c2wasm spike was also rejected for low curriculum coverage, unsupported core C features, unclear licensing, and missing diagnostics. The previous source state is recoverable from git tag `c-runtime-archive` at commit `509c0a9`.
 
-The UI limits source to 12,000 characters, stdin to 2,000 characters, captured output to 64,000 bytes, compilation to 15 seconds, and each guest run to 8 seconds. Users can stop an active run. These controls bound expected resource use but are not a security guarantee against vulnerabilities in the browser, WebAssembly runtime, compiler package, or generated program. The playground is a learning environment and should not be treated as a hardened multi-tenant service. Draft source and stdin are stored locally under `katalyst.c.playground.v1`; they are not included in workspace backups. The initial compiler download requires internet access and deployment infrastructure must preserve both isolation headers.
+Only when a learner explicitly asks Kat for code help can bounded editor source and lesson context be sent to the selected provider. Editing or reading C/C++ code alone makes no network request. No execution provider or C/C++ compile API currently receives the drafts.
 
 ### Compiler Sandboxing and Remote Execution Boundaries (M16)
 
 KATALYST establishes strict security boundaries for multi-language and simulation execution:
-1. **Client-Side First**: C11, C++, Python, JavaScript, and HTML/CSS run locally in browser WebAssembly sandboxes (`@wasmer/sdk`, Pyodide) or sandboxed iframes. No user code is executed on the Next.js server.
+1. **Client-Side First**: Python, JavaScript, SQL, and HTML/CSS use browser WebAssembly, Web Workers, or sandboxed iframes. C/C++ execution is retired; their editor drafts are local and no user code is executed on the Next.js server.
 2. **Cloudflare Workers AI Boundary**: Cloudflare Workers AI is used strictly for AI inference, not for arbitrary general-purpose compiler execution. Workers AI has no POSIX runtime or isolated Linux execution environments.
 3. **Remote Sandbox Requirements**: When remote runners (e.g., Piston or Judge0 microVMs) are integrated for heavy runtimes like Java OpenJDK:
    - Remote runners must operate in dedicated, isolated container/microVM environments.

@@ -641,7 +641,7 @@ CREATE POLICY "allow_owner_all" ...`,
    - Ensure \`.env.local\` is in \`.gitignore\`.
    - Ensure zero production credentials exist in client bundles or public repositories.
 2. **Security Headers (COOP / COEP)**:
-   - For multi-threaded WebAssembly (like Wasmer C11 or Pyodide with SharedArrayBuffer), configure:
+   - For multi-threaded WebAssembly (like Pyodide with SharedArrayBuffer), configure:
      - \`Cross-Origin-Opener-Policy: same-origin\`
      - \`Cross-Origin-Embedder-Policy: require-corp\`
 3. **Health Check Endpoint**:

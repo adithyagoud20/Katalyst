@@ -678,7 +678,8 @@ export function CircuitSimulator({
                       fill={pinD13 ? "#ef4444" : "#451a1a"}
                       stroke={pinD13 ? "#fca5a5" : "#7f1d1d"}
                       strokeWidth="2"
-                      style={pinD13 ? { filter: "drop-shadow(0px 0px 8px #ef4444)", opacity: (outputDuty(outputPinLabels[0]) ?? 255) / 255 } : undefined}
+                      filter={pinD13 ? "drop-shadow(0px 0px 8px #ef4444)" : undefined}
+                      opacity={pinD13 ? (outputDuty(outputPinLabels[0]) ?? 255) / 255 : undefined}
                     />
                     <text x="275" y="108" fill="#f8fafc" fontSize="9" textAnchor="middle" fontWeight="bold">{outputPinLabels[0]} RED</text>
 
@@ -694,7 +695,8 @@ export function CircuitSimulator({
                       fill={pinD12 ? "#10b981" : "#064e3b"}
                       stroke={pinD12 ? "#6ee7b7" : "#065f46"}
                       strokeWidth="2"
-                      style={pinD12 ? { filter: "drop-shadow(0px 0px 8px #10b981)", opacity: (outputDuty(outputPinLabels[1]) ?? 255) / 255 } : undefined}
+                      filter={pinD12 ? "drop-shadow(0px 0px 8px #10b981)" : undefined}
+                      opacity={pinD12 ? (outputDuty(outputPinLabels[1]) ?? 255) / 255 : undefined}
                     />
                     <text x="385" y="120" fill="#f8fafc" fontSize="9" textAnchor="middle" fontWeight="bold">{outputPinLabels[1]} GREEN</text>
 
@@ -710,7 +712,8 @@ export function CircuitSimulator({
                       fill={pinD11 ? "#3b82f6" : "#1e3a8a"}
                       stroke={pinD11 ? "#93c5fd" : "#1e40af"}
                       strokeWidth="2"
-                      style={pinD11 ? { filter: "drop-shadow(0px 0px 8px #3b82f6)", opacity: (outputDuty(outputPinLabels[2]) ?? 255) / 255 } : undefined}
+                      filter={pinD11 ? "drop-shadow(0px 0px 8px #3b82f6)" : undefined}
+                      opacity={pinD11 ? (outputDuty(outputPinLabels[2]) ?? 255) / 255 : undefined}
                     />
                     <text x="495" y="154" fill="#f8fafc" fontSize="9" textAnchor="middle" fontWeight="bold">{outputPinLabels[2]} BLUE</text>
 

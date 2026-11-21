@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown, ArrowUp, BookOpen, Bot, Check, ChartNoAxesColumnIncreasing, Command, Compass, Copy, Cpu, Download, ExternalLink, FileDown, FileUp,
@@ -14,8 +15,9 @@ import { AdminPanel } from "@/components/admin-panel";
 import { SiteContentNotices } from "@/components/site-content-notices";
 import type { CreditStatus } from "@/lib/ai-gateway/types";
 import { LearningExperience } from "@/components/learning-experience";
-import { publishedLearningCourses, type LearningSection } from "@/lib/learning-curriculum";
-import { makeApplicationHash, readApplicationHash, type ApplicationView } from "@/lib/learning-navigation";
+import { publishedLearningCourses } from "@/data/curriculum/learning-index";
+import type { LearningSection } from "@/lib/learning-model";
+import { applicationViewFromPathname, findCourseSlugForLesson, makeApplicationPath, type ApplicationView } from "@/lib/learning-navigation";
 import { composeWorkspaceContext, exportSkillMarkdown, MAX_SKILL_CONTEXT_CHARS, parseSkillMarkdown, skillCompatibilityLabels, starterSkills, type WorkspaceSkill } from "@/lib/skills";
 import { getDefaultModel, providerCatalog, providerIds, type ModelDiscoveryDiagnostic, type ModelMetadata, type ProviderId } from "@/lib/providers/catalog";
 import { DEFAULT_OLLAMA_BASE_URL, MAX_OLLAMA_URL_LENGTH } from "@/lib/providers/constants";
@@ -171,9 +173,8 @@ function emptyModelState(provider: ProviderId): ModelCatalogState {
   return { models: [...providerCatalog[provider].models], loading: false, error: "" };
 }
 
-function playgroundSelectionFromHash(hash: string): PlaygroundRuntimeSelection | null {
-  const params = new URLSearchParams(hash.replace(/^#/, ""));
-  if (params.get("katalyst") !== "playground") return null;
+function playgroundSelectionFromSearch(search: string): PlaygroundRuntimeSelection | null {
+  const params = new URLSearchParams(search);
   const lang = params.get("lang")?.toLowerCase();
   const circuitModes: Record<string, PlaygroundRuntimeSelection["circuitMode"]> = {
     arduino: "arduino", esp32: "esp32", breadboard: "breadboard", digital: "digital",
@@ -186,11 +187,19 @@ function playgroundSelectionFromHash(hash: string): PlaygroundRuntimeSelection |
   return language ? { language, mode: "code", circuitMode: "digital", launcherOpen: false } : null;
 }
 
+function playgroundRouteLanguage(selection: PlaygroundRuntimeSelection | null): string | undefined {
+  if (!selection) return undefined;
+  if (selection.language === "circuit") return selection.circuitMode;
+  return selection.language === "javascript" ? "js" : selection.language;
+}
+
 function createInitialModelCatalogs(): Record<ProviderId, ModelCatalogState> {
   return Object.fromEntries(providerIds.map((provider) => [provider, emptyModelState(provider)])) as Record<ProviderId, ModelCatalogState>;
 }
 
-export function Workspace() {
+export function Workspace({ initialView, initialLessonId }: { initialView?: AppView; initialLessonId?: string } = {}) {
+  const pathname = usePathname();
+  const router = useRouter();
   const [data, setData] = useState<WorkspaceData>(createDefaultWorkspace);
   const [ready, setReady] = useState(false);
   const [storageRecovery, setStorageRecovery] = useState<StorageReadResult | { kind: "unavailable"; issue: string } | null>(null);
@@ -206,14 +215,21 @@ export function Workspace() {
   const [modelSearch, setModelSearch] = useState("");
   const [pricingFilter, setPricingFilter] = useState<PricingFilter>("all");
   const [activeProjectId, setActiveProjectId] = useState("");
-  const [view, setViewState] = useState<AppView>("home");
+  const [view, setViewState] = useState<AppView>(() => initialView ?? applicationViewFromPathname(pathname) ?? "home");
   const [settingsCategory, setSettingsCategory] = useState<SettingsCategory>("appearance");
   const [activityFilter, setActivityFilter] = useState<ProviderId | "all">("all");
   const [aiSystem, setAiSystem] = useState<{ sharedAiEnabled: boolean; killSwitchActive: boolean } | null>(null);
   const [katModelId, setKatModelId] = useState("");
   const [katProviderId, setKatProviderId] = useState<"cloudflare" | "gemini" | "">("");
   const [inferenceState, setInferenceState] = useState<InferenceState>({});
-  const [routeLessonId, setRouteLessonId] = useState("");
+  const [routeLessonId, setRouteLessonId] = useState(() => {
+    if (initialLessonId) return initialLessonId;
+    if (typeof window !== "undefined") {
+      const match = window.location.pathname.match(/^\/courses\/[^/]+\/([^/]+)$/);
+      if (match) return match[1];
+    }
+    return "";
+  });
   const [skillTab, setSkillTab] = useState<"installed" | "available">("installed");
   const [skillSearch, setSkillSearch] = useState("");
   const [backupMode, setBackupMode] = useState<ImportMode>("merge");
@@ -294,11 +310,28 @@ export function Workspace() {
   }>(null);
 
   const setView = useCallback((nextView: AppView, lessonId?: string) => {
+    const contextLessonId = lessonId ?? ((nextView === "playground" || nextView === "tutor") ? routeLessonId || undefined : undefined);
+    const courseSlug = nextView === "lesson" ? findCourseSlugForLesson(publishedLearningCourses, contextLessonId) : undefined;
+    const nextPath = makeApplicationPath(nextView, {
+      lessonId: contextLessonId,
+      courseSlug,
+      lang: nextView === "playground" ? playgroundRouteLanguage(playgroundSelection) : undefined,
+    });
     setViewState(nextView);
-    setRouteLessonId(lessonId ?? "");
-    const nextHash = makeApplicationHash(nextView, lessonId);
-    if (window.location.hash !== nextHash) window.history.pushState({ katalyst: true }, "", nextHash);
-  }, []);
+    setRouteLessonId(contextLessonId ?? "");
+    if (`${window.location.pathname}${window.location.search}` !== nextPath) router.push(nextPath, { scroll: false });
+  }, [playgroundSelection, routeLessonId, router]);
+
+  const updatePlaygroundSelection = useCallback((selection: PlaygroundRuntimeSelection) => {
+    setPlaygroundSelection(selection);
+    const nextPath = makeApplicationPath("playground", {
+      lessonId: routeLessonId || undefined,
+      lang: playgroundRouteLanguage(selection),
+    });
+    if (window.location.pathname === "/playground" && `${window.location.pathname}${window.location.search}` !== nextPath) {
+      router.replace(nextPath, { scroll: false });
+    }
+  }, [routeLessonId, router]);
 
   const openSettings = (category?: SettingsCategory | "providers" | "models" | "usage-credits") => {
     if (category) {
@@ -333,20 +366,27 @@ export function Workspace() {
   }, [refreshAiSession, accountUser]);
 
   useEffect(() => {
-    const restoreLocation = () => {
-      const location = readApplicationHash(window.location.hash);
-      if (!location) return;
-      setViewState(location.view);
-      setRouteLessonId(location.lessonId ?? "");
-      const directPlaygroundSelection = playgroundSelectionFromHash(window.location.hash);
-      if (directPlaygroundSelection) setPlaygroundSelection(directPlaygroundSelection);
-      else if (location.view === "playground") setPlaygroundSelection(null);
+    const restoreRoute = () => {
+      const nextView = applicationViewFromPathname(window.location.pathname);
+      if (!nextView) return;
+      setViewState(nextView);
+      const search = new URLSearchParams(window.location.search);
+      let nextLessonId = search.get("lesson") ?? "";
+      if (nextView === "lesson" && !nextLessonId) {
+        const match = window.location.pathname.match(/^\/courses\/[^/]+\/([^/]+)$/);
+        if (match) nextLessonId = match[1];
+      }
+      setRouteLessonId(nextLessonId);
+      const directPlaygroundSelection = nextView === "playground"
+        ? playgroundSelectionFromSearch(window.location.search)
+        : null;
+      setPlaygroundSelection(directPlaygroundSelection);
       setMobileNav(false);
     };
-    restoreLocation();
-    window.addEventListener("popstate", restoreLocation);
-    return () => window.removeEventListener("popstate", restoreLocation);
-  }, []);
+    restoreRoute();
+    window.addEventListener("popstate", restoreRoute);
+    return () => window.removeEventListener("popstate", restoreRoute);
+  }, [pathname]);
 
   const loadModels = useCallback(async (provider: ProviderId, refresh = false, sessionKey = "", ollamaBaseUrl = "", cloudflareAccountId = "") => {
     setModelCatalogs((current) => ({ ...current, [provider]: { ...current[provider], loading: true, error: "" } }));
@@ -1854,20 +1894,20 @@ export function Workspace() {
           <button className="icon-button collapse-nav" aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!sidebarCollapsed} aria-controls="sidebar-nav" onClick={() => setSidebarCollapsed((current) => !current)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
         </div>
         <nav className="primary-nav learning-nav" aria-label="Main navigation">
-          <button className={`nav-item ${view === "home" ? "selected" : ""}`} aria-label="Learning Home" title="Learning Home" aria-current={view === "home" ? "page" : undefined} onClick={() => { setView("home"); setMobileNav(false); }}><House size={17} /> Learning Home</button>
-          <button className={`nav-item ${view === "paths" ? "selected" : ""}`} aria-label="Explore Learning Paths" title="Explore Learning Paths" aria-current={view === "paths" ? "page" : undefined} onClick={() => { setView("paths"); setMobileNav(false); }}><Compass size={17} /> Explore Learning Paths</button>
-          <button className={`nav-item ${view === "my-learning" ? "selected" : ""}`} aria-label="My Learning" title="My Learning" aria-current={view === "my-learning" ? "page" : undefined} onClick={() => { setView("my-learning"); setMobileNav(false); }}><GraduationCap size={17} /> My Learning</button>
-          <button className={`nav-item ${view === "playground" ? "selected" : ""}`} aria-label="Playground" title="Playground" aria-current={view === "playground" ? "page" : undefined} onClick={() => { setView("playground", routeLessonId); setMobileNav(false); }}><Terminal size={17} /> Playground</button>
-          <button className={`nav-item ${view === "practice" ? "selected" : ""}`} aria-label="Practice Lab" title="Practice Lab" aria-current={view === "practice" ? "page" : undefined} onClick={() => { setView("practice"); setMobileNav(false); }}><FlaskConical size={17} /> Practice Lab</button>
-          <button className={`nav-item ${view === "progress" ? "selected" : ""}`} aria-label="Progress" title="Progress" aria-current={view === "progress" ? "page" : undefined} onClick={() => { setView("progress"); setMobileNav(false); }}><ChartNoAxesColumnIncreasing size={17} /> Progress</button>
-          <button className={`nav-item ${view === "tutor" ? "selected" : ""}`} aria-label="AI Tutor" title="AI Tutor" aria-current={view === "tutor" ? "page" : undefined} onClick={() => { setView("tutor"); setMobileNav(false); }}><Bot size={17} /> AI Tutor <span className="nav-kat">KAT</span></button>
-          <button className={`nav-item ${view === "settings" ? "selected" : ""}`} aria-label="Settings" title="Settings" aria-current={view === "settings" ? "page" : undefined} onClick={() => { openSettings(); setMobileNav(false); }}><Settings2 size={17} /> Settings</button>
+          <Link href="/" className={`nav-item ${view === "home" ? "selected" : ""}`} aria-label="Learning Home" title="Learning Home" aria-current={view === "home" ? "page" : undefined} onClick={() => setMobileNav(false)}><House size={17} /> Learning Home</Link>
+          <Link href="/paths" className={`nav-item ${view === "paths" ? "selected" : ""}`} aria-label="Explore Learning Paths" title="Explore Learning Paths" aria-current={view === "paths" ? "page" : undefined} onClick={() => setMobileNav(false)}><Compass size={17} /> Explore Learning Paths</Link>
+          <Link href="/my-learning" className={`nav-item ${view === "my-learning" ? "selected" : ""}`} aria-label="My Learning" title="My Learning" aria-current={view === "my-learning" ? "page" : undefined} onClick={() => setMobileNav(false)}><GraduationCap size={17} /> My Learning</Link>
+          <Link href={makeApplicationPath("playground", { lessonId: routeLessonId || undefined, lang: playgroundRouteLanguage(playgroundSelection) })} className={`nav-item ${view === "playground" ? "selected" : ""}`} aria-label="Playground" title="Playground" aria-current={view === "playground" ? "page" : undefined} onClick={() => setMobileNav(false)}><Terminal size={17} /> Playground</Link>
+          <Link href="/practice" className={`nav-item ${view === "practice" ? "selected" : ""}`} aria-label="Practice Lab" title="Practice Lab" aria-current={view === "practice" ? "page" : undefined} onClick={() => setMobileNav(false)}><FlaskConical size={17} /> Practice Lab</Link>
+          <Link href="/progress" className={`nav-item ${view === "progress" ? "selected" : ""}`} aria-label="Progress" title="Progress" aria-current={view === "progress" ? "page" : undefined} onClick={() => setMobileNav(false)}><ChartNoAxesColumnIncreasing size={17} /> Progress</Link>
+          <Link href={makeApplicationPath("tutor", { lessonId: routeLessonId || undefined })} className={`nav-item ${view === "tutor" ? "selected" : ""}`} aria-label="AI Tutor" title="AI Tutor" aria-current={view === "tutor" ? "page" : undefined} onClick={() => setMobileNav(false)}><Bot size={17} /> AI Tutor <span className="nav-kat">KAT</span></Link>
+          <Link href="/settings" className={`nav-item ${view === "settings" ? "selected" : ""}`} aria-label="Settings" title="Settings" aria-current={view === "settings" ? "page" : undefined} onClick={() => setMobileNav(false)}><Settings2 size={17} /> Settings</Link>
         </nav>
         <div className="sidebar-tools">
           <div className="section-heading"><span>Workspace tools</span></div>
           <nav className="secondary-nav" aria-label="Workspace tools">
-            <button className={`nav-item ${view === "workspace" ? "selected" : ""}`} aria-label="Workspace" title="Workspace" aria-current={view === "workspace" ? "page" : undefined} onClick={() => { setView("workspace"); setMobileNav(false); }}><MessageSquare size={16} /> Workspace</button>
-            <button className={`nav-item ${view === "skills" ? "selected" : ""}`} aria-label="Skill library" title="Skill library" aria-current={view === "skills" ? "page" : undefined} onClick={() => { setView("skills"); setMobileNav(false); }}><Sparkles size={16} /> Skill library <span className="nav-count">{data.skills.length}</span></button>
+            <Link href="/workspace" className={`nav-item ${view === "workspace" ? "selected" : ""}`} aria-label="Workspace" title="Workspace" aria-current={view === "workspace" ? "page" : undefined} onClick={() => setMobileNav(false)}><MessageSquare size={16} /> Workspace</Link>
+            <Link href="/skills" className={`nav-item ${view === "skills" ? "selected" : ""}`} aria-label="Skill library" title="Skill library" aria-current={view === "skills" ? "page" : undefined} onClick={() => setMobileNav(false)}><Sparkles size={16} /> Skill library <span className="nav-count">{data.skills.length}</span></Link>
           </nav>
         </div>
         {view === "workspace" && <button className="new-chat-button" onClick={() => createChat()} aria-keyshortcuts="Control+K Meta+K"><SquarePen size={16} /> New conversation <span className="shortcut">⌘&nbsp;K</span></button>}
@@ -1890,7 +1930,7 @@ export function Workspace() {
       <main className={`main-panel${view === "playground" ? " main-panel-playground" : ""}`} id="main-content" data-view={view} tabIndex={-1}>
         <header className={`topbar${mobileHeaderCollapsed ? " topbar-collapsed" : ""}`} aria-hidden={mobileHeaderCollapsed} inert={mobileHeaderCollapsed}>
           <button className="icon-button mobile-menu" aria-label="Open navigation" aria-expanded={mobileNav} aria-controls="sidebar-nav" onClick={() => setMobileNav(true)}><Menu size={20} /></button>
-          <div className="breadcrumbs"><button className="breadcrumb-root" onClick={() => setView("home")}>KATALYST</button>{view === "workspace" && <><span className="crumb-sep">/</span><span>{activeProject?.name ?? "Workspace"}</span></>}<span className="crumb-sep">/</span><strong>{view === "workspace" ? (activeChat?.title ?? "New conversation") : view === "skills" ? "Skill library" : view === "settings" ? "Settings" : view === "home" ? "Learning Home" : view === "paths" ? "Learning Paths" : view === "my-learning" ? "My Learning" : view === "playground" ? "Playground" : view === "practice" ? "Practice Lab" : view === "progress" ? "Progress" : view === "tutor" ? "AI Tutor" : "Lesson"}</strong></div>
+          <div className="breadcrumbs"><Link className="breadcrumb-root" href="/">KATALYST</Link>{view === "workspace" && <><span className="crumb-sep">/</span><span>{activeProject?.name ?? "Workspace"}</span></>}<span className="crumb-sep">/</span><strong>{view === "workspace" ? (activeChat?.title ?? "New conversation") : view === "skills" ? "Skill library" : view === "settings" ? "Settings" : view === "home" ? "Learning Home" : view === "paths" ? "Learning Paths" : view === "my-learning" ? "My Learning" : view === "playground" ? "Playground" : view === "practice" ? "Practice Lab" : view === "progress" ? "Progress" : view === "tutor" ? "AI Tutor" : "Lesson"}</strong></div>
           <div className="topbar-actions">
             {view === "home" && <button
               type="button"
@@ -1945,7 +1985,7 @@ export function Workspace() {
         </section>}
         {storageError && <section className="storage-write-error" role="alert"><span>{storageError}</span><button className="secondary-button" onClick={() => openSettings("workspace")}>Open backup settings</button></section>}
 
-        {(["home", "paths", "my-learning", "playground", "practice", "progress", "tutor", "lesson"] as LearningSection[]).includes(view as LearningSection) && <LearningExperience section={view as LearningSection} onNavigate={setView} routeLessonId={routeLessonId} onOpenSettings={() => openSettings("ai-models")} provider={data.provider} model={learningModel} sessionKey={sessionKeys[data.provider]} cloudflareAccountId={sessionCloudflareAccountId} cloudflareMode={cloudflareMode} ollamaBaseUrl={data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL} configured={providerConfigured} workspaceSummary={workspaceDashboardSummary} skills={data.skills} courses={publishedLearningCourses} playgroundSelection={playgroundSelection} onPlaygroundSelectionChange={setPlaygroundSelection} />}
+        {(["home", "paths", "my-learning", "playground", "practice", "progress", "tutor", "lesson"] as LearningSection[]).includes(view as LearningSection) && <LearningExperience section={view as LearningSection} onNavigate={setView} routeLessonId={routeLessonId} onOpenSettings={() => openSettings("ai-models")} provider={data.provider} model={learningModel} sessionKey={sessionKeys[data.provider]} cloudflareAccountId={sessionCloudflareAccountId} cloudflareMode={cloudflareMode} ollamaBaseUrl={data.ollamaBaseUrl || DEFAULT_OLLAMA_BASE_URL} configured={providerConfigured} workspaceSummary={workspaceDashboardSummary} skills={data.skills} courses={publishedLearningCourses} playgroundSelection={playgroundSelection} onPlaygroundSelectionChange={updatePlaygroundSelection} />}
 
         {view === "skills" ? <section className="library-view">
           <div className="view-heading"><div><span className="eyebrow">TOOLS FOR YOUR WORK</span><h1>Skill library</h1><p>Add reusable instructions to the conversations where they help.</p></div><button className="primary-button" onClick={() => fileRef.current?.click()}><FileUp size={16} /> Import a skill</button></div>

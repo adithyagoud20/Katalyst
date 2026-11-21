@@ -72,6 +72,7 @@ function exercise(
     hints,
     hint: hints[0],
     difficulty,
+    language: "javascript",
     ...(starterCode ? { starterCode } : {}),
     ...(testCases ? { testCases } : {}),
   };

@@ -6,7 +6,27 @@ export default function robots(): MetadataRoute.Robots {
     return { rules: { userAgent: "*", disallow: "/" } };
   }
   return {
-    rules: { userAgent: "*", allow: "/", disallow: ["/api/", "/auth/callback", "/auth/reset-password"] },
+    rules: {
+      userAgent: "*",
+      allow: ["/", "/paths", "/courses/", "/privacy", "/terms"],
+      disallow: [
+        "/api/",
+        "/lab-runner/",
+        "/auth/",
+        "/account/",
+        "/delete-account",
+        "/login",
+        "/signin",
+        "/playground",
+        "/practice",
+        "/tutor",
+        "/workspace",
+        "/skills",
+        "/progress",
+        "/settings",
+        "/my-learning",
+      ],
+    },
     sitemap: new URL("/sitemap.xml", getSiteOrigin()).toString(),
   };
 }

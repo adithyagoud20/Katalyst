@@ -66,11 +66,7 @@ npm run build
 
 The production dependency audit excludes build/test tooling. Run `npm audit --audit-level=high` separately to inspect development dependencies as well; record any upstream advisories that do not yet have a patched release.
 
-The normal browser suite uses mocked compiler runtimes for repeatability. The optional live C compiler test downloads the pinned package on first use and needs network access:
-
-```sh
-RUN_C_PLAYGROUND_INTEGRATION=1 npm run test:e2e -- --grep 'compiles and runs a C program'
-```
+The browser suite tests the retired C/C++ runner contract and keeps C lesson editors available without enabling compilation. No C compiler download or runtime mock is required.
 
 The mobile lesson regression also scrolls the CodeMirror editor and Kat conversation through small alternating scroll deltas to catch header flicker.
 
@@ -79,7 +75,7 @@ The mobile lesson regression also scrolls the CodeMirror editor and Kat conversa
 - `npm run lint` — passed.
 - `npm run typecheck` — passed.
 - `npm test` — passed, 333 tests across 38 files.
-- `npm run test:e2e -- --workers=1` — passed, 76 tests; 1 opt-in live C/C++ compiler integration test was skipped because its download flag was not enabled.
+- `npm run test:e2e -- --workers=1` — passed before C/C++ runtime retirement; the current suite checks the disabled editors and 404 runner route, with no compiler-download integration test.
 - Targeted guest-progress export and Markdown injection checks — passed; the progress download contains the validated version-1 learning record, and raw `<script>`/`<img onerror>` response markup is omitted and does not execute.
 - `npm audit --omit=dev --audit-level=high` — passed, 0 production dependency vulnerabilities.
 - `npm audit --audit-level=high` — 16 high advisories remain in development tooling through `picomatch`; the current [GHSA-fc5q-39xc-vjpf advisory](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) lists no patched version. Do not force a breaking downgrade to silence it.

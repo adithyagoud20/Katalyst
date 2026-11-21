@@ -6,11 +6,11 @@ import {
   ExecutionRunner,
   ExecutionTarget,
 } from "./types";
-import { WasmerCRunner } from "./c-runner";
 import { PyodidePythonRunner } from "./python-runner";
 import { JavaScriptWorkerRunner } from "./js-runner";
 import { SqlWasmRunner } from "./sql-runner";
 import { RemoteSandboxRunner } from "./remote-runner";
+import { cRunner } from "./c-runner";
 
 export const DEFAULT_EXECUTION_LIMITS: ExecutionLimits = {
   timeoutMs: 8_000,
@@ -76,7 +76,7 @@ class ExecutionRegistry {
 export const executionRegistry = new ExecutionRegistry();
 
 export function registerDefaultRunners(): void {
-  executionRegistry.register(new WasmerCRunner());
+  executionRegistry.register(cRunner);
   executionRegistry.register(new PyodidePythonRunner());
   executionRegistry.register(new JavaScriptWorkerRunner());
   executionRegistry.register(new SqlWasmRunner());
