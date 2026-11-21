@@ -224,10 +224,8 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
   const [inferenceState, setInferenceState] = useState<InferenceState>({});
   const [routeLessonId, setRouteLessonId] = useState(() => {
     if (initialLessonId) return initialLessonId;
-    if (typeof window !== "undefined") {
-      const match = window.location.pathname.match(/^\/courses\/[^/]+\/([^/]+)$/);
-      if (match) return match[1];
-    }
+    const match = pathname.match(/^\/courses\/[^/]+\/([^/]+)$/);
+    if (match) return match[1];
     return "";
   });
   const [skillTab, setSkillTab] = useState<"installed" | "available">("installed");
@@ -1951,7 +1949,7 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
 
         <SiteContentNotices isHome={view === "home"} />
 
-        {ready && accountPhase === "guest" && !accountUser && signInPromptReady && !signInPromptDismissed && <aside className="guest-account-nudge" role="region" aria-label="Optional account sign-in">
+        {ready && view !== "lesson" && accountPhase === "guest" && !accountUser && signInPromptReady && !signInPromptDismissed && <aside className="guest-account-nudge" role="region" aria-label="Optional account sign-in">
           <div><strong>Save your learning progress</strong><span>Sync progress across devices. Guest learning stays on this device.</span></div>
           <Link href="/login" className="primary-button">Sign in or create account</Link>
           <button type="button" className="mini-icon" aria-label="Dismiss sign-in prompt" onClick={() => setSignInPromptDismissed(true)}><X size={15} /></button>

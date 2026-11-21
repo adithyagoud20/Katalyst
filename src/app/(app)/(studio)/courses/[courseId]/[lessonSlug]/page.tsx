@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
-import { Workspace } from "@/components/workspace";
 import { LessonMarkdown } from "@/components/lesson-markdown";
 import { publishedCourseSummaries, publishedLessonRouteParams } from "@/data/curriculum/course-summaries";
 import { loadCourseDetail } from "@/data/curriculum/course-loader";
@@ -61,7 +60,6 @@ export default async function LessonRoute({
 
   return (
     <>
-      <Workspace initialView="lesson" initialLessonId={lessonSlug} />
       <div className="sr-only" aria-label="Course text for search engines">
         <h1>{lesson.title}</h1>
         <p>{lesson.summary}</p>

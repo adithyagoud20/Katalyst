@@ -1,6 +1,6 @@
 # Roadmap
 
-> **Current C/C++ status (2026-11-21):** In-browser C compilation and execution is implemented using an autonomous WebAssembly toolchain (`wasm-clang` + `wasm-ld` + custom WASI shim) with zero external servers and zero `eval`, gated behind `NEXT_PUBLIC_C_RUN_ENABLED` (default `false`). C++ remains disabled pending C++ curriculum matrix verification. See [C execution options](C_EXECUTION_OPTIONS.md).
+> **Current C/C++ status (2026-11-21):** In-browser C compilation and execution is implemented using an autonomous WebAssembly toolchain (`wasm-clang` + `wasm-ld` + custom WASI shim) with zero external servers and zero `eval`, enabled by default (`NEXT_PUBLIC_C_RUN_ENABLED` defaults to enabled). Single-character typing, independent panel scrolling, and unified persistent studio navigation are verified. C++ remains disabled pending C++ curriculum matrix verification. See [C execution options](C_EXECUTION_OPTIONS.md).
 
 ## MVP milestones
 

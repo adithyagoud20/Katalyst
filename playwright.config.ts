@@ -9,6 +9,6 @@ const cRunEnabled = process.env.NEXT_PUBLIC_C_RUN_ENABLED === "false" ? "false" 
 
 export default defineConfig({
   testDir: "./e2e",
-  use: { ...devices["Desktop Chrome"], baseURL: origin, headless: true },
+  use: { ...devices["Desktop Chrome"], baseURL: origin, headless: true, serviceWorkers: "block" },
   webServer: { command: `AI_PROVIDER=disabled NEXT_PUBLIC_C_RUN_ENABLED=${cRunEnabled} CLOUDFLARE_API_TOKEN= CLOUDFLARE_ACCOUNT_ID= OPENAI_API_KEY= GEMINI_API_KEY= OPENROUTER_API_KEY= PORT=${port} ${serverCommand}`, url: origin, reuseExistingServer: true, timeout: 120_000 },
 });

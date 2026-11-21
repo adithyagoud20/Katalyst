@@ -2,7 +2,12 @@
 
 ## Unreleased — MVP operations, announcement scheduling, and launch media
 
-- Implemented autonomous in-browser C compilation and execution using client-side WebAssembly (`binji/wasm-clang` + `wasm-ld` + in-memory MemFS with custom WASI preview-1 shim), gated behind `NEXT_PUBLIC_C_RUN_ENABLED` (default `false`). Runs with zero external server/API calls and zero `eval`/`new Function` under strict nonce Content Security Policy.
+- Implemented autonomous in-browser C compilation and execution using client-side WebAssembly (`binji/wasm-clang` + `wasm-ld` + in-memory MemFS with custom WASI preview-1 shim), enabled by default (`NEXT_PUBLIC_C_RUN_ENABLED` defaults to enabled). Runs with zero external server/API calls and zero `eval`/`new Function` under strict nonce Content Security Policy.
+- Resolved CodeMirror single-letter focus loss across all workbench and lesson editors, ensuring uninterrupted typing.
+- Kept Git repository clean and under 5 MB by untracking compiled binaries from Git and downloading pinned artifacts with SHA-256 integrity checks at prebuild time (`scripts/download-c-toolchain.mjs`).
+- Unified studio routing by moving `/courses/[courseId]/[lessonSlug]` under persistent `StudioLayout`, eliminating app shell tearing, screen jumping, and state resets when navigating between learning paths and lessons.
+- Fixed compiler panel hide/open toggle in default layout, properly expanding the lesson panel to full width when the compiler is hidden.
+- Eliminated double scrollbars and layout shifts on lesson views with independent panel scroll ownership and suppressed account nudge banners on active lesson surfaces.
 - Added prebuild toolchain automation via `scripts/download-c-toolchain.mjs` with SHA-256 integrity verification into gitignored `public/vendor/c-toolchain/`, keeping Git repository size under 5 MB.
 - Configured immutable caching headers (`max-age=31536000, immutable`) and browser Cache API (`katalyst-c-toolchain-v1`) persistence, eliminating repeated network downloads on subsequent visits.
 - Implemented lazy-loaded compiler and execution workers with download progress indication, offline error recovery, 5-minute idle worker shutdown, 32 MB user linear memory cap, 64 KB output buffer cap, 10-second runtime timeout, and immediate user abort via Stop button.
