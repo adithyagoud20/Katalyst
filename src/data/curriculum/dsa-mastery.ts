@@ -28,6 +28,12 @@ export const dsaMasteryObjectives: LearningObjective[] = [
   { id: "dsa-trees", title: "Traverse and manipulate hierarchical binary search trees using depth-first and breadth-first search." },
   { id: "dsa-graphs", title: "Model network topologies with adjacency lists and find shortest paths using Graph BFS and DFS." },
   { id: "dsa-dp", title: "Solve optimization problems with overlapping subproblems using memoization and bottom-up dynamic programming." },
+  { id: "dsa-doubly-linked", title: "Implement doubly linked list operations with sentinel head and tail nodes." },
+  { id: "dsa-ring-buffer", title: "Construct fixed-capacity circular queues and ring buffers for telemetry streaming." },
+  { id: "dsa-bst-traversal", title: "Execute BST insertions, searches, and sorted in-order traversals in O(H) time." },
+  { id: "dsa-heaps-pq", title: "Build binary heaps with sift-up and sift-down operations to maintain priority queue invariants." },
+  { id: "dsa-merge-sort", title: "Implement O(N log N) divide-and-conquer merge sort and evaluate recurrence trees." },
+  { id: "dsa-capstone", title: "Synthesize non-linear data structures and optimal algorithmic design in a capstone assessment." },
 ];
 
 function exercise(
@@ -1319,6 +1325,538 @@ console.log(climbStairs(5));`,
     ),
     exampleRun: exampleRun("2\n3\n8"),
   },
+
+  {
+    id: "dsa-doubly-linked-list",
+    order: 11,
+    title: "Doubly Linked Lists and Sentinel Nodes",
+    summary: "Eliminate edge-case null pointer checks using dummy head and tail sentinel nodes in doubly linked lists.",
+    type: "guided-coding",
+    objectiveIds: ["dsa-doubly-linked"],
+    prerequisiteLessonIds: ["dsa-dynamic-programming-1d"],
+    estimatedDurationMinutes: 35,
+    content: `In a singly linked list, each node has a \`next\` pointer. Deleting a node requires knowledge of its predecessor, demanding $O(N)$ traversal unless a prior pointer is passed.
+
+### Doubly Linked Lists
+A **Doubly Linked List** stores both \`next\` and \`prev\` pointers. Given a pointer directly to an existing node, deletion runs in $O(1)$ time:
+~~~javascript
+node.prev.next = node.next;
+node.next.prev = node.prev;
+~~~
+
+### Sentinel (Dummy) Nodes
+By maintaining dummy \`head\` and \`tail\` sentinels that are never deleted:
+- The list is never truly empty.
+- Insertions and deletions at the front, back, or middle share the exact same pointer manipulation logic without requiring null checks.`,
+    theorySections: [
+      {
+        id: "dsa-dll-tradeoffs",
+        title: "Trade-offs of Doubly Linked Lists",
+        content: "Doubly linked lists enable O(1) bidirectional traversal and splice operations at the expense of an extra pointer per node (8 bytes on 64-bit platforms).",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Sentinel-Backed Doubly Linked List",
+        language: "javascript",
+        code: `class Node {
+  constructor(val) { this.val = val; this.prev = null; this.next = null; }
+}
+class DoublyList {
+  constructor() {
+    this.head = new Node(0);
+    this.tail = new Node(0);
+    this.head.next = this.tail;
+    this.tail.prev = this.head;
+  }
+  pushFront(val) {
+    const node = new Node(val);
+    node.next = this.head.next;
+    node.prev = this.head;
+    this.head.next.prev = node;
+    this.head.next = node;
+  }
+}
+const list = new DoublyList();
+list.pushFront(42);
+console.log("First:", list.head.next.val);`,
+        description: "Inserting nodes at the front using sentinel boundaries.",
+      },
+    ],
+    resources: [
+      {
+        title: "Doubly Linked List Architecture",
+        url: "https://en.wikipedia.org/wiki/Doubly_linked_list",
+        description: "Node structures, pointer rewiring, and sentinels.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("First: 42\n"),
+    exercise: exercise(
+      "ex-dsa-dll-push-back",
+      "Implement pushBack and popBack on a doubly linked list",
+      "Implement a DoublyLinkedList class with sentinel head and tail. Add pushBack(val) that appends a node before tail, and popBack() that removes the node before tail and returns its val (or null if empty). In your code, pushBack 10, pushBack 20, call popBack(), and print 'Popped: ' followed by the returned value.",
+      `class Node {\n  constructor(val) {\n    this.val = val;\n    this.prev = null;\n    this.next = null;\n  }\n}\nclass DoublyLinkedList {\n  constructor() {\n    this.head = new Node(0);\n    this.tail = new Node(0);\n    this.head.next = this.tail;\n    this.tail.prev = this.head;\n  }\n  pushBack(val) {\n    const node = new Node(val);\n    node.prev = this.tail.prev;\n    node.next = this.tail;\n    this.tail.prev.next = node;\n    this.tail.prev = node;\n  }\n  popBack() {\n    if (this.head.next === this.tail) return null;\n    const node = this.tail.prev;\n    node.prev.next = this.tail;\n    this.tail.prev = node.prev;\n    return node.val;\n  }\n}\n\nconst dll = new DoublyLinkedList();\ndll.pushBack(10);\ndll.pushBack(20);\nconsole.log(\`Popped: \${dll.popBack()}\`);`,
+      "dsa-doubly-linked",
+      "Manage pointers in a sentinel-backed doubly linked list.",
+      [
+        "Link node between this.tail.prev and this.tail.",
+        "To pop, check if this.head.next === this.tail.",
+        "Rewire node.prev.next = this.tail and this.tail.prev = node.prev.",
+      ],
+      "Developing",
+      `class Node {\n  constructor(val) { this.val = val; this.prev = null; this.next = null; }\n}\nclass DoublyLinkedList {\n  // Implement constructor, pushBack(val), and popBack()\n}\n\n// pushBack 10, 20, popBack, and print\n`,
+      [
+        {
+          id: "tc-dll-1",
+          label: "Pushes 10 and 20 and pops 20",
+          expectedStdout: "Popped: 20",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "How do sentinel (dummy) nodes simplify linked list implementations?",
+      "Sentinels ensure that head and tail pointers are never null, eliminating boundary checks during insertions and deletions.",
+    ),
+  },
+
+  {
+    id: "dsa-circular-ring-buffer",
+    order: 12,
+    title: "Circular Queues and Ring Buffers",
+    summary: "Implement fixed-capacity FIFO circular buffers using modular arithmetic for zero-allocation streaming.",
+    type: "practical-exercise",
+    objectiveIds: ["dsa-ring-buffer"],
+    prerequisiteLessonIds: ["dsa-doubly-linked-list"],
+    estimatedDurationMinutes: 35,
+    content: `In embedded systems, audio processing, and network packet ingestion, data arrives in a continuous stream. Standard dynamic arrays cause memory fragmentation and reallocation pauses. A **Circular Buffer (Ring Buffer)** solves this by wrapping around a fixed-size array using modular arithmetic.
+
+### Modular Pointer Indexing
+- \`head\`: Index of the oldest element to be read.
+- \`tail\`: Index where the next new element will be written.
+- Both indices advance modulo capacity: \`idx = (idx + 1) % capacity\`.
+
+~~~javascript
+class RingBuffer {
+  constructor(capacity) {
+    this.buffer = new Array(capacity);
+    this.head = 0;
+    this.tail = 0;
+    this.size = 0;
+    this.capacity = capacity;
+  }
+}
+~~~`,
+    theorySections: [
+      {
+        id: "dsa-ring-buffer-concurrency",
+        title: "Single-Producer Single-Consumer Invariant",
+        content: "Because head and tail pointers are modified independently by reader and writer threads, ring buffers can operate lock-free in hardware interrupt and audio pipelines.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Ring Buffer Enqueue and Dequeue",
+        language: "javascript",
+        code: `class MiniRing {
+  constructor(cap) {
+    this.buf = new Array(cap);
+    this.head = 0; this.tail = 0; this.size = 0; this.cap = cap;
+  }
+  push(val) {
+    this.buf[this.tail] = val;
+    this.tail = (this.tail + 1) % this.cap;
+    if (this.size < this.cap) this.size++;
+    else this.head = (this.head + 1) % this.cap; // Overwrite oldest
+  }
+}
+const r = new MiniRing(3);
+r.push(1); r.push(2); r.push(3); r.push(4);
+console.log("Oldest element:", r.buf[r.head]);`,
+        description: "Overwriting the oldest element on overflow.",
+      },
+    ],
+    resources: [
+      {
+        title: "Circular Buffer Design",
+        url: "https://en.wikipedia.org/wiki/Circular_buffer",
+        description: "Ring buffer FIFO structures and optimization.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Oldest element: 2\n"),
+    exercise: exercise(
+      "ex-dsa-ring-sim",
+      "Implement a fixed-size circular queue",
+      "Implement a CircularQueue class with constructor(capacity) and methods enqueue(val) (returns false if full, else writes val and returns true) and dequeue() (returns null if empty, else reads oldest val and advances head). Instantiate with capacity 3, enqueue 10, 20, 30, dequeue once, enqueue 40, and print 'Queue: ' followed by dequeue(), dequeue(), dequeue() joined by comma.",
+      `class CircularQueue {\n  constructor(capacity) {\n    this.buffer = new Array(capacity);\n    this.head = 0;\n    this.tail = 0;\n    this.size = 0;\n    this.capacity = capacity;\n  }\n  enqueue(val) {\n    if (this.size === this.capacity) return false;\n    this.buffer[this.tail] = val;\n    this.tail = (this.tail + 1) % this.capacity;\n    this.size++;\n    return true;\n  }\n  dequeue() {\n    if (this.size === 0) return null;\n    const val = this.buffer[this.head];\n    this.head = (this.head + 1) % this.capacity;\n    this.size--;\n    return val;\n  }\n}\n\nconst q = new CircularQueue(3);\nq.enqueue(10);\nq.enqueue(20);\nq.enqueue(30);\nq.dequeue();\nq.enqueue(40);\nconst res = [q.dequeue(), q.dequeue(), q.dequeue()].join(",");\nconsole.log(\`Queue: \${res}\`);`,
+      "dsa-ring-buffer",
+      "Implement circular FIFO indexing with modular bounds.",
+      [
+        "Track size, capacity, head, and tail.",
+        "In enqueue, write buffer[tail] and increment tail = (tail + 1) % capacity.",
+        "In dequeue, read buffer[head] and increment head = (head + 1) % capacity.",
+      ],
+      "Developing",
+      `class CircularQueue {\n  // Implement constructor, enqueue, and dequeue\n}\n\n// Run operations and print Queue: 20,30,40\n`,
+      [
+        {
+          id: "tc-ring-1",
+          label: "Verifies FIFO ordering across modular wraparound",
+          expectedStdout: "Queue: 20,30,40",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is a circular ring buffer preferred over a standard array queue with unshift()?",
+      "In a flat array, unshift() requires shifting all N elements (O(N) time). A ring buffer enqueues and dequeues in O(1) time with zero element shifting.",
+    ),
+  },
+
+  {
+    id: "dsa-bst-operations",
+    order: 13,
+    title: "Binary Search Tree Insertion and Traversals",
+    summary: "Maintain BST ordering invariants, insert nodes in O(log N) average time, and generate sorted arrays via in-order traversal.",
+    type: "guided-coding",
+    objectiveIds: ["dsa-bst-traversal"],
+    prerequisiteLessonIds: ["dsa-circular-ring-buffer"],
+    estimatedDurationMinutes: 35,
+    content: `A **Binary Search Tree (BST)** is a node-based binary tree data structure where each node satisfies the BST invariant:
+- All keys in the **left subtree** are strictly less than the node's key.
+- All keys in the **right subtree** are strictly greater than the node's key.
+
+### Traversals
+- **In-Order Traversal** (Left $\\to$ Node $\\to$ Right): Visits nodes in non-decreasing sorted order.
+- **Pre-Order Traversal** (Node $\\to$ Left $\\to$ Right): Used for serializing tree structure.
+- **Post-Order Traversal** (Left $\\to$ Right $\\to$ Node): Used for bottom-up calculation and memory deallocation.
+
+~~~javascript
+function inOrder(node, result = []) {
+  if (!node) return result;
+  inOrder(node.left, result);
+  result.push(node.val);
+  inOrder(node.right, result);
+  return result;
+}
+~~~`,
+    theorySections: [
+      {
+        id: "dsa-bst-skew",
+        title: "Balanced vs. Skewed Complexity",
+        content: "A balanced BST achieves O(log N) search and insertion. If keys are inserted in sorted order without balancing, the tree degenerates into a linked list with O(N) worst-case time.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "BST Insertion and Sorted Extraction",
+        language: "javascript",
+        code: `class TreeNode {
+  constructor(val) { this.val = val; this.left = null; this.right = null; }
+}
+function insert(root, val) {
+  if (!root) return new TreeNode(val);
+  if (val < root.val) root.left = insert(root.left, val);
+  else if (val > root.val) root.right = insert(root.right, val);
+  return root;
+}
+let root = null;
+for (const v of [50, 30, 70, 20]) root = insert(root, v);
+console.log("Root:", root.val, "Left:", root.left.val);`,
+        description: "Recursive insertion maintaining the BST property.",
+      },
+    ],
+    resources: [
+      {
+        title: "Binary Search Tree Visualization",
+        url: "https://en.wikipedia.org/wiki/Binary_search_tree",
+        description: "Recursive tree operations and traversal orders.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Root: 50 Left: 30\n"),
+    exercise: exercise(
+      "ex-dsa-bst-inorder",
+      "Build a BST and output in-order sorted traversal",
+      "Implement a BST with an insert(val) method and an inOrder() method returning an array of values. Insert values [40, 20, 60, 10, 30, 50, 70] into the tree, call inOrder(), and print 'Sorted: ' followed by the comma-separated sorted elements.",
+      `class TreeNode {\n  constructor(val) {\n    this.val = val;\n    this.left = null;\n    this.right = null;\n  }\n}\nclass BST {\n  constructor() {\n    this.root = null;\n  }\n  insert(val) {\n    const add = (node, v) => {\n      if (!node) return new TreeNode(v);\n      if (v < node.val) node.left = add(node.left, v);\n      else if (v > node.val) node.right = add(node.right, v);\n      return node;\n    };\n    this.root = add(this.root, val);\n  }\n  inOrder() {\n    const res = [];\n    const traverse = (node) => {\n      if (!node) return;\n      traverse(node.left);\n      res.push(node.val);\n      traverse(node.right);\n    };\n    traverse(this.root);\n    return res;\n  }\n}\n\nconst tree = new BST();\nfor (const v of [40, 20, 60, 10, 30, 50, 70]) tree.insert(v);\nconsole.log(\`Sorted: \${tree.inOrder().join(",")}\`);`,
+      "dsa-bst-traversal",
+      "Insert into a BST and collect nodes in ascending order using in-order traversal.",
+      [
+        "Recursively compare val with current node.",
+        "In in-order traversal, visit left, append value, then visit right.",
+        "Print 'Sorted: 10,20,30,40,50,60,70'.",
+      ],
+      "Developing",
+      `class BST {\n  // Implement insert(val) and inOrder()\n}\n\n// Insert values and print sorted\n`,
+      [
+        {
+          id: "tc-bst-1",
+          label: "Extracts values in sorted order",
+          expectedStdout: "Sorted: 10,20,30,40,50,60,70",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Which tree traversal order visits nodes of a Binary Search Tree in strictly ascending order?",
+      "In-Order Traversal (Left, Root, Right).",
+    ),
+  },
+
+  {
+    id: "dsa-binary-heap",
+    order: 14,
+    title: "Binary Heaps and Priority Queues",
+    summary: "Implement array-backed binary min-heaps with sift-up and sift-down operations for O(1) peek and O(log N) extraction.",
+    type: "practical-exercise",
+    objectiveIds: ["dsa-heaps-pq"],
+    prerequisiteLessonIds: ["dsa-bst-operations"],
+    estimatedDurationMinutes: 40,
+    content: `A **Binary Heap** is a complete binary tree that satisfies the **Heap Property**:
+- In a **Min-Heap**, for any given node $i$, $\\text{val}(i) \\le \\text{val}(\\text{children})$. The minimum element is always at the root.
+
+### Array Representation
+Because a binary heap is a complete binary tree, it is efficiently stored in a single flat array without pointers:
+- Parent of index $i$: $\\lfloor(i - 1) / 2\\rfloor$
+- Left child of $i$: $2i + 1$
+- Right child of $i$: $2i + 2$
+
+### Key Operations
+1. **Insert (Push)**: Append to end of array and **sift-up** by swapping with parent until heap property is restored ($O(\\log N)$).
+2. **Extract Min (Pop)**: Swap root with last element, remove last element, and **sift-down** root by swapping with smaller child ($O(\\log N)$).`,
+    theorySections: [
+      {
+        id: "dsa-heap-vs-bst",
+        title: "Heap vs. BST Performance",
+        content: "A binary heap provides O(1) root access and guaranteed O(log N) operations with minimal memory overhead and excellent CPU cache locality compared to pointer-heavy BSTs.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Min-Heap Sift-Up Implementation",
+        language: "javascript",
+        code: `class MinHeap {
+  constructor() { this.heap = []; }
+  push(val) {
+    this.heap.push(val);
+    let i = this.heap.length - 1;
+    while (i > 0) {
+      let p = Math.floor((i - 1) / 2);
+      if (this.heap[p] > this.heap[i]) {
+        [this.heap[p], this.heap[i]] = [this.heap[i], this.heap[p]];
+        i = p;
+      } else break;
+    }
+  }
+}
+const h = new MinHeap();
+h.push(15); h.push(10); h.push(20);
+console.log("Min element at root:", h.heap[0]);`,
+        description: "Inserting elements and restoring heap order with sift-up.",
+      },
+    ],
+    resources: [
+      {
+        title: "Binary Heap Specification",
+        url: "https://en.wikipedia.org/wiki/Binary_heap",
+        description: "Array-backed complete binary tree heaps and priority queues.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Min element at root: 10\n"),
+    exercise: exercise(
+      "ex-dsa-heap-extract",
+      "Implement push and popMin on a MinHeap",
+      "Implement a MinHeap class with push(val) (sifts up) and popMin() (swaps root with last, pops last, and sifts down root). Insert [25, 12, 35, 5, 18], then call popMin() twice. Print 'Extracted: ' followed by the two popped values separated by comma.",
+      `class MinHeap {\n  constructor() {\n    this.heap = [];\n  }\n  push(val) {\n    this.heap.push(val);\n    let i = this.heap.length - 1;\n    while (i > 0) {\n      const p = Math.floor((i - 1) / 2);\n      if (this.heap[p] > this.heap[i]) {\n        [this.heap[p], this.heap[i]] = [this.heap[i], this.heap[p]];\n        i = p;\n      } else break;\n    }\n  }\n  popMin() {\n    if (this.heap.length === 0) return null;\n    if (this.heap.length === 1) return this.heap.pop();\n    const min = this.heap[0];\n    this.heap[0] = this.heap.pop();\n    let i = 0;\n    while (true) {\n      const left = 2 * i + 1;\n      const right = 2 * i + 2;\n      let smallest = i;\n      if (left < this.heap.length && this.heap[left] < this.heap[smallest]) smallest = left;\n      if (right < this.heap.length && this.heap[right] < this.heap[smallest]) smallest = right;\n      if (smallest !== i) {\n        [this.heap[i], this.heap[smallest]] = [this.heap[smallest], this.heap[i]];\n        i = smallest;\n      } else break;\n    }\n    return min;\n  }\n}\n\nconst h = new MinHeap();\nfor (const v of [25, 12, 35, 5, 18]) h.push(v);\nconst p1 = h.popMin();\nconst p2 = h.popMin();\nconsole.log(\`Extracted: \${p1},\${p2}\`);`,
+      "dsa-heaps-pq",
+      "Implement min-heap priority queue insertion and extraction.",
+      [
+        "Implement sift-up in push(val).",
+        "Implement sift-down with smallest child index comparison in popMin().",
+        "Verify popping the two minimum elements yields 5, 12.",
+      ],
+      "Developing",
+      `class MinHeap {\n  // Implement push(val) and popMin()\n}\n\n// Insert values and print Extracted: 5,12\n`,
+      [
+        {
+          id: "tc-heap-1",
+          label: "Correctly extracts minimum elements in order",
+          expectedStdout: "Extracted: 5,12",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "In a 0-indexed array representation of a binary heap, what is the formula to find the parent index of element i?",
+      "Math.floor((i - 1) / 2).",
+    ),
+  },
+
+  {
+    id: "dsa-merge-sort-dnc",
+    order: 15,
+    title: "Divide-and-Conquer: Merge Sort",
+    summary: "Recursively partition arrays, merge sorted subarrays in linear time, and analyze O(N log N) recurrence trees.",
+    type: "guided-coding",
+    objectiveIds: ["dsa-merge-sort"],
+    prerequisiteLessonIds: ["dsa-binary-heap"],
+    estimatedDurationMinutes: 35,
+    content: `**Merge Sort** is an archetypal divide-and-conquer algorithm with a deterministic $O(N \\log N)$ worst-case time complexity.
+
+### Algorithmic Steps
+1. **Divide**: Bisect the array into two halves at $mid = \\lfloor N / 2\\rfloor$ ($O(1)$).
+2. **Conquer**: Recursively sort each half until reaching base cases of length $\\le 1$.
+3. **Combine**: Merge the two sorted halves into a single sorted array by comparing front elements ($O(N)$).
+
+### Recurrence Relation
+$$T(N) = 2T(N/2) + O(N)$$
+By the Master Theorem, the recursion tree has $\\log_2 N$ levels, each doing $O(N)$ merging work, resulting in $O(N \\log N)$ overall time. Merge Sort is a **stable** sort.`,
+    theorySections: [
+      {
+        id: "dsa-merge-sort-stability",
+        title: "Sorting Stability and Memory Complexity",
+        content: "Merge sort is stable: elements with equal keys maintain their original relative order. Standard array merge sort requires O(N) auxiliary space for the merged temporary buffers.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Merge Two Sorted Arrays",
+        language: "javascript",
+        code: `function merge(left, right) {
+  const result = [];
+  let i = 0, j = 0;
+  while (i < left.length && j < right.length) {
+    if (left[i] <= right[j]) result.push(left[i++]);
+    else result.push(right[j++]);
+  }
+  return result.concat(left.slice(i)).concat(right.slice(j));
+}
+console.log("Merged:", merge([1, 4, 7], [2, 5, 8]).join(","));`,
+        description: "Linear two-pointer merge operation.",
+      },
+    ],
+    resources: [
+      {
+        title: "Merge Sort Algorithm",
+        url: "https://en.wikipedia.org/wiki/Merge_sort",
+        description: "Divide-and-conquer recurrence relations and sorting stability.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Merged: 1,2,4,5,7,8\n"),
+    exercise: exercise(
+      "ex-dsa-merge-sort-full",
+      "Implement recursive merge sort",
+      "Write a complete mergeSort(arr) function that recursively sorts an array of numbers using divide-and-conquer. Test with unsorted = [38, 27, 43, 3, 9, 82, 10] and print 'Sorted: ' followed by the sorted array joined by comma.",
+      `function mergeSort(arr) {\n  if (arr.length <= 1) return arr;\n  const mid = Math.floor(arr.length / 2);\n  const left = mergeSort(arr.slice(0, mid));\n  const right = mergeSort(arr.slice(mid));\n  const res = [];\n  let i = 0, j = 0;\n  while (i < left.length && j < right.length) {\n    if (left[i] <= right[j]) res.push(left[i++]);\n    else res.push(right[j++]);\n  }\n  return res.concat(left.slice(i)).concat(right.slice(j));\n}\n\nconst unsorted = [38, 27, 43, 3, 9, 82, 10];\nconsole.log(\`Sorted: \${mergeSort(unsorted).join(",")}\`);`,
+      "dsa-merge-sort",
+      "Implement the complete divide-and-conquer merge sort algorithm.",
+      [
+        "Base case: return arr if arr.length <= 1.",
+        "Recursively sort left and right halves around mid.",
+        "Merge both sorted halves using two pointers.",
+      ],
+      "Developing",
+      `function mergeSort(arr) {\n  // Implement mergeSort\n}\n\nconst unsorted = [38, 27, 43, 3, 9, 82, 10];\n// Sort and print output\n`,
+      [
+        {
+          id: "tc-merge-1",
+          label: "Correctly sorts input array",
+          expectedStdout: "Sorted: 3,9,10,27,38,43,82",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "What is the space complexity of standard recursive merge sort on arrays, and why?",
+      "O(N), because temporary arrays must be allocated to hold elements during the merge step.",
+    ),
+  },
+
+  {
+    id: "dsa-capstone-assessment",
+    order: 16,
+    title: "Algorithmic Mastery Assessment",
+    summary: "Synthesize frequency hashing, heaps, and monotonic pointers to solve complex algorithmic problems under asymptotic constraints.",
+    type: "assessment",
+    objectiveIds: ["dsa-capstone"],
+    prerequisiteLessonIds: ["dsa-merge-sort-dnc"],
+    estimatedDurationMinutes: 45,
+    content: `### Capstone Assessment Overview
+This capstone assessment validates your ability to choose, implement, and combine non-trivial data structures to solve algorithmic challenges:
+1. **Asymptotic Optimization**: Replacing $O(N^2)$ brute-force iterations with $O(N)$ or $O(N \\log N)$ strategies.
+2. **Buffer Architectures**: Ring buffers and sentinel-backed linked lists.
+3. **Hierarchical Trees & Heaps**: Binary search invariants and priority queue scheduling.
+4. **Divide-and-Conquer**: Decomposing problems into independent sub-problems.
+
+Review the problem prompt below and implement an optimal Top-K Frequent Elements extraction routine.`,
+    theorySections: [
+      {
+        id: "dsa-capstone-rubric",
+        title: "Engineering Evaluation Criteria",
+        content: "Solutions are assessed for asymptotic optimality, edge-case resilience (empty input, duplicates), and clean separation of algorithmic stages.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Frequency Counting with Map",
+        language: "javascript",
+        code: `function countFreq(items) {
+  const counts = new Map();
+  for (const x of items) counts.set(x, (counts.get(x) || 0) + 1);
+  return counts;
+}
+console.log("Count of 1:", countFreq([1, 2, 1, 3, 1]).get(1));`,
+        description: "Building an O(N) frequency histogram.",
+      },
+    ],
+    resources: [
+      {
+        title: "Top-K Frequent Elements Problem",
+        url: "https://en.wikipedia.org/wiki/Selection_algorithm",
+        description: "Optimal selection algorithms and heap-based partitioning.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Count of 1: 3\n"),
+    exercise: exercise(
+      "ex-dsa-top-k-freq",
+      "Find top-k most frequent elements in O(N log N) time",
+      "Implement a function topKFrequent(nums, k) that returns the k most frequent elements in nums sorted in descending order of frequency. If two numbers have equal frequency, sort them in descending numerical order. Test with nums = [1, 1, 1, 2, 2, 3, 4, 4, 4, 4] and k = 2. Print 'Top 2: ' followed by the result joined by comma.",
+      `function topKFrequent(nums, k) {\n  const freq = new Map();\n  for (const n of nums) freq.set(n, (freq.get(n) || 0) + 1);\n  const sorted = Array.from(freq.entries()).sort((a, b) => {\n    if (b[1] !== a[1]) return b[1] - a[1];\n    return b[0] - a[0];\n  });\n  return sorted.slice(0, k).map(entry => entry[0]);\n}\n\nconst nums = [1, 1, 1, 2, 2, 3, 4, 4, 4, 4];\nconsole.log(\`Top 2: \${topKFrequent(nums, 2).join(",")}\`);`,
+      "dsa-capstone",
+      "Extract the top-k most frequent elements using frequency hashing and sorting.",
+      [
+        "Count occurrences of each number with a Map.",
+        "Sort unique keys descending by frequency, with value as tiebreaker.",
+        "Take the first k elements: [4, 1].",
+      ],
+      "Applied",
+      `function topKFrequent(nums, k) {\n  // Implement topKFrequent\n}\n\nconst nums = [1, 1, 1, 2, 2, 3, 4, 4, 4, 4];\n// Call and print Top 2: 4,1\n`,
+      [
+        {
+          id: "tc-topk-1",
+          label: "Returns 4 and 1 as top 2 frequent items",
+          expectedStdout: "Top 2: 4,1",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "How can the top-K frequent elements problem be optimized from O(N log N) to O(N log K)?",
+      "By pushing elements into a Min-Heap of size K while iterating through the frequency map, maintaining only the K highest frequencies.",
+    ),
+  },
 ];
 
 // Module Groupings
@@ -1351,13 +1889,20 @@ export const dsaMasteryModules: LearningModule[] = [
     "Traverse binary search trees, find shortest paths with graph BFS, and optimize overlapping subproblems with DP.",
     dsaMasteryLessons.slice(7, 10),
   ),
+  moduleData(
+    "dsa-module-advanced-structures",
+    5,
+    "Advanced Structures & Algorithmic Paradigms",
+    "Doubly linked lists, circular ring buffers, BST operations, binary heaps, divide-and-conquer merge sort, and capstone assessment.",
+    dsaMasteryLessons.slice(10),
+  ),
 ];
 
 export const dsaMasteryPath: LearningCourse = {
   id: "dsa-mastery",
   subjectId: dsaMasterySubject.id,
   title: "Data Structures & Algorithms Mastery",
-  description: "Big-O, two pointers, sliding windows, monotonic stacks, binary trees, graph BFS, and dynamic programming.",
+  description: "Big-O, two pointers, sliding windows, monotonic stacks, binary trees, graph BFS, heaps, and dynamic programming.",
   level: "Developing",
   version: "1.0.0",
   prerequisites: [
@@ -1370,9 +1915,10 @@ export const dsaMasteryPath: LearningCourse = {
       "Utilize monotonic stack invariants to solve Next Greater Element problems.",
       "Leverage O(1) hash maps to eliminate quadratic nested iterations.",
       "Traverse binary search trees and implement BFS shortest path in graphs.",
-      "Solve optimization problems with overlapping subproblems using dynamic programming."
+      "Solve optimization problems with overlapping subproblems using dynamic programming.",
+      "Implement circular buffers, binary heaps, and divide-and-conquer sorting algorithms."
   ],
-  estimatedDurationMinutes: 480,
+  estimatedDurationMinutes: 660,
   publicationStatus: "published",
   modules: dsaMasteryModules,
 };

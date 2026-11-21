@@ -26,6 +26,10 @@ export const sqlDatabasesObjectives: LearningObjective[] = [
   { id: "sql-outer-joins-set", title: "Retrieve unmatched records using LEFT OUTER JOIN and combine query streams with UNION." },
   { id: "sql-ctes-subqueries", title: "Structure complex hierarchical queries using Common Table Expressions (WITH syntax) and subqueries." },
   { id: "sql-transactions-acid", title: "Execute atomic data mutations using INSERT, UPDATE, and DELETE enclosed in ACID transactions." },
+  { id: "sql-btree-indexes", title: "Accelerate query execution times by creating B-Tree indexes on high-cardinality columns." },
+  { id: "sql-explain-plans", title: "Analyze query execution plans using EXPLAIN QUERY PLAN to detect full table scans." },
+  { id: "sql-window-analytics", title: "Compute running totals and rankings using SQL window functions (OVER, PARTITION BY)." },
+  { id: "sql-capstone-optimization", title: "Synthesize relational schema design, indexing, and window analytics in a database capstone." },
 ];
 
 function exercise(
@@ -880,6 +884,342 @@ INSERT INTO accounts VALUES (1, 500.0), (2, 200.0), (3, 0.0);`,
     ),
     exampleRun: exampleRun("1|400\n2|300"),
   },
+
+  {
+    id: "sql-indexes-b-tree",
+    order: 9,
+    title: "B-Tree Indexes and Query Performance",
+    summary: "Accelerate SELECT query execution from O(N) linear table scans to O(log N) tree lookups with CREATE INDEX.",
+    type: "guided-coding",
+    objectiveIds: ["sql-btree-indexes"],
+    prerequisiteLessonIds: ["sql-dml-transactions"],
+    estimatedDurationMinutes: 30,
+    content: `Without an index, finding rows matching \`WHERE email = 'alice@example.com'\` requires a full **table scan**, checking every page on disk in $O(N)$ time.
+
+### B-Tree Index Architecture
+A database index is a separate, self-balancing search tree data structure pointing back to the underlying table rows:
+~~~sql
+CREATE INDEX idx_users_email ON users(email);
+~~~
+With a B-Tree index, equality searches run in $O(\\log N)$ time, resolving millions of rows in single-digit disk reads.
+
+### Composite Indexes
+An index on multiple columns \`(department, salary)\` can optimize queries filtering on \`department\` alone, or on both \`department AND salary\`, but not on \`salary\` alone due to left-prefix ordering rules.`,
+    theorySections: [
+      {
+        id: "sql-index-write-overhead",
+        title: "The Write Overhead of Indexes",
+        content: "Every index added speeds up read queries but slows down INSERT, UPDATE, and DELETE operations, because the database engine must synchronously update all corresponding B-Trees on every write.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Creating and Querying with Indexes",
+        language: "sql",
+        code: `CREATE TABLE readings (
+  id INTEGER PRIMARY KEY,
+  device_id TEXT,
+  val REAL
+);
+CREATE INDEX idx_readings_dev ON readings(device_id);
+
+SELECT device_id, val FROM readings WHERE device_id = 'SENS-01';`,
+        description: "Creating an index to accelerate device filtering.",
+      },
+    ],
+    resources: [
+      {
+        title: "SQLite Query Optimizer and Indexes",
+        url: "https://www.sqlite.org/queryplanner.html",
+        description: "Official guide to B-tree indexes and query planning in SQLite.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "sql", target: "browser-wasm" },
+    exampleRun: exampleRun("SENS-01|24.5\n"),
+    exercise: exercise(
+      "ex-sql-create-index",
+      "Create a composite index on telemetry logs",
+      "Given table `telemetry (id INTEGER PRIMARY KEY, station TEXT, metric TEXT, value REAL)`: 1) Create an index named `idx_station_metric` on columns `(station, metric)`. 2) Query all rows where `station = 'ST-01'` and `metric = 'temp'`, ordered by `value ASC`. Select `station`, `metric`, and `value`.",
+      `CREATE INDEX idx_station_metric ON telemetry(station, metric);
+SELECT station, metric, value FROM telemetry WHERE station = 'ST-01' AND metric = 'temp' ORDER BY value ASC;`,
+      "sql-btree-indexes",
+      "Accelerate composite queries with multi-column indexes.",
+      [
+        "Use CREATE INDEX idx_station_metric ON telemetry(station, metric);",
+        "Add WHERE station = 'ST-01' AND metric = 'temp' ORDER BY value ASC;",
+      ],
+      "Developing",
+      `-- Create index and query filtered telemetry:
+CREATE INDEX idx_station_metric ON telemetry(station, metric);
+
+SELECT station, metric, value FROM telemetry WHERE station = 'ST-01' AND metric = 'temp' ORDER BY value ASC;`,
+      [
+        {
+          id: "tc-idx-1",
+          label: "Retrieves indexed telemetry records in ascending value order",
+          stdin: `CREATE TABLE telemetry (id INTEGER PRIMARY KEY, station TEXT, metric TEXT, value REAL);
+INSERT INTO telemetry VALUES (1, 'ST-01', 'temp', 22.4), (2, 'ST-02', 'temp', 25.1), (3, 'ST-01', 'temp', 21.0), (4, 'ST-01', 'press', 1013.2);`,
+          expectedStdout: "21",
+          matchMode: "contains",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why does adding too many indexes degrade database write performance?",
+      "Every INSERT, UPDATE, or DELETE operation must update every index on that table, incurring additional disk I/O and tree balancing operations.",
+    ),
+  },
+
+  {
+    id: "sql-explain-query-plan",
+    order: 10,
+    title: "Analyzing Query Execution with EXPLAIN QUERY PLAN",
+    summary: "Inspect query optimizer execution plans to detect SCAN TABLE bottlenecks and verify USING INDEX utilization.",
+    type: "practical-exercise",
+    objectiveIds: ["sql-explain-plans"],
+    prerequisiteLessonIds: ["sql-indexes-b-tree"],
+    estimatedDurationMinutes: 30,
+    content: `When queries feel sluggish, the primary diagnostic tool is \`EXPLAIN QUERY PLAN\`. Prefixing any SQL statement with this command reveals how the database engine plans to execute the query without actually running it.
+
+### Reading Execution Plans in SQLite
+~~~sql
+EXPLAIN QUERY PLAN
+SELECT * FROM customers WHERE email = 'bob@corp.com';
+~~~
+- \`SCAN TABLE customers\`: **Warning!** The engine scans every single row in the table from top to bottom ($O(N)$).
+- \`SEARCH TABLE customers USING INDEX idx_email\`: **Fast!** The engine navigates a B-Tree directly to the target record in $O(\\log N)$ time.
+- \`SEARCH TABLE customers USING INTEGER PRIMARY KEY (rowid = ?)\`: **Optimal!** Direct rowid hash/B-Tree lookup ($O(1)$).`,
+    theorySections: [
+      {
+        id: "sql-plan-cost-estimator",
+        title: "Cost-Based Query Optimization",
+        content: "Modern SQL planners analyze table statistics, column cardinality, and index availability to select the lowest-cost execution path among dozens of candidate access plans.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Verifying Index Usage with EXPLAIN",
+        language: "sql",
+        code: `CREATE TABLE items (id INTEGER PRIMARY KEY, sku TEXT);
+CREATE INDEX idx_items_sku ON items(sku);
+EXPLAIN QUERY PLAN SELECT * FROM items WHERE sku = 'ABC-123';`,
+        description: "Checking that the SQLite query planner uses the sku index.",
+      },
+    ],
+    resources: [
+      {
+        title: "EXPLAIN QUERY PLAN in SQLite",
+        url: "https://www.sqlite.org/eqp.html",
+        description: "Official guide to interpreting SQLite query plan output.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "sql", target: "browser-wasm" },
+    exampleRun: exampleRun("0|0|0|SEARCH items USING INDEX idx_items_sku (sku=?)\n"),
+    exercise: exercise(
+      "ex-sql-explain-plan",
+      "Inspect execution plan for an indexed search",
+      "Given table `products (id INTEGER PRIMARY KEY, barcode TEXT, name TEXT)`. 1) Create index `idx_barcode ON products(barcode)`. 2) Run `EXPLAIN QUERY PLAN SELECT id, name FROM products WHERE barcode = '9780132350884';` to verify index utilization.",
+      `CREATE INDEX idx_barcode ON products(barcode);
+EXPLAIN QUERY PLAN SELECT id, name FROM products WHERE barcode = '9780132350884';`,
+      "sql-explain-plans",
+      "Inspect and confirm index utilization with EXPLAIN QUERY PLAN.",
+      [
+        "Create index idx_barcode on products(barcode).",
+        "Prefix the query with EXPLAIN QUERY PLAN.",
+      ],
+      "Developing",
+      `-- Create index and inspect query plan:
+CREATE INDEX idx_barcode ON products(barcode);
+
+EXPLAIN QUERY PLAN SELECT id, name FROM products WHERE barcode = '9780132350884';`,
+      [
+        {
+          id: "tc-explain-1",
+          label: "Output confirms USING INDEX idx_barcode execution",
+          stdin: `CREATE TABLE products (id INTEGER PRIMARY KEY, barcode TEXT, name TEXT);`,
+          expectedStdout: "USING INDEX idx_barcode",
+          matchMode: "contains",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "In an EXPLAIN QUERY PLAN output, what is the critical difference between SCAN TABLE and SEARCH TABLE?",
+      "SCAN TABLE traverses every row sequentially (O(N)), whereas SEARCH TABLE navigates an index or primary key directly (O(log N) or O(1)).",
+    ),
+  },
+
+  {
+    id: "sql-window-functions",
+    order: 11,
+    title: "Analytical Window Functions",
+    summary: "Compute running totals, rankings, and partitioned metrics using ROW_NUMBER(), RANK(), and OVER (PARTITION BY ...).",
+    type: "guided-coding",
+    objectiveIds: ["sql-window-analytics"],
+    prerequisiteLessonIds: ["sql-explain-query-plan"],
+    estimatedDurationMinutes: 35,
+    content: `Standard \`GROUP BY\` queries collapse rows into single summary records. In contrast, **Window Functions** compute aggregate and ranking metrics over a sliding frame of rows while **preserving individual row identities**.
+
+### Anatomy of an OVER() Clause
+~~~sql
+SELECT
+  id,
+  department,
+  salary,
+  ROW_NUMBER() OVER (PARTITION BY department ORDER BY salary DESC) AS dept_rank,
+  SUM(salary) OVER (PARTITION BY department) AS dept_total
+FROM employees;
+~~~
+- \`PARTITION BY department\`: Divides the rows into groups for independent calculation.
+- \`ORDER BY salary DESC\`: Defines the ranking and cumulative sequence within each partition.
+- \`ROW_NUMBER()\`: Assigns sequential integers (1, 2, 3...) starting over for each partition.`,
+    theorySections: [
+      {
+        id: "sql-window-vs-groupby",
+        title: "Window Functions vs. GROUP BY",
+        content: "Window functions execute late in the query lifecycle, right after WHERE, GROUP BY, and HAVING, operating over the final filtered result set without collapsing records.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Running Total Calculation",
+        language: "sql",
+        code: `CREATE TABLE sales (id INTEGER PRIMARY KEY, day_num INT, amount REAL);
+INSERT INTO sales VALUES (1, 1, 100), (2, 2, 150), (3, 3, 200);
+
+SELECT day_num, amount,
+       SUM(amount) OVER (ORDER BY day_num) AS running_total
+FROM sales;`,
+        description: "Computing cumulative cumulative sum across days.",
+      },
+    ],
+    resources: [
+      {
+        title: "SQLite Window Functions",
+        url: "https://www.sqlite.org/windowfunctions.html",
+        description: "Official guide to OVER, PARTITION BY, and ranking functions in SQLite.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "sql", target: "browser-wasm" },
+    exampleRun: exampleRun("1|100.0|100.0\n2|150.0|250.0\n3|200.0|450.0\n"),
+    exercise: exercise(
+      "ex-sql-window-rank",
+      "Rank students within each department by GPA",
+      "Given table `students (id INTEGER PRIMARY KEY, dept TEXT, name TEXT, gpa REAL)`. Write a query selecting `dept`, `name`, `gpa`, and `ROW_NUMBER() OVER (PARTITION BY dept ORDER BY gpa DESC) AS rnk`, ordered by `dept ASC, rnk ASC`.",
+      `SELECT dept, name, gpa, ROW_NUMBER() OVER (PARTITION BY dept ORDER BY gpa DESC) AS rnk FROM students ORDER BY dept ASC, rnk ASC;`,
+      "sql-window-analytics",
+      "Partition records and compute departmental student rankings.",
+      [
+        "Use ROW_NUMBER() OVER (PARTITION BY dept ORDER BY gpa DESC) AS rnk.",
+        "Add final ORDER BY dept ASC, rnk ASC.",
+      ],
+      "Developing",
+      `-- Select dept, name, gpa, and rank within department:
+SELECT dept, name, gpa,
+       ROW_NUMBER() OVER (PARTITION BY dept ORDER BY gpa DESC) AS rnk
+FROM students
+ORDER BY dept ASC, rnk ASC;`,
+      [
+        {
+          id: "tc-win-1",
+          label: "Ranks students within department by descending GPA",
+          stdin: `CREATE TABLE students (id INTEGER PRIMARY KEY, dept TEXT, name TEXT, gpa REAL);
+INSERT INTO students VALUES (1, 'CS', 'Alice', 3.9), (2, 'CS', 'Bob', 3.7), (3, 'EE', 'Charlie', 3.8);`,
+          expectedStdout: "Alice",
+          matchMode: "contains",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "How does a window function differ fundamentally from a standard GROUP BY aggregation?",
+      "GROUP BY collapses multiple rows into a single summary row, while a window function produces aggregate calculations while preserving all original individual rows.",
+    ),
+  },
+
+  {
+    id: "sql-capstone-database-assessment",
+    order: 12,
+    title: "Relational Architecture & Performance Assessment",
+    summary: "Synthesize relational schema design, multi-table joins, indexing, and window analytics in a comprehensive database capstone.",
+    type: "assessment",
+    objectiveIds: ["sql-capstone-optimization"],
+    prerequisiteLessonIds: ["sql-window-functions"],
+    estimatedDurationMinutes: 45,
+    content: `### Capstone Database Assessment
+This comprehensive assessment validates your complete mastery of relational database architecture:
+1. **Schema Integrity**: Defining robust primary and foreign key constraints.
+2. **Multi-Table Joins**: Correlating relational entities without data duplication.
+3. **Performance Optimization**: B-Tree indexes and execution plan verification.
+4. **Advanced Analytics**: Window functions and Common Table Expressions.
+
+Review the prompt below to implement the warehouse inventory tracking query.`,
+    theorySections: [
+      {
+        id: "sql-capstone-rubric",
+        title: "Relational Design Best Practices",
+        content: "High-performance database systems eliminate data anomalies through 3rd Normal Form (3NF), index all foreign key columns, and avoid unindexed full-table scans.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Complete Inventory Aggregation",
+        language: "sql",
+        code: `SELECT p.name, SUM(i.quantity) as total_qty
+FROM products p
+JOIN inventory i ON p.id = i.product_id
+GROUP BY p.name;`,
+        description: "Aggregating warehouse stock across relational entities.",
+      },
+    ],
+    resources: [
+      {
+        title: "Relational Database Normalization",
+        url: "https://en.wikipedia.org/wiki/Database_normalization",
+        description: "1NF, 2NF, 3NF, and Boyce-Codd normal forms.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "sql", target: "browser-wasm" },
+    exampleRun: exampleRun("Widget|150\n"),
+    exercise: exercise(
+      "ex-sql-capstone-inventory",
+      "Calculate warehouse stock and running totals",
+      "Given tables `warehouses (id INT, location TEXT)` and `stock (id INT, warehouse_id INT, sku TEXT, qty INT)`. Join warehouses and stock on `warehouse_id = warehouses.id`. Select `warehouses.location`, `stock.sku`, `stock.qty`, and the cumulative sum `SUM(stock.qty) OVER (PARTITION BY warehouses.location ORDER BY stock.qty DESC) AS running_qty`. Order by `warehouses.location ASC, stock.qty DESC`.",
+      `SELECT w.location, s.sku, s.qty, SUM(s.qty) OVER (PARTITION BY w.location ORDER BY s.qty DESC) AS running_qty FROM warehouses w JOIN stock s ON w.id = s.warehouse_id ORDER BY w.location ASC, s.qty DESC;`,
+      "sql-capstone-optimization",
+      "Combine relational joins with cumulative window totals in a single query.",
+      [
+        "Join warehouses w with stock s on w.id = s.warehouse_id.",
+        "Use SUM(s.qty) OVER (PARTITION BY w.location ORDER BY s.qty DESC) AS running_qty.",
+        "Order by w.location ASC, s.qty DESC.",
+      ],
+      "Applied",
+      `-- Join warehouses and stock with running total:
+SELECT w.location, s.sku, s.qty,
+       SUM(s.qty) OVER (PARTITION BY w.location ORDER BY s.qty DESC) AS running_qty
+FROM warehouses w
+JOIN stock s ON w.id = s.warehouse_id
+ORDER BY w.location ASC, s.qty DESC;`,
+      [
+        {
+          id: "tc-sql-cap-1",
+          label: "Returns warehouse locations with SKU quantities and cumulative running totals",
+          stdin: `CREATE TABLE warehouses (id INT, location TEXT);
+CREATE TABLE stock (id INT, warehouse_id INT, sku TEXT, qty INT);
+INSERT INTO warehouses VALUES (1, 'Austin'), (2, 'Seattle');
+INSERT INTO stock VALUES (1, 1, 'SKU-A', 50), (2, 1, 'SKU-B', 30), (3, 2, 'SKU-C', 80);`,
+          expectedStdout: "Austin|SKU-A|50|50",
+          matchMode: "contains",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is normalizing tables to Third Normal Form (3NF) beneficial in high-volume relational systems?",
+      "3NF eliminates data redundancy and update anomalies, guaranteeing that each non-key field depends solely on the primary key.",
+    ),
+  },
 ];
 
 // Module Groupings
@@ -905,13 +1245,20 @@ export const sqlDatabasesModules: LearningModule[] = [
     "Deconstruct hierarchical data with Common Table Expressions (WITH syntax) and execute safe mutations with ACID transactions.",
     sqlDatabasesLessons.slice(6, 8),
   ),
+  moduleData(
+    "sql-module-indexing-optimization",
+    4,
+    "Indexing, Query Plans & Performance Optimization",
+    "B-Tree indexes, EXPLAIN QUERY PLAN, analytical window functions, and database normalization.",
+    sqlDatabasesLessons.slice(8),
+  ),
 ];
 
 export const sqlDatabasesPath: LearningCourse = {
   id: "sql-databases",
   subjectId: sqlDatabasesSubject.id,
   title: "Relational Databases & SQL Foundations",
-  description: "Relational modeling, schema integrity, multi-table joins, aggregations, CTEs, and ACID transactions.",
+  description: "Relational modeling, schema integrity, multi-table joins, aggregations, CTEs, indexes, window functions, and ACID transactions.",
   level: "Beginner",
   version: "1.0.0",
   prerequisites: [
@@ -924,9 +1271,11 @@ export const sqlDatabasesPath: LearningCourse = {
       "Compute aggregate metrics using GROUP BY and HAVING.",
       "Join multiple relational tables using INNER JOIN and LEFT JOIN.",
       "Construct complex hierarchical queries with Common Table Expressions (WITH).",
-      "Execute safe data modifications using ACID transactions."
+      "Execute safe data modifications using ACID transactions.",
+      "Accelerate query performance with B-Tree indexes and inspect EXPLAIN plans.",
+      "Calculate running totals and rankings with analytical window functions."
   ],
-  estimatedDurationMinutes: 360,
+  estimatedDurationMinutes: 480,
   publicationStatus: "published",
   modules: sqlDatabasesModules,
 };

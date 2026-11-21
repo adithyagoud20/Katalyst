@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cProgrammingPath, pythonProgrammingPath } from "../src/lib/learning-curriculum";
+import { cProgrammingPath, flattenLessons, learningPaths, pythonProgrammingPath } from "../src/lib/learning-curriculum";
 import {
   completeLesson,
   emptyLearningProgress,
@@ -19,15 +19,17 @@ import {
 describe("learning curriculum and local progress", () => {
   it("starts with no fabricated enrollment or completion", () => {
     expect(emptyLearningProgress()).toEqual({ version: 1, enrollments: [] });
-    expect(getPathProgress(emptyLearningProgress(), cProgrammingPath)).toMatchObject({ totalLessons: 16, completedCount: 0, completionPercent: 0 });
+    const cTotalLessons = flattenLessons(cProgrammingPath).length;
+    expect(getPathProgress(emptyLearningProgress(), cProgrammingPath)).toMatchObject({ totalLessons: cTotalLessons, completedCount: 0, completionPercent: 0 });
   });
 
   it("records enrollment, lesson navigation, and explicit completion independently from chats", () => {
+    const cTotalLessons = flattenLessons(cProgrammingPath).length;
     let progress = enrollInPath(emptyLearningProgress(), cProgrammingPath.id, 100);
     progress = recordLessonOpened(progress, cProgrammingPath.id, "source-to-output", 200);
     progress = completeLesson(progress, cProgrammingPath.id, "source-to-output", 300);
     expect(progress.enrollments[0]).toMatchObject({ enrolledAt: 100, lastOpenedLessonId: "source-to-output", completedLessons: [{ lessonId: "source-to-output", completedAt: 300 }] });
-    expect(getPathProgress(progress, cProgrammingPath).completionPercent).toBe(6);
+    expect(getPathProgress(progress, cProgrammingPath).completionPercent).toBe(Math.round((1 / cTotalLessons) * 100));
     expect(completeLesson(progress, cProgrammingPath.id, "source-to-output", 400)).toEqual(progress);
   });
 
@@ -63,7 +65,8 @@ describe("learning curriculum and local progress", () => {
     expect(read.kind).toBe("valid");
     if (read.kind !== "valid") return;
     expect(read.progress.enrollments[0].completedLessons.map((item) => item.lessonId)).toEqual(["source-to-output", "arrays"]);
-    expect(getPathProgress(read.progress, cProgrammingPath)).toMatchObject({ totalLessons: 16, completedCount: 2, completionPercent: 13 });
+    const cTotalLessons = flattenLessons(cProgrammingPath).length;
+    expect(getPathProgress(read.progress, cProgrammingPath)).toMatchObject({ totalLessons: cTotalLessons, completedCount: 2, completionPercent: Math.round((2 / cTotalLessons) * 100) });
   });
 
   it("writes a bounded versioned record under a separate key", () => {
@@ -84,8 +87,9 @@ describe("learning curriculum and local progress", () => {
     progress = recordLessonOpened(progress, cProgrammingPath.id, "source-to-output", dayTwo);
     progress = completeLesson(progress, cProgrammingPath.id, "source-to-output", now);
     const summary = getLearningDashboardSummary(progress, now);
+    const totalLessons = learningPaths.reduce((total, path) => total + flattenLessons(path).length, 0);
 
-    expect(summary).toMatchObject({ lessonsCompleted: 1, totalLessons: 123, pathsStarted: 1, totalPaths: 14, pathsCompleted: 0, streak: 3 });
+    expect(summary).toMatchObject({ lessonsCompleted: 1, totalLessons, pathsStarted: 1, totalPaths: learningPaths.length, pathsCompleted: 0, streak: 3 });
     expect(summary.recentLessons[0]).toMatchObject({ lessonId: "source-to-output", lessonTitle: "From source code to output", kind: "lesson-completed" });
     expect(summary.days.slice(-3).map((day) => day.count)).toEqual([2, 1, 1]);
   });

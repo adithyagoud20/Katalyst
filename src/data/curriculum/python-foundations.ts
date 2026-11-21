@@ -37,6 +37,12 @@ const pythonObjectives: LearningObjective[] = [
   { id: "py-classes-encapsulation", title: "Model state and behavior with classes, constructors, self, and encapsulation." },
   { id: "py-inheritance-dataclasses", title: "Extend base classes with inheritance, super(), and structured dataclasses." },
   { id: "py-algorithms-generators", title: "Stream data efficiently with generators and yield, and implement O(log N) search algorithms." },
+  { id: "py-context-managers", title: "Manage resources reliably using context managers and the with statement." },
+  { id: "py-decorators-closures", title: "Wrap functions using decorators and closures with functools.wraps." },
+  { id: "py-dunder-methods", title: "Customize object protocols using Python special dunder methods." },
+  { id: "py-regular-expressions", title: "Parse structured telemetry text using regular expressions." },
+  { id: "py-unit-testing", title: "Write automated test suites with assertions using the unittest framework." },
+  { id: "py-pythonic-capstone", title: "Demonstrate comprehensive mastery of Pythonic idioms, algorithms, and design patterns." },
 ];
 
 function exercise(
@@ -1892,6 +1898,485 @@ Evaluating performance requires measuring asymptotic execution time:
       "A generator computes and yields items lazily one at a time, requiring O(1) memory, whereas a list pre-allocates memory for every item simultaneously (O(N) memory).",
     ),
   },
+
+  {
+    id: "py-context-managers",
+    order: 20,
+    title: "Context Managers and Resource Management",
+    summary: "Manage external resources and enforce teardown guarantees using custom context managers and the with statement.",
+    type: "guided-coding",
+    objectiveIds: ["py-context-managers"],
+    prerequisiteLessonIds: ["py-algorithms-and-generators"],
+    estimatedDurationMinutes: 35,
+    content: `Engineering scripts frequently acquire hardware handles, network sockets, or memory locks. Failing to release these resources causes resource exhaustion or deadlocks. Python's **context managers** enforce deterministic cleanup through the \`with\` statement.
+
+### The Context Manager Protocol
+Any class implementing \`__enter__()\` and \`__exit__()\` acts as a context manager:
+~~~python
+class HardwareLock:
+    def __init__(self, resource: str):
+        self.resource = resource
+
+    def __enter__(self):
+        print(f"Acquired: {self.resource}")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        print(f"Released: {self.resource}")
+        return False  # Do not suppress exceptions
+~~~
+
+### Generator Context Managers with contextlib
+Using \`@contextlib.contextmanager\`, you can create lightweight context managers with a single generator containing a try-finally block.`,
+    theorySections: [
+      {
+        id: "py-context-protocol-flow",
+        title: "Exception Dispatch in __exit__",
+        content: "If an exception occurs within the with block, its type, value, and traceback are passed to __exit__. Returning True suppresses the exception, while returning False or None lets it propagate.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Class-Based Resource Guard",
+        language: "python",
+        code: `class PortScope:\n    def __init__(self, port: int):\n        self.port = port\n    def __enter__(self):\n        print(f"Opening port {self.port}")\n        return self\n    def __exit__(self, exc_type, exc_val, exc_tb):\n        print(f"Closing port {self.port}")\n\nwith PortScope(8080) as p:\n    print(f"Streaming on port {p.port}")`,
+        description: "Enforcing deterministic cleanup around socket and serial port life cycles.",
+      },
+    ],
+    resources: [
+      {
+        title: "contextlib — Utilities for with-statement contexts",
+        url: "https://docs.python.org/3/library/contextlib.html",
+        description: "Official Python documentation for the contextlib module.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "python", target: "browser-wasm" },
+    exampleRun: exampleRun("Opening port 8080\nStreaming on port 8080\nClosing port 8080\n"),
+    exercise: exercise(
+      "ex-py-context-guard",
+      "Build a custom ResourceGuard context manager",
+      "Create a class ResourceGuard with __init__(self, name: str). Its __enter__(self) prints f'[GUARD] Acquired: {self.name}' and returns self.name.upper(). Its __exit__(self, exc_type, exc_val, exc_tb) prints f'[GUARD] Released: {self.name}'. In the script, enter ResourceGuard with 'adc-bus' as bus, and print f'Active on {bus}'.",
+      `class ResourceGuard:\n    def __init__(self, name: str):\n        self.name = name\n    def __enter__(self):\n        print(f"[GUARD] Acquired: {self.name}")\n        return self.name.upper()\n    def __exit__(self, exc_type, exc_val, exc_tb):\n        print(f"[GUARD] Released: {self.name}")\n\nwith ResourceGuard("adc-bus") as bus:\n    print(f"Active on {bus}")`,
+      "py-context-managers",
+      "Build a class-based context manager that guarantees resource acquisition and release.",
+      [
+        "Implement __enter__ to print the acquisition message and return the uppercase name.",
+        "Implement __exit__ with the 4 standard arguments (self, exc_type, exc_val, exc_tb) to print the release message.",
+        "Open the with block and print the uppercase name.",
+      ],
+      "Developing",
+      `class ResourceGuard:\n    # Implement __init__, __enter__, and __exit__\n    pass\n\n# Use with ResourceGuard("adc-bus") as bus\n`,
+      [
+        {
+          id: "tc-py-ctx-1",
+          label: "Prints acquisition, active usage, and release lines",
+          expectedStdout: "[GUARD] Acquired: adc-bus\nActive on ADC-BUS\n[GUARD] Released: adc-bus",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "When is __exit__ executed in a Python context manager?",
+      "The __exit__ method is guaranteed to run whenever execution exits the with block, whether cleanly or via an uncaught exception.",
+    ),
+  },
+
+  {
+    id: "py-decorators-closures",
+    order: 21,
+    title: "Function Decorators and Closures",
+    summary: "Wrap functions to add cross-cutting concerns like logging, timing, and argument validation using closures and @functools.wraps.",
+    type: "practical-exercise",
+    objectiveIds: ["py-decorators-closures"],
+    prerequisiteLessonIds: ["py-context-managers"],
+    estimatedDurationMinutes: 40,
+    content: `A **decorator** is a callable that takes a function as an argument and returns an augmented function. Decorators allow you to cleanly separate cross-cutting concerns like logging, rate limiting, and parameter verification from core algorithmic logic.
+
+### Anatomy of a Decorator
+~~~python
+import functools
+
+def log_call(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        print(f"[CALL] Executing {func.__name__}")
+        return func(*args, **kwargs)
+    return wrapper
+
+@log_call
+def compute(x):
+    return x * 2
+~~~
+Using \`@functools.wraps\` copies original metadata including docstrings and function names.`,
+    theorySections: [
+      {
+        id: "py-closure-lexical-scope",
+        title: "Lexical Closures in Python",
+        content: "An inner function retains access to variables declared in its enclosing parent scope even after the parent function has finished executing.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Timer and Validation Decorator",
+        language: "python",
+        code: `import functools\n\ndef validate_positive(func):\n    @functools.wraps(func)\n    def wrapper(n):\n        if n < 0:\n            raise ValueError("Argument must be positive")\n        return func(n)\n    return wrapper\n\n@validate_positive\ndef calc_area(r):\n    return 3.14159 * r * r\n\nprint(f"Area: {calc_area(5):.2f}")`,
+        description: "Validating function arguments before executing the core routine.",
+      },
+    ],
+    resources: [
+      {
+        title: "functools — Higher-order functions and operations on callables",
+        url: "https://docs.python.org/3/library/functools.html",
+        description: "Documentation for functools.wraps and related utilities.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "python", target: "browser-wasm" },
+    exampleRun: exampleRun("Area: 78.54\n"),
+    exercise: exercise(
+      "ex-py-log-decorator",
+      "Write a logging decorator with functools.wraps",
+      "Import functools. Define a decorator log_execution(func) that uses @functools.wraps(func) and prints f'[CALL] {func.__name__}' before running the target function and returning its result. Decorate a function calculate_checksum(data: list) -> int that returns sum(data) % 256. Call calculate_checksum([10, 20, 30]) and print f'Checksum: {result}'.",
+      `import functools\n\ndef log_execution(func):\n    @functools.wraps(func)\n    def wrapper(*args, **kwargs):\n        print(f"[CALL] {func.__name__}")\n        return func(*args, **kwargs)\n    return wrapper\n\n@log_execution\ndef calculate_checksum(data):\n    return sum(data) % 256\n\nres = calculate_checksum([10, 20, 30])\nprint(f"Checksum: {res}")`,
+      "py-decorators-closures",
+      "Create a reusable decorator that wraps functions and emits trace logs.",
+      [
+        "Import functools and decorate wrapper with @functools.wraps(func).",
+        "Print [CALL] {func.__name__} in wrapper before invoking func(*args, **kwargs).",
+        "Decorate calculate_checksum with @log_execution.",
+      ],
+      "Developing",
+      `import functools\n\n# Implement log_execution decorator\n\n# Define @log_execution calculate_checksum(data)\n`,
+      [
+        {
+          id: "tc-py-dec-1",
+          label: "Prints log message and correct checksum",
+          expectedStdout: "[CALL] calculate_checksum\nChecksum: 60",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is @functools.wraps recommended when writing decorators?",
+      "It preserves the original function's name, docstring, and signature metadata, preventing the wrapper from masking debug traces.",
+    ),
+  },
+
+  {
+    id: "py-dunder-methods",
+    order: 22,
+    title: "Object Protocols and Special Dunder Methods",
+    summary: "Customize object behavior, operator overloading, and string representations using special dunder methods.",
+    type: "guided-coding",
+    objectiveIds: ["py-dunder-methods"],
+    prerequisiteLessonIds: ["py-decorators-closures"],
+    estimatedDurationMinutes: 35,
+    content: `Python allows user-defined classes to participate in language features like addition, indexing, iteration, and string conversion through **dunder** (double-underscore) methods.
+
+### Core Protocols
+- \`__str__(self)\`: Human-readable representation produced by \`print()\` and \`str()\`.
+- \`__repr__(self)\`: Unambiguous developer representation used in debuggers.
+- \`__add__(self, other)\`: Overloads the \`+\` operator.
+- \`__len__(self)\`: Overloads the built-in \`len()\` function.
+
+~~~python
+class Point2D:
+    def __init__(self, x: float, y: float):
+        self.x = x
+        self.y = y
+
+    def __add__(self, other: "Point2D") -> "Point2D":
+        return Point2D(self.x + other.x, self.y + other.y)
+
+    def __str__(self) -> str:
+        return f"({self.x}, {self.y})"
+~~~`,
+    theorySections: [
+      {
+        id: "py-dunder-operator-overload",
+        title: "Operator Overloading Semantics",
+        content: "When an operator like + is evaluated, Python dispatches to the left operand's __add__ method. If it returns NotImplemented, Python tries the right operand's __radd__ method.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Vector Addition with Dunder Methods",
+        language: "python",
+        code: `class Velocity:\n    def __init__(self, vx: float, vy: float):\n        self.vx = vx\n        self.vy = vy\n    def __add__(self, o: "Velocity") -> "Velocity":\n        return Velocity(self.vx + o.vx, self.vy + o.vy)\n    def __str__(self) -> str:\n        return f"Velocity({self.vx:.1f}, {self.vy:.1f})"\n\nv1 = Velocity(10.5, 2.0)\nv2 = Velocity(4.5, 3.0)\nprint(v1 + v2)`,
+        description: "Implementing mathematical addition with __add__ and custom string formatting.",
+      },
+    ],
+    resources: [
+      {
+        title: "Python Data Model - Special method names",
+        url: "https://docs.python.org/3/reference/datamodel.html#special-method-names",
+        description: "Official guide to all dunder methods in the Python object model.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "python", target: "browser-wasm" },
+    exampleRun: exampleRun("Velocity(15.0, 5.0)\n"),
+    exercise: exercise(
+      "ex-py-vector-dunder",
+      "Implement a Vector2D class with __add__ and __str__",
+      "Define a class Vector2D with __init__(self, x: float, y: float), __add__(self, other: 'Vector2D') returning a new Vector2D with summed coordinates, and __str__(self) returning f'Vector2D({self.x:.1f}, {self.y:.1f})'. Instantiate v1 = Vector2D(3.0, 4.0) and v2 = Vector2D(1.5, 2.5), compute v3 = v1 + v2, and print v3.",
+      `class Vector2D:\n    def __init__(self, x: float, y: float):\n        self.x = x\n        self.y = y\n    def __add__(self, other: "Vector2D") -> "Vector2D":\n        return Vector2D(self.x + other.x, self.y + other.y)\n    def __str__(self) -> str:\n        return f"Vector2D({self.x:.1f}, {self.y:.1f})"\n\nv1 = Vector2D(3.0, 4.0)\nv2 = Vector2D(1.5, 2.5)\nprint(v1 + v2)`,
+      "py-dunder-methods",
+      "Overload the + operator and define string conversion for a custom mathematical vector class.",
+      [
+        "Store self.x and self.y in __init__.",
+        "Return a new Vector2D(self.x + other.x, self.y + other.y) from __add__.",
+        "Format coordinates with :.1f inside __str__.",
+      ],
+      "Developing",
+      `class Vector2D:\n    # Define __init__, __add__, and __str__\n    pass\n\nv1 = Vector2D(3.0, 4.0)\nv2 = Vector2D(1.5, 2.5)\n# Compute and print v1 + v2\n`,
+      [
+        {
+          id: "tc-py-dunder-1",
+          label: "Prints summed vector using custom string protocol",
+          expectedStdout: "Vector2D(4.5, 6.5)",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "What is the difference between __str__ and __repr__?",
+      "__str__ provides an informal, human-readable string representation, while __repr__ provides an unambiguous representation used for debugging.",
+    ),
+  },
+
+  {
+    id: "py-regular-expressions",
+    order: 23,
+    title: "Text Parsing and Validation with Regular Expressions",
+    summary: "Match, extract, and validate structured text telemetry using Python's standard re library.",
+    type: "practical-exercise",
+    objectiveIds: ["py-regular-expressions"],
+    prerequisiteLessonIds: ["py-dunder-methods"],
+    estimatedDurationMinutes: 35,
+    content: `Engineering systems stream telemetry in semi-structured text: serial logs, GPS NMEA sentences, and sensor strings. Python's built-in \`re\` module provides regular expression pattern matching to parse these formats reliably.
+
+### Essential re Functions
+- \`re.search(pattern, string)\`: Scans through string looking for the first location where pattern matches.
+- \`re.findall(pattern, string)\`: Returns all non-overlapping matches as a list of strings or tuples.
+- \`re.sub(pattern, replacement, string)\`: Replaces occurrences of pattern with replacement.
+
+### Capture Groups
+~~~python
+import re
+
+pattern = r"NODE:(\d+),TEMP:([\d\.]+)C"
+match = re.search(pattern, "NODE:104,TEMP:24.6C")
+if match:
+    node_id = int(match.group(1))
+    temp = float(match.group(2))
+~~~`,
+    theorySections: [
+      {
+        id: "py-regex-syntax",
+        title: "Raw Strings in Regex",
+        content: "Always prefix regular expression patterns with r (e.g. r'\\d+') to prevent Python from interpreting backslashes as string escape sequences.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Extracting Telemetry Fields",
+        language: "python",
+        code: `import re\n\nlog = "STATUS:OK ID=99 VOLT=3.31V"\nm = re.search(r"ID=(\\d+)\\s+VOLT=([\\d\\.]+)V", log)\nif m:\n    print(f"Device {m.group(1)} operates at {m.group(2)} volts")`,
+        description: "Extracting numeric device ID and voltage reading from a log line.",
+      },
+    ],
+    resources: [
+      {
+        title: "re — Regular expression operations",
+        url: "https://docs.python.org/3/library/re.html",
+        description: "Official documentation for Python regular expressions.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "python", target: "browser-wasm" },
+    exampleRun: exampleRun("Device 99 operates at 3.31 volts\n"),
+    exercise: exercise(
+      "ex-py-parse-telemetry-re",
+      "Parse node telemetry using capture groups",
+      "Import re. Given string telemetry = 'NODE=42,VOLT=3.30V,TEMP=26.4C', use re.search with capture groups to extract the integer node ID and float temperature. Parse node_id = int(match.group(1)) and temp = float(match.group(2)). Print f'Node: {node_id}, Temp: {temp} C'.",
+      `import re\n\ntelemetry = "NODE=42,VOLT=3.30V,TEMP=26.4C"\nm = re.search(r"NODE=(\\d+).*?TEMP=([\\d\\.]+)C", telemetry)\nif m:\n    node_id = int(m.group(1))\n    temp = float(m.group(2))\n    print(f"Node: {node_id}, Temp: {temp} C")`,
+      "py-regular-expressions",
+      "Use regular expression capture groups to parse structured values from sensor strings.",
+      [
+        "Import the re module.",
+        "Formulate a pattern matching NODE=(\\d+) and TEMP=([\\d\\.]+)C.",
+        "Extract group(1) as integer and group(2) as float and print the formatted output.",
+      ],
+      "Developing",
+      `import re\n\ntelemetry = "NODE=42,VOLT=3.30V,TEMP=26.4C"\n# Use re.search with capture groups and print formatted output\n`,
+      [
+        {
+          id: "tc-py-re-1",
+          label: "Extracts node ID and temperature correctly",
+          expectedStdout: "Node: 42, Temp: 26.4 C",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why are raw strings (r'...') preferred when declaring regular expression patterns?",
+      "Raw strings prevent Python from interpreting backslash escape sequences like \\n or \\t, passing literal backslashes directly to the regex engine.",
+    ),
+  },
+
+  {
+    id: "py-unit-testing",
+    order: 24,
+    title: "Automated Unit Testing with unittest",
+    summary: "Write automated test suites with assertions and test discovery using Python's standard unittest framework.",
+    type: "guided-coding",
+    objectiveIds: ["py-unit-testing"],
+    prerequisiteLessonIds: ["py-regular-expressions"],
+    estimatedDurationMinutes: 35,
+    content: `Automated testing ensures systems code behaves correctly through refactoring and version updates. Python includes the **unittest** framework in its standard library.
+
+### Writing a TestCase
+A test case is created by subclassing \`unittest.TestCase\`:
+~~~python
+import unittest
+
+def celsius_to_kelvin(c: float) -> float:
+    return c + 273.15
+
+class TestConversions(unittest.TestCase):
+    def test_absolute_zero(self):
+        self.assertAlmostEqual(celsius_to_kelvin(-273.15), 0.0, places=2)
+
+    def test_boiling(self):
+        self.assertAlmostEqual(celsius_to_kelvin(100.0), 373.15, places=2)
+~~~
+Running \`unittest.main()\` executes discovered tests and summarizes results.`,
+    theorySections: [
+      {
+        id: "py-assertion-types",
+        title: "Standard Assertions",
+        content: "Common assertions include assertEqual, assertTrue, assertFalse, assertAlmostEqual for floating point tolerances, and assertRaises for verifying exceptions.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Testing Mathematical Utilities",
+        language: "python",
+        code: `import unittest\n\ndef clamp(val, low, high):\n    return max(low, min(val, high))\n\nclass TestClamp(unittest.TestCase):\n    def test_within_range(self):\n        self.assertEqual(clamp(5, 0, 10), 5)\n    def test_below_range(self):\n        self.assertEqual(clamp(-5, 0, 10), 0)\n    def test_above_range(self):\n        self.assertEqual(clamp(15, 0, 10), 10)\n\nsuite = unittest.TestLoader().loadTestsFromTestCase(TestClamp)\nrunner = unittest.TextTestRunner(verbosity=0)\nresult = runner.run(suite)\nprint("All tests passed:", result.wasSuccessful())`,
+        description: "Programmatically loading and running a test suite with programmatic assertion checks.",
+      },
+    ],
+    resources: [
+      {
+        title: "unittest — Unit testing framework",
+        url: "https://docs.python.org/3/library/unittest.html",
+        description: "Comprehensive guide to test cases, fixtures, and runners in Python.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "python", target: "browser-wasm" },
+    exampleRun: exampleRun("All tests passed: True\n"),
+    exercise: exercise(
+      "ex-py-temp-unittest",
+      "Write a unit test suite for temperature conversion",
+      "Import unittest. Define fahrenheit_to_celsius(f: float) -> float that returns (f - 32.0) * 5.0 / 9.0. Create a TestCase class TestTemperature with two test methods: test_boiling asserting that fahrenheit_to_celsius(212.0) is almost equal to 100.0 (places=2), and test_freezing asserting that fahrenheit_to_celsius(32.0) is almost equal to 0.0 (places=2). Run the suite programmatically using suite = unittest.TestLoader().loadTestsFromTestCase(TestTemperature); runner = unittest.TextTestRunner(verbosity=0); res = runner.run(suite); print(f'Passed: {res.wasSuccessful()}, Ran: {res.testsRun}').",
+      `import unittest\n\ndef fahrenheit_to_celsius(f: float) -> float:\n    return (f - 32.0) * 5.0 / 9.0\n\nclass TestTemperature(unittest.TestCase):\n    def test_boiling(self):\n        self.assertAlmostEqual(fahrenheit_to_celsius(212.0), 100.0, places=2)\n    def test_freezing(self):\n        self.assertAlmostEqual(fahrenheit_to_celsius(32.0), 0.0, places=2)\n\nsuite = unittest.TestLoader().loadTestsFromTestCase(TestTemperature)\nrunner = unittest.TextTestRunner(verbosity=0)\nres = runner.run(suite)\nprint(f"Passed: {res.wasSuccessful()}, Ran: {res.testsRun}")`,
+      "py-unit-testing",
+      "Construct automated unit test cases with assertions for numeric tolerance verification.",
+      [
+        "Define fahrenheit_to_celsius(f) returning (f - 32.0) * 5.0 / 9.0.",
+        "Subclass unittest.TestCase with test_boiling and test_freezing methods.",
+        "Use self.assertAlmostEqual(actual, expected, places=2) in each test method.",
+      ],
+      "Developing",
+      `import unittest\n\n# Define conversion function and TestTemperature class\n`,
+      [
+        {
+          id: "tc-py-unittest-1",
+          label: "Verifies test execution and successful assertion results",
+          expectedStdout: "Passed: True, Ran: 2",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is assertAlmostEqual preferred over assertEqual when comparing floating point calculations?",
+      "Floating point arithmetic introduces minor binary precision inaccuracies; assertAlmostEqual checks that values match within a specified decimal tolerance.",
+    ),
+  },
+
+  {
+    id: "py-pythonic-capstone-quiz",
+    order: 25,
+    title: "Python Foundations Comprehensive Assessment",
+    summary: "Synthesize modern Pythonic idioms, algorithmic pipelines, object-oriented design, and defensive engineering patterns.",
+    type: "assessment",
+    objectiveIds: ["py-pythonic-capstone"],
+    prerequisiteLessonIds: ["py-unit-testing"],
+    estimatedDurationMinutes: 45,
+    content: `### Capstone Assessment Overview
+This capstone assessment validates your mastery across the complete Python engineering spectrum:
+1. **Dynamic Data Structures**: Dictionaries, sets, list comprehensions, and generators.
+2. **Robust Systems Programming**: Context managers, file parsing, and exception management.
+3. **Object-Oriented Design**: Class hierarchies, special dunder methods, and dataclasses.
+4. **Reliability & Validation**: Decorators, regular expressions, and unit testing.
+
+Review the problem prompt below and implement the end-to-end telemetry parser pipeline.`,
+    theorySections: [
+      {
+        id: "py-capstone-rubric",
+        title: "Engineering Best Practices",
+        content: "High-quality Python code is clean, modular, properly typed, and handles edge cases such as empty input or corrupted records gracefully.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "End-to-End Pipeline Sample",
+        language: "python",
+        code: `def process_records(raw_data):\n    for line in raw_data:\n        if line.startswith("DATA:"):\n            yield int(line.split(":")[1])\n\nprint("Total:", sum(process_records(["DATA:10", "IGNORE", "DATA:20"])))`,
+        description: "Streaming transformation pipeline using generator filtering.",
+      },
+    ],
+    resources: [
+      {
+        title: "The Zen of Python (PEP 20)",
+        url: "https://peps.python.org/pep-0020/",
+        description: "Guiding design principles for Python software architecture.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "python", target: "browser-wasm" },
+    exampleRun: exampleRun("Total: 30\n"),
+    exercise: exercise(
+      "ex-py-capstone-pipeline",
+      "Build a streaming telemetry aggregator pipeline",
+      "Implement a function parse_and_average(records: list[str]) -> float that processes a list of telemetry strings in format 'DEVICE:ID,VALUE:NUM'. The function must: 1) Skip strings that do not start with 'DEVICE:'. 2) Extract the float NUM value using string splitting or regex. 3) Compute and return the average of all valid numeric values rounded to 2 decimal places. Test with records = ['DEVICE:1,VALUE:12.5', 'COMMENT:SKIP', 'DEVICE:2,VALUE:17.5', 'DEVICE:3,VALUE:20.0'] and print f'Average: {parse_and_average(records):.2f}'.",
+      `def parse_and_average(records: list[str]) -> float:\n    values = []\n    for r in records:\n        if r.startswith("DEVICE:"):\n            val = float(r.split("VALUE:")[1])\n            values.append(val)\n    return sum(values) / len(values) if values else 0.0\n\nrecords = ["DEVICE:1,VALUE:12.5", "COMMENT:SKIP", "DEVICE:2,VALUE:17.5", "DEVICE:3,VALUE:20.0"]\nprint(f"Average: {parse_and_average(records):.2f}")`,
+      "py-pythonic-capstone",
+      "Synthesize parsing, filtering, and aggregation into a complete telemetry processing function.",
+      [
+        "Iterate over records and filter using line.startswith('DEVICE:').",
+        "Extract the value after VALUE: and cast to float.",
+        "Compute sum / count and format to 2 decimal places.",
+      ],
+      "Applied",
+      `def parse_and_average(records: list[str]) -> float:\n    # Implement parser and return average\n    pass\n\nrecords = ["DEVICE:1,VALUE:12.5", "COMMENT:SKIP", "DEVICE:2,VALUE:17.5", "DEVICE:3,VALUE:20.0"]\n# Call and print Average: {val:.2f}\n`,
+      [
+        {
+          id: "tc-py-cap-1",
+          label: "Calculates correct average across filtered telemetry records",
+          expectedStdout: "Average: 16.67",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "What core engineering trade-off is achieved by streaming data processing using generators?",
+      "Generators trade negligible execution overhead for massive memory savings (O(1) memory), enabling systems to process datasets larger than available RAM.",
+    ),
+  },
 ];
 
 export const pythonProgrammingPath: LearningCourse = {
@@ -1914,7 +2399,7 @@ export const pythonProgrammingPath: LearningCourse = {
     "Design reusable functions with positional, default, and keyword arguments and clear variable scopes.",
     "Solve engineering and data-handling problems by combining data structures, modular logic, and file operations.",
   ],
-  estimatedDurationMinutes: 540,
+  estimatedDurationMinutes: 660,
   publicationStatus: "published",
   modules: [
     moduleData("py-fundamentals", 1, "Python fundamentals and dynamic typing", "Meet Python, understand interpreted execution, and work with dynamic variables and numeric types.", pythonLessons.slice(0, 2)),
@@ -1923,6 +2408,7 @@ export const pythonProgrammingPath: LearningCourse = {
     moduleData("py-data-structures", 4, "Strings, collections, and data structures", "Store, index, slice, and transform collections with lists, tuples, dictionaries, and sets.", pythonLessons.slice(8, 11)),
     moduleData("py-functions-and-robustness", 5, "Functions, scope, and error handling", "Encapsulate logic into reusable functions, manage variable scope, and handle runtime exceptions gracefully.", pythonLessons.slice(11, 14)),
     moduleData("py-files-and-projects", 6, "Files, modules, and practical engineering", "Read and write external files, structure modular scripts, and build a complete engineering data processor.", pythonLessons.slice(14, 16)),
-    moduleData("py-oop-and-algorithms", 7, "Object-oriented systems and algorithmic efficiency", "Design robust domain models using classes, inheritance, dataclasses, and streaming generators.", pythonLessons.slice(16)),
+    moduleData("py-oop-and-algorithms", 7, "Object-oriented systems and algorithmic efficiency", "Design robust domain models using classes, inheritance, dataclasses, and streaming generators.", pythonLessons.slice(16, 19)),
+    moduleData("py-advanced-architecture", 8, "Pythonic Architecture and Advanced Constructs", "Master context managers, function decorators, special dunder methods, regular expressions, unit testing, and architectural design patterns.", pythonLessons.slice(19)),
   ],
 };

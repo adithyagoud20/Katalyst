@@ -36,6 +36,12 @@ const objectives: LearningObjective[] = [
   { id: "bitwise-registers", title: "Apply bitwise operations to set, clear, and inspect hardware control register flags." },
   { id: "dynamic-memory", title: "Allocate and free heap memory safely while checking for allocation failures." },
   { id: "function-pointers", title: "Store function addresses in pointer variables and dispatch dynamic callbacks." },
+  { id: "recursion-callstack", title: "Trace recursive calls and stack frame allocation." },
+  { id: "preprocessor-macros", title: "Write parameterized preprocessor macros and header guards safely." },
+  { id: "structures-padding-alignment", title: "Explain struct memory alignment, member ordering, and padding." },
+  { id: "error-handling-errno", title: "Handle runtime faults defensively using return codes and errno." },
+  { id: "defensive-programming-assert", title: "Enforce internal state invariants with runtime assertions." },
+  { id: "c-foundations-capstone", title: "Integrate pointers, bitwise math, structures, and defensive checks in a capstone review." },
 ];
 
 function exercise(
@@ -1007,6 +1013,361 @@ The declaration \`int (*operation)(int, int)\` defines a pointer to a function r
     exampleRun: exampleRun("Transformed: 15\n"),
     checkpoint: checkpoint("How does a function pointer enable flexible state machines and event-driven architectures?", "Instead of using monolithic switch-case blocks, event handlers or state transition callbacks can be registered and invoked dynamically."),
   },
+  {
+    id: "recursion-callstack",
+    order: 17,
+    title: "Call Stack and Recursion",
+    summary: "Trace how recursive functions allocate stack frames and return through base cases.",
+    objectiveIds: ["recursion-callstack"],
+    prerequisiteLessonIds: ["function-pointers"],
+    content: `Every time a C function is called, the runtime pushes a **stack frame** containing its parameters, local variables, and return address. When the function returns, its frame is popped.
+
+A recursive function calls itself to solve smaller sub-problems. Every valid recursive function requires:
+1. A **base case** that stops recursion.
+2. A **recursive step** moving toward the base case.
+
+~~~c
+#include <stdio.h>
+
+static int factorial(int n) {
+    if (n <= 1) return 1;
+    return n * factorial(n - 1);
+}
+
+int main(void) {
+    printf("Factorial 5 = %d\\n", factorial(5));
+    return 0;
+}
+~~~
+
+### Common Mistakes to Avoid
+- Forgetting the base case, leading to infinite recursion and stack overflow.
+- Performing heavy stack allocations inside deep recursion.
+- Modifying a parameter expecting it to persist across sibling recursive calls.`,
+    exercise: exercise(
+      "ex-recursion-sum",
+      "Recursive range sum",
+      "Write a recursive function sum_range(int n) that computes the sum from 1 to n.",
+      "#include <stdio.h>\n\nstatic int sum_range(int n) {\n    if (n <= 1) return n;\n    return n + sum_range(n - 1);\n}\n\nint main(void) {\n    printf(\"Sum: %d\\n\", sum_range(5));\n    return 0;\n}",
+      "recursion-callstack",
+      "Compute sum of first N positive integers using recursion.",
+      "Base case: if n <= 1 return n.",
+      "Developing",
+      "#include <stdio.h>\n\nstatic int sum_range(int n) {\n    /* TODO: base case and recursive call */\n    return 0;\n}\n\nint main(void) {\n    printf(\"Sum: %d\\n\", sum_range(5));\n    return 0;\n}",
+      [
+        "Check if n <= 1 and return n immediately.",
+        "Otherwise return n + sum_range(n - 1)."
+      ],
+      [
+        {
+          id: "tc-sum-1",
+          label: "Computes sum from 1 to 5 as 15",
+          expectedStdout: "Sum: 15",
+          matchMode: "trimmed"
+        }
+      ]
+    ),
+    exampleRun: exampleRun("Factorial 5 = 120\n"),
+    checkpoint: checkpoint("What happens if a recursive function lacks a base case?", "The function calls itself indefinitely until all thread stack memory is exhausted, resulting in a stack overflow crash.")
+  },
+  {
+    id: "preprocessor-macros",
+    order: 18,
+    title: "Preprocessor Macros & Guards",
+    summary: "Write safe parameterized macros and conditional compilation blocks.",
+    objectiveIds: ["preprocessor-macros"],
+    prerequisiteLessonIds: ["recursion-callstack"],
+    content: `The C preprocessor runs before actual token compilation. It handles includes, conditional compilation (\`#ifdef\`, \`#endif\`), and macro substitution (\`#define\`).
+
+Always parenthesize macro arguments and expressions to prevent operator precedence bugs:
+
+~~~c
+#include <stdio.h>
+
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+#define DEBUG_PRINT(msg) printf("Debug: %s\\n", msg)
+
+int main(void) {
+    int x = 15;
+    int y = 42;
+    printf("Max: %d\\n", MAX(x, y));
+    DEBUG_PRINT("active");
+    return 0;
+}
+~~~
+
+### Common Mistakes to Avoid
+- Missing parentheses in macros: \`#define SQUARE(x) x * x\` breaks on \`SQUARE(2 + 3)\` (evaluating as \`2 + 3 * 2 + 3 = 11\` instead of 25).
+- Passing expressions with side effects to macros: \`MAX(a++, b)\` increments \`a\` twice.`,
+    exercise: exercise(
+      "ex-macro-cube",
+      "Safe arithmetic macro",
+      "Define a macro CUBE(x) that safely cubes its argument with full parentheses.",
+      "#include <stdio.h>\n\n#define CUBE(x) ((x) * (x) * (x))\n\nint main(void) {\n    printf(\"Cube: %d\\n\", CUBE(3));\n    return 0;\n}",
+      "preprocessor-macros",
+      "Define CUBE(x) with parentheses around every argument and the whole expression.",
+      "Use ((x) * (x) * (x))",
+      "Beginner",
+      "#include <stdio.h>\n\n/* TODO: Define CUBE(x) */\n\nint main(void) {\n    printf(\"Cube: %d\\n\", CUBE(3));\n    return 0;\n}",
+      [
+        "Parenthesize every instance of x.",
+        "Wrap the whole product in parentheses."
+      ],
+      [
+        {
+          id: "tc-cube-1",
+          label: "Calculates cube of 3 as 27",
+          expectedStdout: "Cube: 27",
+          matchMode: "trimmed"
+        }
+      ]
+    ),
+    exampleRun: exampleRun("Max: 42\nDebug: active\n"),
+    checkpoint: checkpoint("Why must every parameter in a parameterized macro be wrapped in parentheses?", "Because macro substitution is text replacement; without parentheses, operator precedence in callers can alter evaluation order.")
+  },
+  {
+    id: "structures-padding-alignment",
+    order: 19,
+    title: "Structure Memory Alignment",
+    summary: "Understand CPU memory alignment requirements and structure padding.",
+    objectiveIds: ["structures-padding-alignment"],
+    prerequisiteLessonIds: ["preprocessor-macros"],
+    content: `Hardware architectures access memory faster when multi-byte datatypes reside on natural address boundaries (e.g., 4-byte integers at multiples of 4).
+
+The compiler inserts unused padding bytes between struct members to satisfy alignment:
+
+~~~c
+#include <stdio.h>
+
+struct CompactPacket {
+    int id;
+    int code;
+    char flag;
+};
+
+int main(void) {
+    struct CompactPacket packet = { 101, 202, 'A' };
+    printf("Packet id=%d, code=%d, flag=%c\\n", packet.id, packet.code, packet.flag);
+    return 0;
+}
+~~~
+
+### Common Mistakes to Avoid
+- Assuming \`sizeof(struct)\` equals the direct arithmetic sum of its member sizes.
+- Ordering members haphazardly, wasting RAM on embedded microcontrollers.`,
+    exercise: exercise(
+      "ex-struct-alignment",
+      "Struct field initialization",
+      "Initialize and print the fields of a structured packet.",
+      "#include <stdio.h>\n\nstruct Header {\n    int version;\n    char type;\n};\n\nint main(void) {\n    struct Header h = { 2, 'H' };\n    printf(\"Ver: %d, Type: %c\\n\", h.version, h.type);\n    return 0;\n}",
+      "structures-padding-alignment",
+      "Print struct header values.",
+      "Access members using dot notation: h.version",
+      "Beginner",
+      "#include <stdio.h>\n\nstruct Header {\n    int version;\n    char type;\n};\n\nint main(void) {\n    /* TODO: initialize and print */\n    return 0;\n}",
+      [
+        "Create struct Header h = { 2, 'H' };",
+        "Use printf(\"Ver: %d, Type: %c\\n\", h.version, h.type);"
+      ],
+      [
+        {
+          id: "tc-hdr-1",
+          label: "Prints Ver: 2, Type: H",
+          expectedStdout: "Ver: 2, Type: H",
+          matchMode: "trimmed"
+        }
+      ]
+    ),
+    exampleRun: exampleRun("Packet id=101, code=202, flag=A\n"),
+    checkpoint: checkpoint("Why does the compiler insert padding bytes into a structure?", "CPUs fetch data more efficiently when words align on matching memory address boundaries.")
+  },
+  {
+    id: "error-handling-errno",
+    order: 20,
+    title: "Defensive Error Handling with errno",
+    summary: "Return status codes and inspect standard error indicators defensively.",
+    objectiveIds: ["error-handling-errno"],
+    prerequisiteLessonIds: ["structures-padding-alignment"],
+    content: `C does not have try-catch exceptions. Robust systems functions return status codes (such as 0 for success, non-zero for error) and report results through pointer parameters.
+
+Standard C library functions also set the global \`errno\` variable on failure.
+
+~~~c
+#include <stdio.h>
+#include <errno.h>
+
+static int safe_divide(int num, int den, int *result) {
+    if (den == 0) {
+        return -1;
+    }
+    *result = num / den;
+    return 0;
+}
+
+int main(void) {
+    int res = 0;
+    if (safe_divide(100, 0, &res) != 0) {
+        printf("Error: division by zero prevented\\n");
+    }
+    if (safe_divide(100, 4, &res) == 0) {
+        printf("Quotient: %d\\n", res);
+    }
+    return 0;
+}
+~~~
+
+### Common Mistakes to Avoid
+- Ignoring return values of critical functions (like \`malloc\`, \`fopen\`, or parser routines).
+- Checking \`errno\` without the library documentation specifying that the function sets it.`,
+    exercise: exercise(
+      "ex-safe-subtraction",
+      "Safe non-negative subtraction",
+      "Implement safe_sub(int a, int b, int *diff) returning -1 if b > a, otherwise 0.",
+      "#include <stdio.h>\n\nstatic int safe_sub(int a, int b, int *diff) {\n    if (b > a) return -1;\n    *diff = a - b;\n    return 0;\n}\n\nint main(void) {\n    int out = 0;\n    if (safe_sub(10, 3, &out) == 0) {\n        printf(\"Diff: %d\\n\", out);\n    }\n    return 0;\n}",
+      "error-handling-errno",
+      "Write safe_sub checking subtraction constraints.",
+      "Check if (b > a) return -1; else assign *diff.",
+      "Developing",
+      "#include <stdio.h>\n\nstatic int safe_sub(int a, int b, int *diff) {\n    /* TODO: check and assign */\n    return 0;\n}\n\nint main(void) {\n    int out = 0;\n    if (safe_sub(10, 3, &out) == 0) {\n        printf(\"Diff: %d\\n\", out);\n    }\n    return 0;\n}",
+      [
+        "Return -1 if b > a.",
+        "Store a - b in *diff and return 0."
+      ],
+      [
+        {
+          id: "tc-sub-1",
+          label: "Computes 10 - 3 as 7",
+          expectedStdout: "Diff: 7",
+          matchMode: "trimmed"
+        }
+      ]
+    ),
+    exampleRun: exampleRun("Error: division by zero prevented\nQuotient: 25\n"),
+    checkpoint: checkpoint("Why do C systems APIs return status codes instead of throwing exceptions?", "C is designed for deterministic execution and low runtime overhead without stack unwinding mechanisms.")
+  },
+  {
+    id: "defensive-programming-assert",
+    order: 21,
+    title: "Assertions & Defensive Invariants",
+    summary: "Validate internal assumptions and catch developer logic errors with assert.",
+    objectiveIds: ["defensive-programming-assert"],
+    prerequisiteLessonIds: ["error-handling-errno"],
+    content: `The \`assert()\` macro from \`<assert.h>\` tests expressions that must always be true unless the code has a bug. If an assertion evaluates to false, the program aborts immediately with diagnostic information.
+
+Assertions are for developer invariants, not user-facing runtime input validation:
+
+~~~c
+#include <stdio.h>
+#include <assert.h>
+
+static int get_element(const int *arr, int size, int index) {
+    assert(arr != NULL);
+    assert(index >= 0 && index < size);
+    return arr[index];
+}
+
+int main(void) {
+    int data[4] = { 10, 20, 30, 40 };
+    printf("Element at 2: %d\\n", get_element(data, 4, 2));
+    printf("Validation passed\\n");
+    return 0;
+}
+~~~
+
+### Common Mistakes to Avoid
+- Putting expressions with side effects in assertions (e.g. \`assert(x++ > 0)\`), because in release builds with \`-DNDEBUG\`, assertions are removed entirely!
+- Using \`assert\` to handle expected user input errors.`,
+    exercise: exercise(
+      "ex-validate-positive",
+      "Assertion guard",
+      "Write a function double_val(int x) that asserts x >= 0 and returns x * 2.",
+      "#include <stdio.h>\n#include <assert.h>\n\nstatic int double_val(int x) {\n    assert(x >= 0);\n    return x * 2;\n}\n\nint main(void) {\n    printf(\"Doubled: %d\\n\", double_val(21));\n    return 0;\n}",
+      "defensive-programming-assert",
+      "Write double_val using assert.",
+      "Include <assert.h> and call assert(x >= 0).",
+      "Beginner",
+      "#include <stdio.h>\n#include <assert.h>\n\nstatic int double_val(int x) {\n    /* TODO: assert and return */\n    return 0;\n}\n\nint main(void) {\n    printf(\"Doubled: %d\\n\", double_val(21));\n    return 0;\n}",
+      [
+        "Add assert(x >= 0);",
+        "Return x * 2;"
+      ],
+      [
+        {
+          id: "tc-double-1",
+          label: "Doubles 21 to 42",
+          expectedStdout: "Doubled: 42",
+          matchMode: "trimmed"
+        }
+      ]
+    ),
+    exampleRun: exampleRun("Element at 2: 30\nValidation passed\n"),
+    checkpoint: checkpoint("What happens to assert() statements when compiling with -DNDEBUG?", "All assertions are disabled and expand to nothing, producing zero runtime overhead in production.")
+  },
+  {
+    id: "c-foundations-capstone-quiz",
+    order: 22,
+    title: "C Systems Checkpoint & Capstone",
+    summary: "Integrate pointers, memory alignment, bitwise math, and defensive checks.",
+    objectiveIds: ["c-foundations-capstone"],
+    prerequisiteLessonIds: ["defensive-programming-assert"],
+    content: `You have built a rigorous foundation in C: compilation pipelines, types, control flow, pointers, memory records, file I/O, bitwise masks, dynamic memory, and function pointers.
+
+In real systems software and firmware drivers, these concepts work together. Here is a telemetry packet validator that treats struct memory as raw byte arrays to calculate an XOR checksum:
+
+~~~c
+#include <stdio.h>
+
+struct SensorTelemetry {
+    int sensorId;
+    int reading;
+};
+
+static unsigned char compute_checksum(const struct SensorTelemetry *p) {
+    const unsigned char *bytes = (const unsigned char *)p;
+    unsigned char chk = 0;
+    for (size_t i = 0; i < sizeof(struct SensorTelemetry); ++i) {
+        chk ^= bytes[i];
+    }
+    return chk;
+}
+
+int main(void) {
+    struct SensorTelemetry t = { 1, 100 };
+    unsigned char c = compute_checksum(&t);
+    printf("Telemetry ID: %d, Reading: %d, Validated: %s\\n", t.sensorId, t.reading, c ? "yes" : "no");
+    return 0;
+}
+~~~
+
+### Common Mistakes to Avoid
+- Casting arbitrary structs without knowing alignment or endianness when sending over a network.
+- Assuming different compiler versions pack structs identically.`,
+    exercise: exercise(
+      "ex-capstone-validate",
+      "Packet ID validator",
+      "Write a function validate_id(int id) that returns 1 if id is between 1 and 255, else 0.",
+      "#include <stdio.h>\n\nstatic int validate_id(int id) {\n    return (id >= 1 && id <= 255) ? 1 : 0;\n}\n\nint main(void) {\n    printf(\"Valid: %d\\n\", validate_id(42));\n    return 0;\n}",
+      "c-foundations-capstone",
+      "Implement packet range validation.",
+      "Return 1 if in range 1..255 else 0.",
+      "Beginner",
+      "#include <stdio.h>\n\nstatic int validate_id(int id) {\n    /* TODO: range check */\n    return 0;\n}\n\nint main(void) {\n    printf(\"Valid: %d\\n\", validate_id(42));\n    return 0;\n}",
+      [
+        "Check (id >= 1 && id <= 255).",
+        "Return 1 if valid, 0 otherwise."
+      ],
+      [
+        {
+          id: "tc-val-1",
+          label: "Validates ID 42 as 1",
+          expectedStdout: "Valid: 1",
+          matchMode: "trimmed"
+        }
+      ]
+    ),
+    exampleRun: exampleRun("Telemetry ID: 1, Reading: 100, Validated: yes\n"),
+    checkpoint: checkpoint("Why are byte-level pointer casts (unsigned char *) preferred for serializing data packets?", "Because unsigned char pointers are guaranteed by the C standard to safely inspect the object representation of any type without violating strict aliasing.")
+  }
 ];
 
 export const cProgrammingPath: LearningCourseDetail = {
@@ -1034,6 +1395,7 @@ export const cProgrammingPath: LearningCourseDetail = {
     moduleData("functions-and-sequences", 3, "Functions and sequences", "Name reusable work and handle ordered collections of data.", lessons.slice(6, 9)),
     moduleData("memory-and-records", 4, "Memory and records", "Follow addresses and model related data with C record types.", lessons.slice(9, 11)),
     moduleData("files-and-practice", 5, "Files and practical programming", "Check file operations and bring the course ideas together.", lessons.slice(11, 13)),
-    moduleData("systems-engineering", 6, "Systems & low-level engineering", "Manipulate bitwise registers, manage dynamic heap memory, and dispatch function pointers.", lessons.slice(13)),
+    moduleData("systems-engineering", 6, "Systems & low-level engineering", "Manipulate bitwise registers, manage dynamic heap memory, and dispatch function pointers.", lessons.slice(13, 16)),
+    moduleData("robust-systems-engineering", 7, "Robust systems & defensive C", "Trace stack frames, configure safe preprocessor macros, handle memory alignment, manage errno, and write defensive assertions.", lessons.slice(16)),
   ],
 };

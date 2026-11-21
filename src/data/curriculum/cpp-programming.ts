@@ -23,6 +23,10 @@ const objectives: LearningObjective[] = [
   { id: "cpp-stl-algos", title: "Compose STL algorithms (std::transform, std::copy_if, std::accumulate) with modern C++ lambdas." },
   { id: "cpp-smart-ptrs", title: "Enforce single and shared ownership semantics using std::unique_ptr and std::shared_ptr." },
   { id: "cpp-templates", title: "Write reusable generic functions and container class templates with compile-time type safety." },
+  { id: "cpp-move-semantics", title: "Apply rvalue references and std::move for zero-copy ownership transfer." },
+  { id: "cpp-lambdas-capture", title: "Capture state with lambdas and pass callbacks via std::function." },
+  { id: "cpp-concurrency-threads", title: "Coordinate multithreaded tasks using std::thread and std::lock_guard." },
+  { id: "cpp-capstone-quiz", title: "Synthesize modern C++ idioms, RAII, STL, and memory management." },
 ];
 
 function testCase(
@@ -1216,6 +1220,499 @@ int main() {
       "Static templates are resolved at compile time with zero vtable pointer indirection and full compiler inlining."
     ),
   },
+
+  {
+    id: "cpp-move-semantics-rvalue",
+    order: 9,
+    title: "Move Semantics and Rvalue References",
+    summary: "Eliminate expensive buffer copies using rvalue references (T&&) and std::move transfer semantics.",
+    type: "guided-coding",
+    objectiveIds: ["cpp-move-semantics"],
+    prerequisiteLessonIds: ["cpp-templates-polymorphism"],
+    estimatedDurationMinutes: 30,
+    content: `Prior to C++11, copying objects holding dynamic heap buffers required allocating a duplicate buffer and copying each element. **Move semantics** solves this by transferring ownership of internal resources from temporary objects (rvalues) without copying.
+
+### Rvalue References (T&&)
+An rvalue reference \`T&&\` binds specifically to temporary objects that are about to be destroyed.
+
+### std::move
+\`std::move\` does not move anything itself; it unconditionally casts its argument to an rvalue reference, enabling the move constructor or move assignment operator to be selected.
+
+~~~cpp
+#include <iostream>
+#include <vector>
+#include <utility>
+
+struct Buffer {
+    std::vector<int> data;
+    Buffer(size_t size) : data(size, 1) {}
+    Buffer(Buffer&& other) noexcept : data(std::move(other.data)) {
+        std::cout << "Moved!\\n";
+    }
+};
+~~~`,
+    theorySections: [
+      {
+        id: "cpp-move-vs-copy",
+        title: "Copy vs. Move Cost",
+        content: "A copy of a 1 MB std::vector requires a 1 MB allocation and 1 MB memcpy. A move simply swaps three internal 64-bit pointers (begin, end, capacity) in O(1) time.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Resource Transfer Demonstration",
+        language: "cpp",
+        code: `#include <iostream>
+#include <string>
+#include <utility>
+
+void inspect(const std::string& lval) {
+    std::cout << "lvalue: " << lval << "\\n";
+}
+
+void inspect(std::string&& rval) {
+    std::cout << "rvalue moved: " << rval << "\\n";
+}
+
+int main() {
+    std::string text = "Katalyst Engine";
+    inspect(text);
+    inspect(std::move(text));
+    return 0;
+}`,
+        description: "Overload resolution between lvalue and rvalue references.",
+      },
+    ],
+    execution: { language: "cpp", target: "browser-wasm" },
+    exampleRun: {
+      sampleInput: "",
+      expectedOutput: "lvalue: Katalyst Engine\nrvalue moved: Katalyst Engine\n",
+    },
+    exercise: {
+      id: "ex-cpp-move-transfer",
+      title: "Implement Move Semantics on a Buffer Holder",
+      prompt: "Implement a MoveBuffer struct with a std::vector<int> data member. Provide a constructor MoveBuffer(size_t n) filling data with value 42, and a move constructor MoveBuffer(MoveBuffer&& o) noexcept that moves o.data into data and prints 'MOVED'. In main(), construct b1 with size 5, then construct b2 using std::move(b1), and print b2.data.size().",
+      objectiveId: "cpp-move-semantics",
+      difficulty: "Developing",
+      expectedOutcome: "Transfer vector ownership with std::move and output 'MOVED' followed by size 5.",
+      starterCode: `#include <iostream>
+#include <vector>
+#include <utility>
+
+struct MoveBuffer {
+    std::vector<int> data;
+    // Add constructor and move constructor
+};
+
+int main() {
+    // Construct b1 and move to b2
+    return 0;
+}
+`,
+      solution: `#include <iostream>
+#include <vector>
+#include <utility>
+
+struct MoveBuffer {
+    std::vector<int> data;
+    MoveBuffer(size_t n) : data(n, 42) {}
+    MoveBuffer(MoveBuffer&& o) noexcept : data(std::move(o.data)) {
+        std::cout << "MOVED\\n";
+    }
+};
+
+int main() {
+    MoveBuffer b1(5);
+    MoveBuffer b2(std::move(b1));
+    std::cout << "Size: " << b2.data.size() << "\\n";
+    return 0;
+}
+`,
+      hints: [
+        "In the move constructor, initialize `data(std::move(o.data))` in the member initializer list.",
+        "Print `MOVED\\n` inside the move constructor body.",
+      ],
+      testCases: [
+        testCase("tc-move-1", "Verify move constructor execution and size", "MOVED\nSize: 5"),
+      ],
+    },
+    checkpoint: checkpoint(
+      "What state is a moved-from standard library object left in?",
+      "It is left in a valid but unspecified state, meaning it can be safely destroyed or reassigned, but its value cannot be relied upon."
+    ),
+  },
+
+  {
+    id: "cpp-lambdas-capture",
+    order: 10,
+    title: "Lambda Expressions and Functional Callbacks",
+    summary: "Write concise inline lambdas with explicit capture clauses and pass them via std::function.",
+    type: "practical-exercise",
+    objectiveIds: ["cpp-lambdas-capture"],
+    prerequisiteLessonIds: ["cpp-move-semantics-rvalue"],
+    estimatedDurationMinutes: 30,
+    content: `Lambdas in C++ provide lightweight anonymous function objects (closures) that can capture variables from their enclosing scope.
+
+### Lambda Syntax
+\`\`\`cpp
+[capture_clause](parameters) -> return_type {
+    body;
+}
+\`\`\`
+
+### Capture Modes
+- \`[]\`: Capture nothing.
+- \`[=]\`: Capture all outer variables by copy (read-only by default).
+- \`[&]\`: Capture all outer variables by reference.
+- \`[x, &y]\`: Capture \`x\` by copy and \`y\` by reference.
+
+~~~cpp
+#include <iostream>
+#include <functional>
+
+void process_data(int val, const std::function<void(int)>& callback) {
+    callback(val * 2);
+}
+~~~`,
+    theorySections: [
+      {
+        id: "cpp-closure-compiler-generation",
+        title: "Compiler Closure Types",
+        content: "Every lambda expression generates a unique, anonymous struct type with overloaded operator() and member variables corresponding to captured values.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Filter and Transform with Capture Clause",
+        language: "cpp",
+        code: `#include <iostream>
+#include <vector>
+#include <algorithm>
+
+int main() {
+    std::vector<int> readings = {12, 45, 68, 23, 89};
+    int threshold = 30;
+    int count = 0;
+    std::for_each(readings.begin(), readings.end(), [threshold, &count](int val) {
+        if (val > threshold) count++;
+    });
+    std::cout << "Above " << threshold << ": " << count << "\\n";
+    return 0;
+}`,
+        description: "Capturing a threshold by value and a counter by reference.",
+      },
+    ],
+    execution: { language: "cpp", target: "browser-wasm" },
+    exampleRun: {
+      sampleInput: "",
+      expectedOutput: "Above 30: 3\n",
+    },
+    exercise: {
+      id: "ex-cpp-lambda-callback",
+      title: "Pass a stateful lambda callback to a processor",
+      prompt: "Write a function `void apply_filter(const std::vector<int>& vals, const std::function<void(int)>& fn)` that loops through vals and invokes fn for each value. In main(), create vals = {10, 25, 30, 45}, maintain total = 0, call apply_filter with a lambda capturing total by reference to sum elements greater than 20, and print 'Sum: ' followed by total.",
+      objectiveId: "cpp-lambdas-capture",
+      difficulty: "Developing",
+      expectedOutcome: "Accumulate filtered values with a capture-by-reference lambda to produce 'Sum: 100'.",
+      starterCode: `#include <iostream>
+#include <vector>
+#include <functional>
+
+void apply_filter(const std::vector<int>& vals, const std::function<void(int)>& fn) {
+    // Iterate and invoke fn
+}
+
+int main() {
+    // Define vector, run filter, and print Sum
+    return 0;
+}
+`,
+      solution: `#include <iostream>
+#include <vector>
+#include <functional>
+
+void apply_filter(const std::vector<int>& vals, const std::function<void(int)>& fn) {
+    for (int v : vals) {
+        fn(v);
+    }
+}
+
+int main() {
+    std::vector<int> vals = {10, 25, 30, 45};
+    int total = 0;
+    apply_filter(vals, [&total](int v) {
+        if (v > 20) total += v;
+    });
+    std::cout << "Sum: " << total << "\\n";
+    return 0;
+}
+`,
+      hints: [
+        "Include `<functional>` to use `std::function<void(int)>`.",
+        "Capture total with `[&total]` in the lambda parameter list.",
+      ],
+      testCases: [
+        testCase("tc-lambda-1", "Verify filtered sum via capture by reference", "Sum: 100"),
+      ],
+    },
+    checkpoint: checkpoint(
+      "When should you prefer std::function over a template argument for callbacks?",
+      "std::function is preferred when callbacks need to be stored in containers or headers without exposing template definitions, at the cost of a small type-erasure indirection."
+    ),
+  },
+
+  {
+    id: "cpp-concurrency-threads",
+    order: 11,
+    title: "Concurrency with std::thread and std::mutex",
+    summary: "Coordinate concurrent execution safely using std::thread, std::mutex, and RAII locks.",
+    type: "guided-coding",
+    objectiveIds: ["cpp-concurrency-threads"],
+    prerequisiteLessonIds: ["cpp-lambdas-capture"],
+    estimatedDurationMinutes: 35,
+    content: `Modern microcontrollers (like dual-core ESP32) and multi-core systems run multiple tasks in parallel. C++11 introduced a native threading model in the standard library.
+
+### Spawning Threads
+\`\`\`cpp
+#include <thread>
+
+void worker(int id) {
+    // Task code
+}
+
+std::thread t(worker, 1);
+t.join(); // Wait for thread completion
+\`\`\`
+
+### Race Conditions and std::mutex
+When multiple threads read and write shared data simultaneously without synchronization, a **data race** occurs. Protecting the shared resource with \`std::mutex\` and \`std::lock_guard\` guarantees mutual exclusion.
+
+~~~cpp
+#include <mutex>
+
+std::mutex mtx;
+int counter = 0;
+
+void increment() {
+    std::lock_guard<std::mutex> lock(mtx);
+    counter++;
+}
+~~~`,
+    theorySections: [
+      {
+        id: "cpp-raii-locking",
+        title: "RAII Locking with std::lock_guard",
+        content: "std::lock_guard locks the mutex upon construction and unlocks it automatically when going out of scope, preventing deadlocks even if an exception is thrown.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Thread Join and Mutex Demonstration",
+        language: "cpp",
+        code: `#include <iostream>
+#include <thread>
+#include <mutex>
+#include <vector>
+
+std::mutex log_mtx;
+
+void log_task(int id) {
+    std::lock_guard<std::mutex> lock(log_mtx);
+    std::cout << "Task " << id << " completed\\n";
+}
+
+int main() {
+    std::thread t1(log_task, 1);
+    std::thread t2(log_task, 2);
+    t1.join();
+    t2.join();
+    return 0;
+}`,
+        description: "Launching parallel tasks and synchronizing console I/O.",
+      },
+    ],
+    execution: { language: "cpp", target: "browser-wasm" },
+    exampleRun: {
+      sampleInput: "",
+      expectedOutput: "Task 1 completed\nTask 2 completed\n",
+    },
+    exercise: {
+      id: "ex-cpp-thread-counter",
+      title: "Safely increment a shared counter across threads",
+      prompt: "Implement a thread-safe increment program. Declare a global `int counter = 0;` and `std::mutex mtx;`. Write a function `void add_ticks(int n)` that loops n times, locking mtx with `std::lock_guard<std::mutex>` on each step to increment counter. In main(), spawn two threads each adding 500 ticks, join both threads, and print 'Counter: ' followed by counter.",
+      objectiveId: "cpp-concurrency-threads",
+      difficulty: "Developing",
+      expectedOutcome: "Synchronized concurrent execution resulting in 'Counter: 1000'.",
+      starterCode: `#include <iostream>
+#include <thread>
+#include <mutex>
+
+int counter = 0;
+std::mutex mtx;
+
+void add_ticks(int n) {
+    // Loop and safely increment counter
+}
+
+int main() {
+    // Launch 2 threads, join, and print Counter
+    return 0;
+}
+`,
+      solution: `#include <iostream>
+#include <thread>
+#include <mutex>
+
+int counter = 0;
+std::mutex mtx;
+
+void add_ticks(int n) {
+    for (int i = 0; i < n; i++) {
+        std::lock_guard<std::mutex> lock(mtx);
+        counter++;
+    }
+}
+
+int main() {
+    std::thread t1(add_ticks, 500);
+    std::thread t2(add_ticks, 500);
+    t1.join();
+    t2.join();
+    std::cout << "Counter: " << counter << "\\n";
+    return 0;
+}
+`,
+      hints: [
+        "Include `<thread>` and `<mutex>`.",
+        "Always call `.join()` on launched threads before main exits.",
+      ],
+      testCases: [
+        testCase("tc-thread-1", "Verify concurrent thread synchronization", "Counter: 1000"),
+      ],
+    },
+    checkpoint: checkpoint(
+      "Why must std::thread objects be joined or detached before destruction?",
+      "If a joinable std::thread object is destroyed without being joined or detached, its destructor calls std::terminate, immediately crashing the program."
+    ),
+  },
+
+  {
+    id: "cpp-capstone-modern-quiz",
+    order: 12,
+    title: "Modern C++ Systems Assessment",
+    summary: "Synthesize RAII, move semantics, smart pointers, templates, and concurrency in a comprehensive systems assessment.",
+    type: "assessment",
+    objectiveIds: ["cpp-capstone-quiz"],
+    prerequisiteLessonIds: ["cpp-concurrency-threads"],
+    estimatedDurationMinutes: 40,
+    content: `### Modern C++ Systems Assessment
+This capstone assessment validates your understanding of modern ISO C++17 design principles:
+1. **RAII & Resource Safety**: Managing memory, handles, and locks with zero leaks.
+2. **Move Semantics & Zero-Copy**: Eliminating unnecessary buffer copies.
+3. **Generic Programming**: Type-safe templates and STL algorithms.
+4. **Concurrency**: Synchronizing access to shared memory.
+
+Review the prompt below to implement the telemetry circular queue buffer.`,
+    theorySections: [
+      {
+        id: "cpp-capstone-rubric",
+        title: "Idiomatic Modern C++",
+        content: "Modern C++ avoids raw pointers for ownership, prefers smart pointers and value semantics, uses noexcept on move operations, and writes clear, declarative algorithms.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Thread-Safe Ring Buffer Sample",
+        language: "cpp",
+        code: `#include <iostream>
+#include <vector>
+#include <memory>
+
+template <typename T>
+class MiniContainer {
+    std::vector<T> items;
+public:
+    void add(T item) { items.push_back(std::move(item)); }
+    size_t size() const { return items.size(); }
+};
+
+int main() {
+    MiniContainer<int> c;
+    c.add(10);
+    c.add(20);
+    std::cout << "Count: " << c.size() << "\\n";
+    return 0;
+}`,
+        description: "Template container using move semantics for item ingestion.",
+      },
+    ],
+    execution: { language: "cpp", target: "browser-wasm" },
+    exampleRun: {
+      sampleInput: "",
+      expectedOutput: "Count: 2\n",
+    },
+    exercise: {
+      id: "ex-cpp-capstone-telemetry",
+      title: "Build a generic telemetry pipeline class",
+      prompt: "Implement a template class `TelemetryBuffer<T>` with a private `std::vector<T> items;`. Add methods: `void push(T val)` which moves val into items, `size_t count() const` returning items.size(), and `T back() const` returning items.back(). In main(), instantiate TelemetryBuffer<int>, push values 10, 20, 30, and print 'Count: ' followed by count() and ' Last: ' followed by back().",
+      objectiveId: "cpp-capstone-quiz",
+      difficulty: "Applied",
+      expectedOutcome: "Generic buffer output 'Count: 3 Last: 30'.",
+      starterCode: `#include <iostream>
+#include <vector>
+#include <utility>
+
+template <typename T>
+class TelemetryBuffer {
+    // Implement push, count, back
+};
+
+int main() {
+    // Test with int buffer
+    return 0;
+}
+`,
+      solution: `#include <iostream>
+#include <vector>
+#include <utility>
+
+template <typename T>
+class TelemetryBuffer {
+    std::vector<T> items;
+public:
+    void push(T val) {
+        items.push_back(std::move(val));
+    }
+    size_t count() const {
+        return items.size();
+    }
+    T back() const {
+        return items.back();
+    }
+};
+
+int main() {
+    TelemetryBuffer<int> buf;
+    buf.push(10);
+    buf.push(20);
+    buf.push(30);
+    std::cout << "Count: " << buf.count() << " Last: " << buf.back() << "\\n";
+    return 0;
+}
+`,
+      hints: [
+        "Declare `template <typename T>` above the class definition.",
+        "Use `std::move(val)` in push to leverage move semantics.",
+      ],
+      testCases: [
+        testCase("tc-cpp-cap-1", "Verify template telemetry buffer operation", "Count: 3 Last: 30"),
+      ],
+    },
+    checkpoint: checkpoint(
+      "Why is ISO C++ preferred for low-latency robotics and high-frequency systems over garbage-collected languages?",
+      "C++ provides deterministic resource destruction via RAII, predictable cache-friendly memory layout, zero-cost abstractions, and no unpredictable garbage collection pauses."
+    ),
+  },
 ];
 
 export const cppProgrammingCourse: LearningCourse = {
@@ -1233,7 +1730,7 @@ export const cppProgrammingCourse: LearningCourse = {
     "Utilize standard template library containers, iterators, and lambdas for high-performance data processing.",
     "Implement generic data structures and algorithms using function and class templates.",
   ],
-  estimatedDurationMinutes: 220,
+  estimatedDurationMinutes: 320,
   publicationStatus: "published",
   modules: [
     moduleData(
@@ -1256,6 +1753,13 @@ export const cppProgrammingCourse: LearningCourse = {
       "Memory Safety, Smart Pointers & Generic Programming",
       "Exclusive unique_ptr, shared ownership, and compile-time generic templates.",
       cppProgrammingLessons.slice(6, 8),
+    ),
+    moduleData(
+      "cpp-m4-move-concurrency",
+      4,
+      "Move Semantics, Concurrency & Modern C++ Idioms",
+      "Zero-copy move semantics, lambda capture closures, std::thread, and multithreaded synchronization.",
+      cppProgrammingLessons.slice(8),
     ),
   ],
 };

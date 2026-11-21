@@ -705,7 +705,7 @@ test("starts the C learning path and records progress independently of the works
   await page.getByRole("button", { name: /mark lesson complete/i }).click();
   await expect(page.getByRole("button", { name: /lesson completed/i })).toBeVisible();
   await page.getByRole("button", { name: "Progress", exact: true }).click();
-  await expect(page.getByText("1 of 123 lessons", { exact: true })).toBeVisible();
+  await expect(page.getByText(/1 of \d+ lessons/)).toBeVisible();
   await page.waitForFunction(() => window.localStorage.getItem("katalyst.learning.v1")?.includes("source-to-output") === true);
   expect(await page.evaluate(() => window.localStorage.getItem("katalyst.workspace.v1"))).toBe(workspaceBefore);
 
@@ -1299,7 +1299,7 @@ test("records real AI request metadata and reports it in the local Progress dash
   await expect(page.locator(".ai-dashboard-section")).not.toContainText("gpt-6-luna");
   await expect(page.locator(".ai-dashboard-section")).toContainText("18 input tokens reported in 1 request");
   await expect(page.locator(".ai-dashboard-section")).toContainText("6 output tokens reported in 1 request");
-  await expect(page.locator(".dashboard-metrics")).toContainText("0 of 123 lessons");
+  await expect(page.locator(".dashboard-metrics")).toContainText(/0 of \d+ lessons/);
   await expect(page.getByText("Local analytics · not synced")).toBeVisible();
 });
 

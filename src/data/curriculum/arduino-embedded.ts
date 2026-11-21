@@ -23,6 +23,12 @@ const objectives: LearningObjective[] = [
   { id: "ard-adc-analog", title: "Sample continuous analog voltages using the 10-bit Successive Approximation ADC and calculate millivolt resolutions." },
   { id: "ard-pwm-serial", title: "Generate analog-equivalent signals via Pulse-Width Modulation (PWM) and stream UART serial telemetry." },
   { id: "ard-millis-fsm", title: "Design non-blocking finite state machines using millis() time slicing to eliminate blocking delay() calls." },
+  { id: "ard-hardware-interrupts", title: "Attach external hardware interrupts (INT0/INT1) and write race-free ISRs with volatile flags." },
+  { id: "ard-non-blocking-timing", title: "Build complex multi-rate non-blocking schedulers and software timers without blocking delays." },
+  { id: "ard-tone-piezo", title: "Drive piezo buzzers using Timer2 square waves with tone() and calculate acoustic pitch frequencies." },
+  { id: "ard-servo-actuator", title: "Control 50 Hz PWM servo motors with 544µs to 2400µs pulse widths for angular positioning." },
+  { id: "ard-i2c-bus", title: "Communicate with sensors and displays over the 2-wire I2C bus (A4/SDA, A5/SCL) using the Wire library." },
+  { id: "ard-multisensor-capstone", title: "Synthesize interrupt handling, sensor fusion, and actuator actuation in an autonomous controller." },
 ];
 
 function testCase(
@@ -879,6 +885,984 @@ console.log(JSON.stringify(simulateTrafficLight(7)));`,
         "Unsigned subtraction correctly handles 32-bit integer overflow rollover at 49.7 days without requiring any special condition checks.",
       ),
   },
+  // Module 4: Hardware Timers, Interrupts & Actuators
+  {
+    id: "arduino-hardware-interrupts",
+    order: 7,
+    title: "External Hardware Interrupts (INT0 / INT1) & Race-Free ISRs",
+    summary: "Harness hardware interrupt pins 2 and 3, configure RISING/FALLING edges, and write volatile-safe ISR routines.",
+    type: "guided-coding",
+    objectiveIds: ["ard-hardware-interrupts"],
+    prerequisiteLessonIds: ["arduino-millis-fsm"],
+    estimatedDurationMinutes: 30,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "ATmega328P External Interrupt Simulator",
+      description: "Trigger digital pulses on INT0 (Pin 2) and observe asynchronous ISR invocation and variable updates.",
+    },
+    content: `# External Hardware Interrupts (INT0 / INT1) & Race-Free ISRs
+
+In standard polling architectures, the microcontroller must continuously check the electrical state of a pin within \`loop()\`. If a critical event occurs while the CPU is executing a slow computation or delay, the pulse is missed. Hardware interrupts solve this by immediately suspending main program execution to run an Interrupt Service Routine (ISR).
+
+## ATmega328P Hardware Interrupt Architecture
+
+The ATmega328P features two dedicated external interrupt pins:
+- **INT0 (Digital Pin 2)**: Triggers interrupt vector \`__vector_1\`.
+- **INT1 (Digital Pin 3)**: Triggers interrupt vector \`__vector_2\`.
+
+When an electrical edge arrives on Pin 2 or 3, the CPU finishes the current instruction, pushes the Program Counter onto the stack, and jumps directly to the ISR.
+
+\`\`\`
+Main loop() execution
+      │
+      ├─── Pulse arrives on Pin 2 (INT0)
+      │    │
+      │    ▼
+      │    CPU saves Program Counter (PC)
+      │    Jumps to ISR vector table
+      │    Executes ISR code immediately
+      │    Executes RETI (Return from Interrupt)
+      │    CPU restores PC
+      ▼
+Main loop() resumes seamlessly
+\`\`\`
+
+## The \`attachInterrupt()\` API
+
+Arduino configures external interrupts via the \`attachInterrupt\` function:
+
+\`\`\`cpp
+attachInterrupt(digitalPinToInterrupt(pin), ISR_callback, mode);
+\`\`\`
+
+Available interrupt trigger modes:
+- **RISING**: Triggers when pin transitions from LOW to HIGH.
+- **FALLING**: Triggers when pin transitions from HIGH to LOW.
+- **CHANGE**: Triggers on both rising and falling edges.
+- **LOW**: Triggers continuously as long as the pin remains LOW.
+
+## The Critical Role of \`volatile\`
+
+Any global variable shared between an ISR and normal code must be declared with the \`volatile\` type qualifier:
+
+\`\`\`cpp
+volatile uint32_t pulseCount = 0;
+\`\`\`
+
+Without \`volatile\`, the C++ compiler's optimizer assumes the variable cannot change during a loop that doesn't explicitly modify it. It may cache the variable in a CPU register (like \`r24\`), ignoring updates written to SRAM by the ISR!
+
+## Atomic Access to Multi-Byte Variables
+
+The ATmega328P is an 8-bit architecture. Reading a 32-bit integer (\`uint32_t\`) requires four separate \`LDS\` instructions. If an interrupt fires between the second and third read, the main loop reads a corrupted, hybrid value (a **torn read**). To prevent this, disable interrupts momentarily during the read:
+
+\`\`\`cpp
+uint32_t safeCount;
+noInterrupts();          // Disable interrupts (cli)
+safeCount = pulseCount; // Atomic copy
+interrupts();            // Re-enable interrupts (sei)
+\`\`\``,
+    theorySections: [
+      {
+        id: "isr-rules-and-constraints",
+        title: "Golden Rules for ISR Implementation",
+        content: `Because interrupts run in privileged asynchronous contexts, adhere strictly to these rules:
+1. **Keep it ultra-short**: An ISR should set a flag or increment a counter and return immediately.
+2. **Never call delay()**: delay() relies on the Timer0 overflow interrupt. Since interrupts are disabled inside an ISR, delay() will hang forever.
+3. **Avoid Serial.print()**: Serial output relies on UART transmit interrupts. Sending long strings inside an ISR can cause buffer overflow and deadlock.
+4. **Use volatile variables**: Always mark variables shared between ISR and loop() as volatile.`,
+      },
+      {
+        id: "hardware-vs-software-debounce",
+        title: "Interrupt Contact Debouncing",
+        content: `Mechanical switches bounce mechanically for 5 to 20 milliseconds upon closing. Because an interrupt triggers in sub-microsecond time, a single button press can trigger 10 to 50 interrupt events! Debounce by comparing current millis() against last interrupt timestamp: if (now - lastInterruptTime > 50) { ... }.`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Interrupt-Driven Pulse Counter (Tachometer)",
+        language: "c",
+        description: "Counts high-speed incoming pulses on INT0 (Pin 2) with atomic reading in loop().",
+        code: `#include <Arduino.h>
+
+const uint8_t SENSOR_PIN = 2; // INT0
+volatile uint32_t pulseCount = 0;
+volatile unsigned long lastInterruptTime = 0;
+
+void onPulseISR() {
+  unsigned long now = millis();
+  if (now - lastInterruptTime > 15) { // 15 ms debounce
+    pulseCount++;
+    lastInterruptTime = now;
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(SENSOR_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(SENSOR_PIN), onPulseISR, FALLING);
+}
+
+void loop() {
+  static unsigned long lastReport = 0;
+  if (millis() - lastReport >= 1000) {
+    lastReport = millis();
+    uint32_t copy;
+    noInterrupts();
+    copy = pulseCount;
+    pulseCount = 0;
+    interrupts();
+    Serial.print("Pulses per sec: ");
+    Serial.println(copy);
+  }
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-ard-interrupts",
+      "Simulate Interrupt Pulse Counter with Debounce",
+      "Implement a function `simulatePulseCounter(pulseTimesMs, debounceMs)` that filters a chronological series of incoming pulse timestamps, rejecting bounces occurring within `debounceMs` of the last registered pulse. Return the final count of valid pulses.",
+      `function simulatePulseCounter(pulseTimesMs, debounceMs) {
+  let validCount = 0;
+  let lastRegisteredTime = -Infinity;
+  for (const time of pulseTimesMs) {
+    if (time - lastRegisteredTime >= debounceMs) {
+      validCount++;
+      lastRegisteredTime = time;
+    }
+  }
+  return validCount;
+}
+
+console.log(simulatePulseCounter([10, 15, 22, 60, 65, 120], 20));`,
+      "ard-hardware-interrupts",
+      "Accurately filter noisy interrupt pulses using software timestamp debouncing.",
+      [
+        "Initialize validCount = 0 and lastRegisteredTime = -Infinity.",
+        "Iterate over each pulse timestamp in pulseTimesMs.",
+        "Check if (time - lastRegisteredTime >= debounceMs); if so, increment validCount and update lastRegisteredTime.",
+      ],
+      "Developing",
+      `function simulatePulseCounter(pulseTimesMs, debounceMs) {
+  // Filter noisy pulse events using debounce threshold
+  return 0;
+}
+
+console.log(simulatePulseCounter([10, 15, 22, 60, 65, 120], 20));`,
+      [
+        testCase("tc-ard-int-1", "Filters rapid bounce pulses", "3"),
+        testCase("tc-ard-int-2", "Accepts all well-spaced pulses", "4", "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why must multi-byte variables updated in an ISR be read with interrupts disabled in the main loop?",
+      "On an 8-bit AVR, reading a 16-bit or 32-bit variable takes multiple CPU instructions; without disabling interrupts, an ISR could fire mid-read and produce a corrupted torn value.",
+    ),
+  },
+
+  // Lesson 8: Multi-Rate Non-Blocking Schedulers
+  {
+    id: "arduino-non-blocking-millis",
+    order: 8,
+    title: "Multi-Rate Cooperative Schedulers with millis()",
+    summary: "Build scalable multi-rate task schedulers using millis() interval tracking without blocking delay() calls.",
+    type: "guided-coding",
+    objectiveIds: ["ard-non-blocking-timing"],
+    prerequisiteLessonIds: ["arduino-hardware-interrupts"],
+    estimatedDurationMinutes: 25,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "Cooperative Task Scheduler Visualizer",
+      description: "Observe independent software timers executing sensor reads, LED flashes, and serial telemetry concurrently.",
+    },
+    content: `# Multi-Rate Cooperative Schedulers with millis()
+
+Real-world embedded systems must handle multiple concurrent tasks: blinking an indicator LED at 1 Hz, sampling a temperature sensor at 10 Hz, and streaming serial telemetry at 2 Hz. Calling \`delay(1000)\` blocks the CPU completely, rendering multi-rate operations impossible.
+
+## The Delta-Time Architecture
+
+The ATmega328P Timer0 interrupt maintains an internal 32-bit millisecond counter accessed via \`millis()\`. By storing the timestamp of the last task execution and comparing the difference against a desired interval, multiple tasks run cooperatively:
+
+\`\`\`cpp
+unsigned long now = millis();
+if (now - lastSensorRead >= SENSOR_INTERVAL) {
+  lastSensorRead = now;
+  readSensors();
+}
+if (now - lastHeartbeat >= HEARTBEAT_INTERVAL) {
+  lastHeartbeat = now;
+  toggleHeartbeatLED();
+}
+\`\`\`
+
+## Unsigned Subtraction & 49.7-Day Rollover Protection
+
+The 32-bit counter returned by \`millis()\` overflows and rolls over to 0 after approximately 49.7 days ($2^{32} - 1$ milliseconds). 
+
+Using unsigned subtraction:
+\`\`\`cpp
+if (currentMillis - previousMillis >= interval)
+\`\`\`
+is **100% immune to rollover bugs**. In two's complement unsigned binary arithmetic:
+\`\`\`
+(uint32_t)(5 - 4294967290) = 11
+\`\`\`
+The difference calculation wraps naturally and produces the exact elapsed interval. In contrast, \`if (currentMillis >= previousMillis + interval)\` fails catastrophically when the addition overflows!
+
+## Struct-Based Task Descriptors
+
+For clean scalable firmware, encapsulate tasks in a table of function pointers and intervals:
+
+\`\`\`cpp
+typedef struct {
+  void (*execute)(void);
+  unsigned long interval;
+  unsigned long lastRun;
+} Task;
+
+Task scheduler[] = {
+  { sampleSensors, 100, 0 },
+  { updateDisplay, 250, 0 },
+  { transmitTelemetry, 1000, 0 }
+};
+\`\`\``,
+    theorySections: [
+      {
+        id: "task-starvation",
+        title: "Cooperative Multitasking & Task Starvation",
+        content: `In cooperative multitasking without an RTOS, each task must execute quickly and yield control back to the main loop. If one task executes a slow 50 ms calculation, all other tasks are delayed by 50 ms. Break long operations into sequential state machine steps to maintain responsive loop latency.`,
+      },
+      {
+        id: "timer0-hardware-details",
+        title: "Hardware Timer0 Prescaler & Overflow",
+        content: `Timer0 runs at 16 MHz / 64 = 250 kHz (4 µs tick). It overflows every 256 ticks = 1.024 ms. The Arduino core ISR adds 1 ms to the counter on each overflow and applies fractional adjustments every ~41 milliseconds to keep millis() synchronized with real time.`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Table-Driven Non-Blocking Task Scheduler",
+        language: "c",
+        description: "Orchestrates three concurrent tasks with different execution periods using a descriptor array.",
+        code: `#include <Arduino.h>
+
+void taskFastLED(void) {
+  digitalWrite(13, !digitalRead(13));
+}
+
+void taskPrintTelemetry(void) {
+  Serial.print("Uptime: ");
+  Serial.println(millis());
+}
+
+typedef struct {
+  void (*run)(void);
+  unsigned long period;
+  unsigned long prev;
+} ScheduledTask;
+
+ScheduledTask tasks[] = {
+  { taskFastLED, 200, 0 },
+  { taskPrintTelemetry, 1000, 0 }
+};
+
+const uint8_t TASK_COUNT = sizeof(tasks) / sizeof(tasks[0]);
+
+void setup() {
+  pinMode(13, OUTPUT);
+  Serial.begin(9600);
+}
+
+void loop() {
+  unsigned long now = millis();
+  for (uint8_t i = 0; i < TASK_COUNT; i++) {
+    if (now - tasks[i].prev >= tasks[i].period) {
+      tasks[i].prev = now;
+      tasks[i].run();
+    }
+  }
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-ard-scheduler",
+      "Simulate Multi-Rate Cooperative Scheduler",
+      "Implement a function `simulateScheduler(tasks, totalDurationMs)` that models a cooperative scheduler. Each task is an object `{ name: string, period: number }`. When `t % period === 0` (starting at t = 0), record the task name. Return an array of all executed task events in chronological order.",
+      `function simulateScheduler(tasks, totalDurationMs) {
+  const events = [];
+  for (let t = 0; t < totalDurationMs; t += 10) {
+    for (const task of tasks) {
+      if (t % task.period === 0) {
+        events.push(\`\${t}ms: \${task.name}\`);
+      }
+    }
+  }
+  return events;
+}
+
+console.log(JSON.stringify(simulateScheduler([
+  { name: "LED", period: 20 },
+  { name: "SENS", period: 40 }
+], 50)));`,
+      "ard-non-blocking-timing",
+      "Accurately model periodic task firing in cooperative systems.",
+      [
+        "Initialize an empty events array.",
+        "Iterate time t from 0 to totalDurationMs in 10ms increments.",
+        "For each task, test if t % task.period === 0 and push formatted string.",
+      ],
+      "Developing",
+      `function simulateScheduler(tasks, totalDurationMs) {
+  // Simulate task firing at their respective periods
+  return [];
+}
+
+console.log(JSON.stringify(simulateScheduler([
+  { name: "LED", period: 20 },
+  { name: "SENS", period: 40 }
+], 50)));`,
+      [
+        testCase("tc-ard-sched-1", "Schedules multi-rate events correctly", '["0ms: LED","0ms: SENS","20ms: LED","40ms: LED","40ms: SENS"]'),
+        testCase("tc-ard-sched-2", "Handles higher duration schedules", '["0ms: HEARTBEAT","50ms: HEARTBEAT"]', "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is (currentMillis - previousMillis >= interval) mathematically safe against timer overflow at 49.7 days?",
+      "In unsigned two's complement subtraction, wrapping around 0 yields the true positive elapsed difference without negative numbers or special case branches.",
+    ),
+  },
+
+  // Lesson 9: Acoustic Tone Generation & Piezo Transducers
+  {
+    id: "arduino-tone-buzzer",
+    order: 9,
+    title: "Acoustic Tone Generation, Timer2 & Piezo Transducers",
+    summary: "Generate square-wave audio frequencies using ATmega328P Timer2 CTC mode and the tone() library API.",
+    type: "guided-coding",
+    objectiveIds: ["ard-tone-piezo"],
+    prerequisiteLessonIds: ["arduino-non-blocking-millis"],
+    estimatedDurationMinutes: 25,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "Piezo Acoustic Transducer Synthesizer",
+      description: "Trigger musical scale notes, adjust square wave frequencies, and inspect acoustic duty-cycle waveforms.",
+    },
+    content: `# Acoustic Tone Generation, Timer2 & Piezo Transducers
+
+Microcontrollers interact with the physical world not only through visual LEDs and serial logs, but also acoustically. Producing musical tones, audible error alarms, and user feedback clicks requires synthesizing controlled square wave audio frequencies.
+
+## Piezoelectric Transducers: Active vs Passive
+
+There are two primary types of buzzer components:
+1. **Active Buzzer**: Contains an integrated internal oscillator transistor circuit. Supplying continuous DC voltage ($5\\text{ V}$) immediately produces a fixed single-frequency buzz (typically 2.5 kHz). It cannot generate varying musical notes.
+2. **Passive Buzzer (Piezo Transducer)**: Contains only a piezoelectric ceramic crystal. It requires an AC square wave signal from the microcontroller to oscillate and produce sound at selectable pitches.
+
+## How the \`tone()\` Function Operates
+
+The Arduino core provides the built-in \`tone()\` function:
+
+\`\`\`cpp
+tone(pin, frequency, duration);
+noTone(pin);
+\`\`\`
+
+Under the hood, \`tone()\` reconfigures the ATmega328P **Timer2** hardware into CTC (Clear Timer on Compare Match) mode. Timer2 toggles the designated output pin automatically at the target frequency without CPU software intervention:
+
+\`\`\`
+f = F_CPU / (2 * Prescaler * (1 + OCR2A))
+\`\`\`
+
+## Musical Note Frequencies & 12-Tone Equal Temperament
+
+Musical pitches are standardized by the 12-Tone Equal Temperament (12-TET) scale, anchored at Concert Pitch $A4 = 440\\text{ Hz}$:
+
+\`\`\`
+f_n = 440 * 2^((n - 69) / 12)
+\`\`\`
+
+Common note frequencies:
+- **C4 (Middle C)**: $262\\text{ Hz}$
+- **D4**: $294\\text{ Hz}$
+- **E4**: $330\\text{ Hz}$
+- **G4**: $392\\text{ Hz}$
+- **A4**: $440\\text{ Hz}$
+- **C5**: $523\\text{ Hz}$
+
+## Hardware Conflict: Timer2 and PWM
+
+Because \`tone()\` repurposes Timer2, calling \`tone()\` disables PWM output on **Pins 3 and 11** (OC2B and OC2A). Always avoid using Pins 3 or 11 for \`analogWrite()\` while playing tones!`,
+    theorySections: [
+      {
+        id: "piezo-inductive-kickback",
+        title: "Piezo Transducer Impedance & Flyback Spikes",
+        content: `While piezo buzzers are predominantly capacitive loads, electromagnetic buzzers (magnetic transducers) are highly inductive coils. When turning off an inductive buzzer pin, the collapsing magnetic field creates a reverse voltage spike that can exceed 30V! Always place a flyback diode (1N4148) in reverse parallel across electromagnetic buzzers to protect the AVR output stage.`,
+      },
+      {
+        id: "frequency-vs-pitch-perception",
+        title: "Human Auditory Range & Logarithmic Perception",
+        content: `The human ear perceives frequency logarithmically. Doubling the frequency corresponds to an increase of one musical octave. Our ears are most sensitive between 2 kHz and 4 kHz, making 2.5 kHz to 3.5 kHz the ideal frequency band for emergency alerts and alarms.`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Playing a Musical Melody Sequence",
+        language: "c",
+        description: "Plays a sequential melody array with proportional note pauses using tone() and noTone().",
+        code: `#include <Arduino.h>
+
+#define NOTE_C4 262
+#define NOTE_E4 330
+#define NOTE_G4 392
+#define NOTE_C5 523
+
+const uint8_t BUZZER_PIN = 8;
+
+const int melody[] = { NOTE_C4, NOTE_E4, NOTE_G4, NOTE_C5 };
+const int durations[] = { 250, 250, 250, 500 };
+
+void setup() {
+  for (int thisNote = 0; thisNote < 4; thisNote++) {
+    int duration = durations[thisNote];
+    tone(BUZZER_PIN, melody[thisNote], duration);
+    delay(duration * 1.30); // 30% pause between notes
+    noTone(BUZZER_PIN);
+  }
+}
+
+void loop() {
+  // Idle after melody finishes
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-ard-tone",
+      "Calculate 12-TET Note Frequencies",
+      "Implement a function `calculateNoteFrequencies(semitoneOffsets)` that takes an array of integer semitone offsets relative to A4 (0 = 440 Hz, -9 = C4 ~ 262 Hz, 3 = C5 ~ 523 Hz) and computes the exact frequency in Hz rounded to the nearest integer: `round(440 * Math.pow(2, offset / 12))`.",
+      `function calculateNoteFrequencies(semitoneOffsets) {
+  return semitoneOffsets.map(offset => Math.round(440 * Math.pow(2, offset / 12)));
+}
+
+console.log(JSON.stringify(calculateNoteFrequencies([0, -9, 3])));`,
+      "ard-tone-piezo",
+      "Accurately calculate acoustic note frequencies using 12-TET logarithmic pitch math.",
+      [
+        "Use Array.prototype.map over semitoneOffsets.",
+        "Apply formula: Math.round(440 * Math.pow(2, offset / 12)).",
+        "Return the mapped array of integer frequencies.",
+      ],
+      "Developing",
+      `function calculateNoteFrequencies(semitoneOffsets) {
+  // Map semitone offsets from A4 into rounded Hz frequencies
+  return [];
+}
+
+console.log(JSON.stringify(calculateNoteFrequencies([0, -9, 3])));`,
+      [
+        testCase("tc-ard-tone-1", "Computes A4, C4, C5 note frequencies", "[440,262,523]"),
+        testCase("tc-ard-tone-2", "Computes D4 and E4 note frequencies", "[294,330]", "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why does calling tone() on an Arduino Uno disable analogWrite() PWM on pins 3 and 11?",
+      "tone() takes over the 8-bit Timer2 hardware to generate the CTC square wave, which disables Timer2's PWM channels OC2A (pin 11) and OC2B (pin 3).",
+    ),
+  },
+
+  // Lesson 10: Precision Servo Motor Actuation
+  {
+    id: "arduino-servo-control",
+    order: 10,
+    title: "Precision Servo Motor Actuation & 50 Hz PWM Pulses",
+    summary: "Control angular position of RC hobby servos using 50 Hz control pulses (544µs to 2400µs) and the Servo library.",
+    type: "guided-coding",
+    objectiveIds: ["ard-servo-actuator"],
+    prerequisiteLessonIds: ["arduino-tone-buzzer"],
+    estimatedDurationMinutes: 30,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "RC Servo Motor Pulse-Width Simulator",
+      description: "Vary control pulse durations between 544µs and 2400µs and watch the simulated servo horn rotate from 0° to 180°.",
+    },
+    content: `# Precision Servo Motor Actuation & 50 Hz PWM Pulses
+
+RC hobby servo motors (such as the ubiquitous SG90 and MG996R) provide closed-loop angular position control without external encoders. They are ubiquitous in robotics, pan-tilt camera mounts, and automated valves.
+
+## The 50 Hz Pulse Duration Protocol
+
+Unlike high-frequency 490 Hz or 980 Hz power PWM used for DC motor speed control, standard servos use a specialized **Pulse-Duration Modulation** protocol with a fixed **50 Hz frame rate** (20 ms period):
+
+\`\`\`
+        ◄───────────── 20 ms (50 Hz) ─────────────►
+        ┌──────┐                                  ┌──────┐
+        │ Pulse│                                  │ Pulse│
+  ──────┘      └──────────────────────────────────┘      └───────────
+        ◄──────►
+         Pulse Width:
+         • 544 µs (or 1000 µs) ──> 0°  (Minimum deflection)
+         • 1500 µs            ──> 90° (Neutral center)
+         • 2400 µs (or 2000 µs) ──> 180° (Maximum deflection)
+\`\`\`
+
+## The Arduino \`Servo\` Library
+
+The Arduino \`Servo\` library abstracts pulse generation using the 16-bit **Timer1** peripheral:
+
+\`\`\`cpp
+#include <Servo.h>
+
+Servo myServo;
+
+void setup() {
+  myServo.attach(9); // Attaches servo on pin 9
+}
+
+void loop() {
+  myServo.write(90);        // Move to 90 degrees
+  delay(1000);
+  myServo.writeMicroseconds(1500); // Direct microsecond precision
+  delay(1000);
+}
+\`\`\`
+
+## Electrical Warning: The Power Rail Danger
+
+A hobby servo motor contains a DC motor, reduction gears, a feedback potentiometer, and an H-bridge driver. Under mechanical stall or sudden acceleration, an SG90 draws **500 mA to 1 A**, while larger MG996R servos draw **over 2.5 A**!
+
+**CRITICAL RULE**: **Never power servo motors directly from the Arduino Uno 5V header pin.**
+Drawing high stall currents through the Uno's onboard AMS1117 regulator triggers thermal shutdown or voltage sag below 4.3V, causing the ATmega328P to suffer an immediate **Brown-Out Reset (BOR)**.
+
+### Proper Wiring:
+1. Power the servo from an **external regulated 5V power supply** (e.g. 5V 2A adapter or battery pack).
+2. **Connect the Ground (GND) of the external supply directly to Arduino GND** to establish a common voltage reference!
+3. Connect the Arduino signal pin (e.g. Pin 9) directly to the servo yellow/white control wire.`,
+    theorySections: [
+      {
+        id: "timer1-and-pwm-tradeoffs",
+        title: "Timer1 Consumption by Servo Library",
+        content: `The standard Arduino Servo library utilizes the 16-bit Timer1 to generate pulse widths with sub-microsecond precision. Consequently, using the Servo library disables hardware analogWrite() PWM on **Pins 9 and 10** on the Uno, even if the servo is attached to a different pin!`,
+      },
+      {
+        id: "closed-loop-potentiometer",
+        title: "Closed-Loop Potentiometer Servo Mechanics",
+        content: `Inside the servo casing, the final gear is mechanically linked to a rotary potentiometer. An internal comparator circuit compares the voltage generated by the incoming pulse width against the potentiometer wiper voltage. The internal H-bridge powers the DC motor until the position error reaches zero.`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Smooth Non-Blocking Servo Sweep",
+        language: "c",
+        description: "Sweeps a servo back and forth between 0° and 180° incrementally without blocking delays.",
+        code: `#include <Arduino.h>
+#include <Servo.h>
+
+Servo panServo;
+const uint8_t SERVO_PIN = 9;
+
+int currentAngle = 0;
+int stepDirection = 1;
+unsigned long lastMoveTime = 0;
+const unsigned long STEP_INTERVAL = 15; // 15 ms per degree = 2.7 sec sweep
+
+void setup() {
+  panServo.attach(SERVO_PIN);
+  panServo.write(currentAngle);
+}
+
+void loop() {
+  unsigned long now = millis();
+  if (now - lastMoveTime >= STEP_INTERVAL) {
+    lastMoveTime = now;
+    currentAngle += stepDirection;
+    if (currentAngle >= 180) {
+      currentAngle = 180;
+      stepDirection = -1;
+    } else if (currentAngle <= 0) {
+      currentAngle = 0;
+      stepDirection = 1;
+    }
+    panServo.write(currentAngle);
+  }
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-ard-servo",
+      "Calculate Servo Angle from Microsecond Pulse Width",
+      "Implement a function `pulseToAngle(pulseUs, minPulseUs = 544, maxPulseUs = 2400)` that clamps the microsecond pulse between `minPulseUs` and `maxPulseUs` and converts it linearly into degrees in the range `[0, 180]`, rounded to the nearest integer.",
+      `function pulseToAngle(pulseUs, minPulseUs = 544, maxPulseUs = 2400) {
+  const clamped = Math.max(minPulseUs, Math.min(maxPulseUs, pulseUs));
+  const ratio = (clamped - minPulseUs) / (maxPulseUs - minPulseUs);
+  return Math.round(ratio * 180);
+}
+
+console.log(pulseToAngle(1472));`,
+      "ard-servo-actuator",
+      "Correctly translate microsecond pulse widths into calibrated servo rotation angles.",
+      [
+        "Clamp pulseUs between minPulseUs and maxPulseUs.",
+        "Calculate the normalized ratio: (clamped - minPulseUs) / (maxPulseUs - minPulseUs).",
+        "Multiply by 180 and round using Math.round.",
+      ],
+      "Developing",
+      `function pulseToAngle(pulseUs, minPulseUs = 544, maxPulseUs = 2400) {
+  // Convert pulse microsecond duration to rounded degree angle
+  return 0;
+}
+
+console.log(pulseToAngle(1472));`,
+      [
+        testCase("tc-ard-servo-1", "Calculates center neutral angle (90 deg)", "90"),
+        testCase("tc-ard-servo-2", "Clamps minimum pulse to 0 deg", "0", "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why must the ground of an external servo power supply be connected to the Arduino GND pin?",
+      "Voltage is a relative potential difference; without a common ground reference between the external supply and the Arduino, the control signal cannot be referenced and causes erratic servo jitter.",
+    ),
+  },
+
+  // Module 5: Communication Buses & Capstone System
+  {
+    id: "arduino-i2c-wire-oled",
+    order: 11,
+    title: "The I2C Bus Protocol, Two-Wire Interface & OLED Displays",
+    summary: "Master synchronous serial I2C bus communication (SDA/SCL), 7-bit addressing, and interfacing SSD1306 OLED displays.",
+    type: "guided-coding",
+    objectiveIds: ["ard-i2c-bus"],
+    prerequisiteLessonIds: ["arduino-servo-control"],
+    estimatedDurationMinutes: 30,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "I2C Bus Protocol Packet Analyzer",
+      description: "Transmit 7-bit slave address frames, R/W control bits, and inspect ACK/NACK handshake states on SDA and SCL.",
+    },
+    content: `# The I2C Bus Protocol, Two-Wire Interface & OLED Displays
+
+In complex embedded projects, connecting multiple sensors, memories, and displays using individual digital pins rapidly depletes available I/O lines. The **I2C (Inter-Integrated Circuit)** bus, also known as the Two-Wire Interface (TWI), solves this by connecting dozens of peripheral ICs using only two shared physical lines.
+
+## I2C Physical Layer: Open-Drain & Pull-Up Resistors
+
+The I2C bus utilizes two bidirectional signals:
+- **SDA (Serial Data)**: Carries data bits. On Uno, this is Pin **A4** (or dedicated SDA header pin).
+- **SCL (Serial Clock)**: Carries clock pulses driven by the bus Master. On Uno, this is Pin **A5** (or dedicated SCL header pin).
+
+Both SDA and SCL utilize **open-drain / open-collector drivers** with external **pull-up resistors** (typically $4.7\\text{ k}\\Omega$ to $5\\text{ V}$):
+
+\`\`\`
+        +5V Rail
+          │        │
+         [4.7k]   [4.7k]
+          │        │
+  SCL ────┴────────┼─────────────────── SCL Master & Slaves
+                   │
+  SDA ─────────────┴─────────────────── SDA Master & Slaves
+\`\`\`
+
+Because pins can only pull lines LOW or let them float HIGH, bus contention never damages silicon outputs. If two devices transmit simultaneously, a zero bit (LOW) dominates, allowing clean collision arbitration.
+
+## The I2C Frame Transaction
+
+An I2C frame consists of:
+1. **START Condition**: SDA transitions HIGH-to-LOW while SCL is HIGH.
+2. **7-Bit Address + R/W Bit**: 7 address bits followed by 0 (Write) or 1 (Read).
+3. **ACK / NACK Bit**: The receiver pulls SDA LOW to acknowledge receipt of each byte.
+4. **Data Bytes**: 8 bits of payload, each followed by an ACK bit.
+5. **STOP Condition**: SDA transitions LOW-to-HIGH while SCL is HIGH.
+
+\`\`\`
+SDA: ──┐      ┌──[A6]─[A5]─[A4]─[A3]─[A2]─[A1]─[A0]─[R/W]──[ACK]──┐   ┌──
+       └──────┘                                            └───┘   └───
+SCL: ────┐      ┌───┐   ┌───┐   ┌───┐   ┌───┐   ┌───┐   ┌───┐     ┌───┐
+         └──────┘   └───┘   └───┘   └───┘   └───┘   └───┘   └─────┘   └──
+         START                7-Bit Slave Address + Direction     STOP
+\`\`\`
+
+## The Arduino \`Wire\` Library
+
+Arduino handles I2C transactions using the built-in \`Wire\` library:
+
+\`\`\`cpp
+#include <Wire.h>
+
+void setup() {
+  Wire.begin(); // Join bus as Master
+}
+
+void writeRegister(uint8_t devAddr, uint8_t regAddr, uint8_t value) {
+  Wire.beginTransmission(devAddr); // Start condition + Address (W)
+  Wire.write(regAddr);             // Target register
+  Wire.write(value);               // Register value
+  Wire.endTransmission();          // Stop condition
+}
+\`\`\``,
+    theorySections: [
+      {
+        id: "i2c-addressing-conflicts",
+        title: "7-Bit Device Addressing & Multiplexers",
+        content: `Each I2C device on a shared bus must possess a unique 7-bit address (0x08 to 0x77). Popular sensor addresses include 0x68 (MPU6050 accelerometer) and 0x3C or 0x3D (SSD1306 OLED). If you need multiple identical sensors with fixed addresses, use an I2C multiplexer such as the TCA9548A.`,
+      },
+      {
+        id: "clock-stretching",
+        title: "Clock Stretching by Slave Peripherals",
+        content: `When a slow microcontroller or slave device needs extra time to process a received byte or prepare output data, it can hold the SCL clock line LOW. The master detects this and halts clock generation until the slave releases SCL.`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "I2C Bus Address Scanner Utility",
+        language: "c",
+        description: "Scans all 127 possible I2C addresses and reports active responding devices on the Serial monitor.",
+        code: `#include <Arduino.h>
+#include <Wire.h>
+
+void setup() {
+  Wire.begin();
+  Serial.begin(115200);
+  while (!Serial);
+  Serial.println("Scanning I2C bus...");
+
+  uint8_t count = 0;
+  for (uint8_t address = 1; address < 127; address++) {
+    Wire.beginTransmission(address);
+    uint8_t error = Wire.endTransmission();
+
+    if (error == 0) {
+      Serial.print("Device found at address 0x");
+      if (address < 16) Serial.print("0");
+      Serial.println(address, HEX);
+      count++;
+    }
+  }
+  Serial.print("Scan complete. Devices found: ");
+  Serial.println(count);
+}
+
+void loop() {
+  // Idle after scan
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-ard-i2c",
+      "Parse I2C Protocol Frame Packet",
+      "Implement a function `parseI2CFrame(addressByte, dataBytes)` that parses the first I2C transaction byte into the 7-bit target device address in hex (e.g. \"0x3C\") and the operation mode (\"READ\" if bit 0 is 1, \"WRITE\" if bit 0 is 0), along with payload count.",
+      `function parseI2CFrame(addressByte, dataBytes) {
+  const address7Bit = (addressByte >> 1) & 0x7F;
+  const isRead = (addressByte & 0x01) === 1;
+  const hexAddress = "0x" + address7Bit.toString(16).toUpperCase().padStart(2, "0");
+  return {
+    address: hexAddress,
+    mode: isRead ? "READ" : "WRITE",
+    byteCount: dataBytes.length
+  };
+}
+
+console.log(JSON.stringify(parseI2CFrame(0x78, [0x00, 0xAF])));`,
+      "ard-i2c-bus",
+      "Correctly decode I2C address bytes and read/write control flags.",
+      [
+        "Shift addressByte right by 1 to isolate the 7-bit device address: (addressByte >> 1) & 0x7F.",
+        "Check bit 0 of addressByte: if 1 mode is 'READ', else 'WRITE'.",
+        "Format address as uppercase 2-digit hex string prefixed with '0x'.",
+      ],
+      "Developing",
+      `function parseI2CFrame(addressByte, dataBytes) {
+  // Decode 7-bit address and mode from addressByte
+  return null;
+}
+
+console.log(JSON.stringify(parseI2CFrame(0x78, [0x00, 0xAF])));`,
+      [
+        testCase("tc-ard-i2c-1", "Parses write frame to SSD1306 (0x3C)", '{"address":"0x3C","mode":"WRITE","byteCount":2}'),
+        testCase("tc-ard-i2c-2", "Parses read frame from sensor (0x68)", '{"address":"0x68","mode":"READ","byteCount":0}', "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "What happens on an I2C bus if the pull-up resistors on SDA and SCL are completely missing?",
+      "Because I2C drivers are open-drain, the lines cannot return to a logic HIGH state on their own, causing the bus to remain permanently LOW and freeze.",
+    ),
+  },
+
+  // Lesson 12: Embedded Systems Capstone
+  {
+    id: "arduino-capstone-multisensor",
+    order: 12,
+    title: "Embedded Capstone: Autonomous Multisensor Controller",
+    summary: "Synthesize hardware interrupts, ADC sensor filtering, non-blocking state schedulers, and actuator control into a complete embedded application.",
+    type: "guided-coding",
+    objectiveIds: ["ard-multisensor-capstone"],
+    prerequisiteLessonIds: ["arduino-i2c-wire-oled"],
+    estimatedDurationMinutes: 35,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "Autonomous Multisensor Controller Dashboard",
+      description: "Interact with live sensor streams, test watchdog timer auto-recovery, and inspect closed-loop motor/buzzer responses.",
+    },
+    content: `# Embedded Capstone: Autonomous Multisensor Controller
+
+Professional embedded engineering requires orchestrating multiple subsystems—analog acquisition, interrupt handling, actuator modulation, and fault recovery—into an integrated, robust firmware architecture. In this capstone, we synthesize every concept into an industrial environmental controller.
+
+## System Architecture
+
+The autonomous controller executes four concurrent roles:
+1. **Interrupt-Driven Pulse Counter**: Logs optical tachometer pulses on INT0 (Pin 2).
+2. **Moving-Average Analog Filtering**: Samples raw analog temperature voltage and filters high-frequency thermal noise.
+3. **Non-Blocking Finite State Machine**: Evaluates system states (\`IDLE\`, \`ACTIVE\`, \`ALARM\`) based on sensor thresholds.
+4. **Hardware Watchdog Protection**: Armed with the AVR Watchdog Timer (WDT) to guarantee automatic reboot within 2 seconds if a software hang occurs.
+
+\`\`\`
+                 ┌───────────────────────────────────────┐
+                 │        AVR ATmega328P Core            │
+                 │                                       │
+ INT0 (Pin 2) ──>│ ISR: Increment pulse counter          │
+                 │                                       │
+ ADC (Pin A0) ──>│ Moving average circular filter (10Hz) │
+                 │                                       │
+ Timer0 Sched ──>│ State Machine: IDLE -> ACTIVE -> ALARM│
+                 │                                       │
+ WDT (2.0s)   ──>│ wdt_reset() inside loop()             │
+                 └──────────────┬────────────────────────┘
+                                │
+                  ┌─────────────┴─────────────┐
+                  ▼                           ▼
+            PWM Servo (Pin 9)        Piezo Alarm (Pin 8)
+\`\`\`
+
+## Watchdog Timer (WDT) Integration
+
+The ATmega328P includes an independent on-chip 128 kHz oscillator running a hardware Watchdog Timer. If the firmware enters an infinite loop, deadlocks on a bus, or suffers stack corruption:
+
+\`\`\`cpp
+#include <avr/wdt.h>
+
+void setup() {
+  wdt_enable(WDTO_2S); // Reboot if not serviced within 2 seconds
+}
+
+void loop() {
+  // Execute non-blocking state tasks
+  wdt_reset(); // Service (kick) the watchdog
+}
+\`\`\`
+
+If \`wdt_reset()\` is not called within 2 seconds, the WDT generates a hardware system reset, bringing the microcontroller back to \`setup()\`.
+
+## Production Firmware Checklist
+- Zero \`delay()\` calls in \`loop()\`.
+- All ISR-modified variables declared as \`volatile\`.
+- Multi-byte variable reads protected with atomic \`noInterrupts()\` / \`interrupts()\`.
+- Watchdog timer enabled and kicked in main loop.
+- Decoupling capacitors (100nF ceramic) present across all sensor power rails.`,
+    theorySections: [
+      {
+        id: "moving-average-circular-buffers",
+        title: "Moving Average Filtering on Constrained Microcontrollers",
+        content: `Floating-point digital filtering incurs heavy computational overhead on 8-bit AVR microcontrollers without hardware FPUs. An integer circular buffer of size N (ideally a power of two, e.g. 8 or 16) allows computing moving averages with bit-shifting: sum = sum - buffer[idx] + newSample; buffer[idx] = newSample; average = sum >> 3;.`,
+      },
+      {
+        id: "brownout-protection-wdt",
+        title: "Brown-Out Detection (BOD) Fuses",
+        content: `Microcontrollers operating under marginal supply voltages (e.g. 3.5V on a 5V ATmega328P) can execute invalid opcodes and corrupt flash memory. Setting the AVR BOD fuse to 4.3V holds the CPU in reset until power supply voltage stabilizes.`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Integrated Multisensor Embedded Controller",
+        language: "c",
+        description: "Complete firmware combining external interrupts, analog filtering, watchdog timer, and state machine.",
+        code: `#include <Arduino.h>
+#include <avr/wdt.h>
+
+volatile uint16_t pulseCount = 0;
+void onPulse(void) { pulseCount++; }
+
+#define WINDOW_SIZE 4
+uint16_t adcSamples[WINDOW_SIZE] = {0};
+uint8_t sampleIdx = 0;
+uint32_t sampleSum = 0;
+
+uint16_t getFilteredADC(uint16_t raw) {
+  sampleSum -= adcSamples[sampleIdx];
+  adcSamples[sampleIdx] = raw;
+  sampleSum += raw;
+  sampleIdx = (sampleIdx + 1) % WINDOW_SIZE;
+  return sampleSum / WINDOW_SIZE;
+}
+
+enum State { ST_NORMAL, ST_WARNING, ST_CRITICAL };
+State currentState = ST_NORMAL;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(2, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(2), onPulse, FALLING);
+  pinMode(13, OUTPUT);
+  wdt_enable(WDTO_2S);
+}
+
+void loop() {
+  wdt_reset();
+  static unsigned long lastTick = 0;
+  if (millis() - lastTick >= 200) {
+    lastTick = millis();
+    uint16_t currentReading = getFilteredADC(analogRead(A0));
+    if (currentReading > 700) currentState = ST_CRITICAL;
+    else if (currentReading > 400) currentState = ST_WARNING;
+    else currentState = ST_NORMAL;
+
+    digitalWrite(13, currentState == ST_CRITICAL ? HIGH : LOW);
+  }
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-ard-capstone",
+      "Simulate Moving Average Environmental Controller",
+      "Implement a function `simulateController(rawReadings, windowSize, warningThreshold, criticalThreshold)` that processes an array of raw sensor readings through a moving average filter of size `windowSize`. For each step (once window is primed), classify state as \"CRITICAL\" if average >= criticalThreshold, \"WARNING\" if average >= warningThreshold, or \"NORMAL\". Return array of classifications.",
+      `function simulateController(rawReadings, windowSize, warningThreshold, criticalThreshold) {
+  const results = [];
+  const buffer = [];
+  let sum = 0;
+
+  for (const val of rawReadings) {
+    buffer.push(val);
+    sum += val;
+    if (buffer.length > windowSize) {
+      sum -= buffer.shift();
+    }
+    if (buffer.length === windowSize) {
+      const avg = sum / windowSize;
+      if (avg >= criticalThreshold) results.push("CRITICAL");
+      else if (avg >= warningThreshold) results.push("WARNING");
+      else results.push("NORMAL");
+    }
+  }
+  return results;
+}
+
+console.log(JSON.stringify(simulateController([300, 320, 350, 420, 500, 750], 3, 400, 700)));`,
+      "ard-multisensor-capstone",
+      "Implement real-time moving average smoothing and multi-threshold state classification.",
+      [
+        "Maintain a sliding window buffer and running sum.",
+        "When buffer reaches windowSize, compute avg = sum / windowSize.",
+        "Classify avg against criticalThreshold and warningThreshold, pushing state string to results.",
+      ],
+      "Developing",
+      `function simulateController(rawReadings, windowSize, warningThreshold, criticalThreshold) {
+  // Process readings through moving average and return state classifications
+  return [];
+}
+
+console.log(JSON.stringify(simulateController([300, 320, 350, 420, 500, 750], 3, 400, 700)));`,
+      [
+        testCase("tc-ard-cap-1", "Filters sensor noise and detects transitions", '["NORMAL","WARNING","WARNING","CRITICAL"]'),
+        testCase("tc-ard-cap-2", "Maintains NORMAL state under low readings", '["NORMAL","NORMAL"]', "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why must the Watchdog Timer be refreshed in the main loop rather than inside a hardware timer ISR?",
+      "An ISR may continue firing even if the main loop has locked up or crashed; refreshing the watchdog in the main loop verifies that the entire application scheduling loop is running normally.",
+    ),
+  },
 ];
 
 export const arduinoEmbeddedModules: LearningModule[] = [
@@ -903,6 +1887,20 @@ export const arduinoEmbeddedModules: LearningModule[] = [
     "Generate pulse-width modulated outputs, stream UART serial telemetry, and construct non-blocking state machines.",
     arduinoEmbeddedLessons.slice(4, 6),
   ),
+  moduleData(
+    "ard-module-timers-actuators",
+    4,
+    "Hardware Timers, Interrupts & Actuators",
+    "Attach external hardware interrupts, construct multi-rate software schedulers, generate piezo tones, and command servo motors.",
+    arduinoEmbeddedLessons.slice(6, 10),
+  ),
+  moduleData(
+    "ard-module-buses-capstone",
+    5,
+    "Communication Buses & Capstone System",
+    "Interface I2C OLED displays and environmental sensors, and build a resilient multi-sensor embedded controller.",
+    arduinoEmbeddedLessons.slice(10, 12),
+  ),
 ];
 
 export const arduinoEmbeddedCourse: LearningCourse = {
@@ -921,8 +1919,14 @@ export const arduinoEmbeddedCourse: LearningCourse = {
     "Sample continuous physical quantities with the 10-bit Successive Approximation ADC.",
     "Modulate actuator power and brightness using hardware PWM duty cycles.",
     "Construct cooperative non-blocking state machines with millis() timing.",
+    "Attach external hardware interrupts (INT0/INT1) and write race-free ISRs.",
+    "Build multi-rate non-blocking schedulers and eliminate blocking delay calls.",
+    "Synthesize acoustic musical tones using Timer2 CTC square waves.",
+    "Actuate precision RC hobby servos using 50 Hz PWM timing pulses.",
+    "Master the I2C two-wire bus protocol to communicate with sensors and OLEDs.",
+    "Architect resilient embedded systems with watchdog timers and moving average filtering.",
   ],
-  estimatedDurationMinutes: 165,
+  estimatedDurationMinutes: 320,
   publicationStatus: "published",
   modules: arduinoEmbeddedModules,
 };

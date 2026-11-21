@@ -23,6 +23,12 @@ const objectives: LearningObjective[] = [
   { id: "esp-ledc-pwm", title: "Allocate hardware LEDC timers, assign channels to arbitrary GPIOs, and modulate duty cycle with up to 16-bit resolution." },
   { id: "esp-wifi-telemetry", title: "Establish 802.11 b/g/n Wi-Fi station connectivity and transmit serialized JSON telemetry payloads via HTTP REST." },
   { id: "esp-deep-sleep", title: "Configure Ultra-Low-Power (ULP) deep sleep modes, preserve variables in RTC slow memory, and handle external wakeups." },
+  { id: "esp-freertos-tasks", title: "Create pinned tasks on Core 0 and Core 1 with priority scheduling and stack allocation." },
+  { id: "esp-freertos-queues", title: "Implement thread-safe inter-task communication using FreeRTOS FIFO queues and mutexes." },
+  { id: "esp-adc-multisampling", title: "Calibrate 12-bit ADC non-linearity using multisampling and lookup tables." },
+  { id: "esp-deep-sleep-advanced", title: "Design ultra-low-power duty cycles using timer and touch wakeups with RTC SRAM state persistence." },
+  { id: "esp-mqtt-telemetry", title: "Publish and subscribe to lightweight IoT telemetry using the MQTT protocol over TLS." },
+  { id: "esp-iot-capstone", title: "Synthesize dual-core FreeRTOS tasks, sensor sampling, and cloud telemetry into a resilient IoT node." },
 ];
 
 function testCase(
@@ -843,6 +849,1066 @@ console.log(calcAverageCurrent(120, 2, 15, 58));`,
         "Standard SRAM is completely unpowered during Deep Sleep to conserve energy. Only the 8 KB of RTC slow memory remains powered to preserve annotated state variables.",
       ),
   },
+  // Module 4: FreeRTOS Dual-Core Concurrency & Calibration
+  {
+    id: "esp32-freertos-tasks",
+    order: 7,
+    title: "FreeRTOS Dual-Core Multitasking & Task Pinning",
+    summary: "Spawn dedicated tasks pinned to Core 0 and Core 1 with xTaskCreatePinnedToCore, configure priority levels, and handle watchdog timeouts.",
+    type: "guided-coding",
+    objectiveIds: ["esp-freertos-tasks"],
+    prerequisiteLessonIds: ["esp32-deep-sleep-rtc"],
+    estimatedDurationMinutes: 30,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "ESP32 Dual-Core FreeRTOS Task Scheduler",
+      description: "Inspect concurrent task execution across Core 0 (Protocol) and Core 1 (Application) with real-time priority preemption.",
+    },
+    content: `# FreeRTOS Dual-Core Multitasking & Task Pinning
+
+The ESP32 SoC contains two independent 32-bit Xtensa LX6 microprocessor cores. Rather than running a monolithic super-loop that blocks when handling networking or complex sensor math, the ESP-IDF runtime runs **FreeRTOS** natively across both symmetrical cores.
+
+## Core Allocation & Task Pinning
+
+By convention in the Arduino ESP32 framework:
+- **Core 0 (Protocol Core / PRO_CPU)**: Manages Wi-Fi, Bluetooth LE stacks, and TCP/IP background threads.
+- **Core 1 (Application Core / APP_CPU)**: Executes your standard \`setup()\` and \`loop()\` functions.
+
+Using \`xTaskCreatePinnedToCore()\`, you can launch dedicated background threads pinned to either core:
+
+\`\`\`cpp
+BaseType_t xTaskCreatePinnedToCore(
+  TaskFunction_t pvTaskCode,   // Pointer to task function (void fn(void *param))
+  const char *pcName,          // Descriptive name for debugging
+  const uint32_t usStackDepth, // Stack size in 32-bit WORDS (e.g. 4096 words = 16 KB)
+  void *pvParameters,          // Pointer to input arguments passed to task
+  UBaseType_t uxPriority,      // Priority (0 = lowest, configMAX_PRIORITIES - 1 = highest)
+  TaskHandle_t *pvCreatedTask, // Optional pointer to receive task handle
+  const BaseType_t xCoreID     // Core affinity: 0, 1, or tskNO_AFFINITY
+);
+\`\`\`
+
+## Task Function Anatomy & The Infinite Loop
+
+A FreeRTOS task function must NEVER return or exit normally like a regular C function. It must execute an infinite loop and **yield CPU time** when idle:
+
+\`\`\`cpp
+void telemetryTask(void *pvParameters) {
+  for (;;) {
+    // 1. Perform high-priority sensor read or computation
+    readSensors();
+
+    // 2. Yield control to scheduler for 500 milliseconds
+    vTaskDelay(pdMS_TO_TICKS(500));
+  }
+  // If a task must terminate, it must delete itself:
+  vTaskDelete(NULL);
+}
+\`\`\`
+
+## The Task Watchdog Timer (TWDT)
+
+FreeRTOS on ESP32 includes an active Task Watchdog Timer (TWDT) enabled on both cores. If a high-priority task executes a tight \`while(1) {}\` loop without calling \`vTaskDelay()\` or blocking on a queue, the **IDLE task** for that core is starved. After 5 seconds of starvation, the TWDT triggers a system panic and reboots the chip!`,
+    theorySections: [
+      {
+        id: "stack-high-water-mark",
+        title: "Stack Sizing & High Water Mark Detection",
+        content: `Allocating too little stack space to a task causes silent stack overflow, overwriting adjacent memory heaps and causing unpredictable crashes. Use \`uxTaskGetStackHighWaterMark(NULL)\` inside your task to query the minimum amount of unused stack remaining. If it approaches 200 words, increase \`usStackDepth\`.`,
+      },
+      {
+        id: "preemptive-priority-scheduling",
+        title: "Preemptive Priority vs Round-Robin Slicing",
+        content: `FreeRTOS scheduler is strictly preemptive. A higher priority task immediately preempts a lower priority task as soon as it becomes READY. Tasks with identical priorities share the core via round-robin time slicing governed by the 1000 Hz system tick timer (1 ms slice).`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Dual-Core Task Pinning & High-Frequency Sensor Loop",
+        language: "c",
+        description: "Spawns a dedicated fast acquisition task on Core 0 while loop() continues running on Core 1.",
+        code: `#include <Arduino.h>
+
+TaskHandle_t sensorTaskHandle;
+
+void sensorWorker(void *pvParameters) {
+  Serial.print("Sensor task running on core: ");
+  Serial.println(xPortGetCoreID());
+
+  for (;;) {
+    // High-frequency sensor acquisition
+    int rawValue = analogRead(36);
+    // Yield for 50 milliseconds
+    vTaskDelay(pdMS_TO_TICKS(50));
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+
+  xTaskCreatePinnedToCore(
+    sensorWorker,       // Function
+    "SensorWorker",     // Name
+    4096,               // Stack size (words)
+    NULL,               // Params
+    2,                  // Priority (higher than loop priority 1)
+    &sensorTaskHandle,  // Handle
+    0                   // Pin to Core 0!
+  );
+}
+
+void loop() {
+  Serial.print("Main loop running on core: ");
+  Serial.println(xPortGetCoreID());
+  delay(1000);
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-esp-tasks",
+      "Simulate Preemptive Priority Task Scheduling",
+      "Implement a function `simulateTaskScheduler(tasks, totalTicks)` that models a single-core preemptive priority scheduler. Each task is `{ name: string, priority: number, period: number, duration: number }`. When a task triggers at `tick % period === 0`, it runs for `duration` ticks. If multiple tasks want to run, the one with highest priority runs. Return an array of task names executed at each tick (or 'IDLE').",
+      `function simulateTaskScheduler(tasks, totalTicks) {
+  const executionLog = [];
+  const activeQueues = [];
+
+  for (let tick = 0; tick < totalTicks; tick++) {
+    // Check if new task instances are released
+    for (const task of tasks) {
+      if (tick % task.period === 0) {
+        activeQueues.push({ name: task.name, priority: task.priority, remaining: task.duration });
+      }
+    }
+
+    if (activeQueues.length === 0) {
+      executionLog.push("IDLE");
+      continue;
+    }
+
+    // Sort by priority descending
+    activeQueues.sort((a, b) => b.priority - a.priority);
+    const current = activeQueues[0];
+    executionLog.push(current.name);
+    current.remaining--;
+    if (current.remaining <= 0) {
+      activeQueues.shift();
+    }
+  }
+
+  return executionLog;
+}
+
+console.log(JSON.stringify(simulateTaskScheduler([
+  { name: "NET", priority: 2, period: 4, duration: 1 },
+  { name: "APP", priority: 1, period: 2, duration: 1 }
+], 6)));`,
+      "esp-freertos-tasks",
+      "Model preemptive priority scheduling and IDLE yield semantics accurately.",
+      [
+        "Track pending task instances with remaining execution duration.",
+        "On each tick, release tasks where tick % period === 0.",
+        "Select active task with highest priority; decrement remaining ticks, removing when done.",
+      ],
+      "Developing",
+      `function simulateTaskScheduler(tasks, totalTicks) {
+  // Simulate preemptive priority execution log across totalTicks
+  return [];
+}
+
+console.log(JSON.stringify(simulateTaskScheduler([
+  { name: "NET", priority: 2, period: 4, duration: 1 },
+  { name: "APP", priority: 1, period: 2, duration: 1 }
+], 6)));`,
+      [
+        testCase("tc-esp-task-1", "Preempts lower priority task with higher priority task", '["NET","APP","APP","IDLE","NET","APP"]'),
+        testCase("tc-esp-task-2", "Logs IDLE when no tasks are ready", '["IDLE","IDLE"]', "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why must every FreeRTOS task function contain a vTaskDelay() or blocking synchronization call inside its loop?",
+      "Without yielding or blocking, a task running on a core starves lower-priority threads and the FreeRTOS IDLE task, triggering the Task Watchdog Timer (TWDT) reset after 5 seconds.",
+    ),
+  },
+
+  // Lesson 8: Thread-Safe Inter-Core Communication with FreeRTOS Queues
+  {
+    id: "esp32-freertos-queues",
+    order: 8,
+    title: "Thread-Safe Inter-Core Communication with FreeRTOS Queues",
+    summary: "Transfer structured telemetry safely between Core 0 and Core 1 without race conditions using FreeRTOS FIFO queues and binary semaphores.",
+    type: "guided-coding",
+    objectiveIds: ["esp-freertos-queues"],
+    prerequisiteLessonIds: ["esp32-freertos-tasks"],
+    estimatedDurationMinutes: 30,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "Inter-Core FreeRTOS Queue Visualizer",
+      description: "Push structured telemetry packets from Core 0 and observe atomic FIFO retrieval and buffer depth on Core 1.",
+    },
+    content: `# Thread-Safe Inter-Core Communication with FreeRTOS Queues
+
+In multi-threaded and multi-core embedded systems, two CPU cores running concurrently must never access or modify shared variables (such as arrays, buffers, or structs) without synchronization. Unsynchronized shared memory access causes **data races**, torn reads, and heap corruption.
+
+## The FreeRTOS Queue Primitive
+
+A **Queue** is the primary thread-safe inter-task communication primitive in FreeRTOS:
+- **FIFO (First-In, First-Out)**: Items are retrieved in the order they were inserted.
+- **Copy-by-Value**: Items sent to a queue are copied byte-by-byte into the queue's internal buffer, eliminating lifetime and scope hazards.
+- **Thread-Safe**: Internal spinlocks protect queue access across both Core 0 and Core 1.
+- **Blocking with Timeout**: Tasks can block waiting to read from an empty queue or write to a full queue without burning CPU cycles.
+
+## Creating and Using Queues
+
+\`\`\`cpp
+// 1. Declare payload struct and queue handle
+typedef struct {
+  float temperature;
+  uint32_t timestamp;
+} SensorPacket;
+
+QueueHandle_t sensorQueue;
+
+void setup() {
+  // Create queue capable of holding 10 SensorPacket items
+  sensorQueue = xQueueCreate(10, sizeof(SensorPacket));
+}
+
+// Producer Task (Running on Core 0)
+void producerTask(void *pvParam) {
+  for (;;) {
+    SensorPacket packet = { 24.5f, millis() };
+    // Send packet, waiting up to 10 ticks if full
+    xQueueSend(sensorQueue, &packet, pdMS_TO_TICKS(10));
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+}
+
+// Consumer Task (Running on Core 1)
+void consumerTask(void *pvParam) {
+  SensorPacket receivedPacket;
+  for (;;) {
+    // Wait indefinitely (portMAX_DELAY) until an item arrives
+    if (xQueueReceive(sensorQueue, &receivedPacket, portMAX_DELAY) == pdTRUE) {
+      Serial.printf("Got temp: %.1f at %u\\n", receivedPacket.temperature, receivedPacket.timestamp);
+    }
+  }
+}
+\`\`\`
+
+## Mutexes for Shared Hardware Peripherals
+
+While Queues transfer data between tasks, **Mutexes (Mutual Exclusion Semaphores)** guard shared hardware buses like I2C or SPI:
+
+\`\`\`cpp
+SemaphoreHandle_t i2cMutex;
+
+void readI2CDevice() {
+  if (xSemaphoreTake(i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    // Safe exclusive access to I2C bus
+    Wire.requestFrom(0x68, 6);
+    xSemaphoreGive(i2cMutex); // Release lock
+  }
+}
+\`\`\``,
+    theorySections: [
+      {
+        id: "queue-copy-vs-reference",
+        title: "Pass by Value vs Pass by Reference",
+        content: `Small structs (up to 32–64 bytes) should always be copied directly into the queue by value. For large payloads (e.g. 50 KB camera JPEG images), send a pointer to dynamically allocated memory (\`ps_malloc\`) through the queue, transferring ownership to the receiving task to avoid buffer copies.`,
+      },
+      {
+        id: "priority-inversion-mutex",
+        title: "Priority Inversion & Mutex Priority Inheritance",
+        content: `Priority inversion occurs when a low-priority task holds a lock needed by a high-priority task, while a medium-priority task preempts the low-priority task. FreeRTOS Mutexes implement Priority Inheritance, temporarily elevating the priority of the lock-holding task to resolve the deadlock.`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Thread-Safe Multi-Core Sensor Pipeline with Queues",
+        language: "c",
+        description: "Produces sensor telemetry on Core 0 and delivers it safely via Queue to Core 1 for serial logging.",
+        code: `#include <Arduino.h>
+
+typedef struct {
+  uint16_t adcRaw;
+  uint32_t tickMs;
+} TelemetryData;
+
+QueueHandle_t telemetryQueue;
+
+void samplerTask(void *param) {
+  for (;;) {
+    TelemetryData data;
+    data.adcRaw = analogRead(34);
+    data.tickMs = millis();
+    xQueueSend(telemetryQueue, &data, 0); // Non-blocking send
+    vTaskDelay(pdMS_TO_TICKS(100));
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  telemetryQueue = xQueueCreate(8, sizeof(TelemetryData));
+
+  xTaskCreatePinnedToCore(samplerTask, "Sampler", 2048, NULL, 2, NULL, 0);
+}
+
+void loop() {
+  TelemetryData item;
+  if (xQueueReceive(telemetryQueue, &item, pdMS_TO_TICKS(50)) == pdTRUE) {
+    Serial.printf("Raw: %u at %u ms\\n", item.adcRaw, item.tickMs);
+  }
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-esp-queues",
+      "Simulate Bounded FIFO Queue Operations",
+      "Implement a function `simulateQueue(capacity, operations)` that models a FreeRTOS bounded FIFO queue. Operations is an array of `{ type: 'SEND' | 'RECEIVE', value?: any }`. If SEND is called when full, the item is dropped (increment `droppedCount`). If RECEIVE is called when empty, record `null` in `receivedValues`. Return `{ remainingItems: [...], droppedCount: number, receivedValues: [...] }`.",
+      `function simulateQueue(capacity, operations) {
+  const queue = [];
+  const receivedValues = [];
+  let droppedCount = 0;
+
+  for (const op of operations) {
+    if (op.type === "SEND") {
+      if (queue.length < capacity) {
+        queue.push(op.value);
+      } else {
+        droppedCount++;
+      }
+    } else if (op.type === "RECEIVE") {
+      if (queue.length > 0) {
+        receivedValues.push(queue.shift());
+      } else {
+        receivedValues.push(null);
+      }
+    }
+  }
+
+  return { remainingItems: queue, droppedCount, receivedValues };
+}
+
+console.log(JSON.stringify(simulateQueue(2, [
+  { type: "SEND", value: 10 },
+  { type: "SEND", value: 20 },
+  { type: "SEND", value: 30 },
+  { type: "RECEIVE" },
+  { type: "RECEIVE" }
+])));`,
+      "esp-freertos-queues",
+      "Implement bounded FIFO capacity, packet dropping, and non-blocking dequeue behavior.",
+      [
+        "Initialize queue = [], receivedValues = [], droppedCount = 0.",
+        "For 'SEND', test if queue.length < capacity; push value if space exists, otherwise increment droppedCount.",
+        "For 'RECEIVE', shift from queue if not empty, otherwise push null to receivedValues.",
+      ],
+      "Developing",
+      `function simulateQueue(capacity, operations) {
+  // Simulate FIFO queue with capacity limits
+  return null;
+}
+
+console.log(JSON.stringify(simulateQueue(2, [
+  { type: "SEND", value: 10 },
+  { type: "SEND", value: 20 },
+  { type: "SEND", value: 30 },
+  { type: "RECEIVE" },
+  { type: "RECEIVE" }
+])));`,
+      [
+        testCase("tc-esp-q-1", "Enforces capacity limits and drops overflow items", '{"remainingItems":[],"droppedCount":1,"receivedValues":[10,20]}'),
+        testCase("tc-esp-q-2", "Handles empty queue receive without crash", '{"remainingItems":[],"droppedCount":0,"receivedValues":[null]}', "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is copying items by value into a FreeRTOS queue safer than passing pointers to local variables?",
+      "Local variables allocated on a task's stack are destroyed when that function exits or context changes; passing by value guarantees the receiving task receives valid, immutable data regardless of stack state.",
+    ),
+  },
+
+  // Lesson 9: 12-Bit ADC Non-Linearity Compensation & Multisampling
+  {
+    id: "esp32-adc-calibration",
+    order: 9,
+    title: "12-Bit ADC Non-Linearity Compensation & Multisampling",
+    summary: "Overcome the ESP32 SAR ADC non-linear transfer curve, dead zones at 0V and 3.3V, and implement multi-sample statistical smoothing.",
+    type: "guided-coding",
+    objectiveIds: ["esp-adc-multisampling"],
+    prerequisiteLessonIds: ["esp32-freertos-queues"],
+    estimatedDurationMinutes: 30,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "ESP32 SAR ADC Linearization Curve Simulator",
+      description: "Compare raw non-linear ADC transfer curves against factory eFuse characterized polynomial correction.",
+    },
+    content: `# 12-Bit ADC Non-Linearity Compensation & Multisampling
+
+The ESP32 features two 12-bit Successive Approximation Register (SAR) Analog-to-Digital Converters. However, unlike the laser-trimmed 10-bit ADC of the ATmega328P, the ESP32 ADC is notoriously non-linear and exhibits distinct physical imperfections:
+1. **Dead Zone at 0V**: Voltages below $\\sim 100\\text{ mV}$ register as 0.
+2. **Saturation near 3.3V**: At 11 dB attenuation, voltages above $\\sim 3.1\\text{ V}$ saturate at 4095.
+3. **Non-Linear Transfer Function**: The step size is non-uniform across the range.
+
+## Attenuation (dB) Settings
+
+The ESP32 ADC internal reference is $1.1\\text{ V}$. An internal resistive attenuator scales higher voltages into the ADC range:
+- **ADC_ATTEN_DB_0 ($0\\text{ dB}$)**: Range $0 - 1.1\\text{ V}$ full scale.
+- **ADC_ATTEN_DB_2_5 ($2.5\\text{ dB}$)**: Range $0 - 1.5\\text{ V}$.
+- **ADC_ATTEN_DB_6 ($6\\text{ dB}$)**: Range $0 - 2.2\\text{ V}$.
+- **ADC_ATTEN_DB_11 ($11\\text{ dB}$)**: Range $0 - 3.3\\text{ V}$ (Most common for 3.3V sensors).
+
+## Factory eFuse Calibration (esp_adc_cal)
+
+Espressif burns unique factory calibration parameters into on-chip **eFuses** during silicon fabrication. The ESP-IDF \`esp_adc_cal\` API reads these eFuses to compute a tailored polynomial correction:
+
+\`\`\`cpp
+#include "esp_adc_cal.h"
+
+esp_adc_cal_characteristics_t adc_chars;
+
+void setup() {
+  // Characterize ADC1 at 11 dB attenuation using eFuse Vref
+  esp_adc_cal_characterize(
+    ADC_UNIT_1,
+    ADC_ATTEN_DB_11,
+    ADC_WIDTH_BIT_12,
+    1100, // Default Vref if eFuse not burned
+    &adc_chars
+  );
+}
+
+uint32_t readCalibratedMillivolts(adc1_channel_t channel) {
+  uint32_t raw = adc1_get_raw(channel);
+  // Converts raw 12-bit value directly to linearized millivolts
+  return esp_adc_cal_raw_to_voltage(raw, &adc_chars);
+}
+\`\`\`
+
+## Hardware Multisampling (Oversampling)
+
+Electrical switching noise from the internal Wi-Fi radio and high-speed CPU clocks couples into analog ground planes. Multisampling (taking 32 to 64 successive samples and averaging them) dramatically reduces Gaussian thermal noise:
+
+\`\`\`cpp
+uint32_t multisampleADC(uint8_t pin, uint8_t sampleCount) {
+  uint32_t sum = 0;
+  for (uint8_t i = 0; i < sampleCount; i++) {
+    sum += analogRead(pin);
+  }
+  return sum / sampleCount;
+}
+\`\`\``,
+    theorySections: [
+      {
+        id: "adc2-wifi-conflict",
+        title: "ADC2 & Wi-Fi Radio Incompatibility",
+        content: `ESP32 GPIOs are divided between ADC1 (GPIO 32–39) and ADC2 (GPIO 0, 2, 4, 12–15, 25–27). **ADC2 is shared with the Wi-Fi subsystem**. When the Wi-Fi radio is active, calls to \`analogRead()\` on ADC2 pins return error codes or garbage data. **Always connect analog sensors strictly to ADC1 pins (GPIO 32 through 39)**!`,
+      },
+      {
+        id: "oversampling-enob",
+        title: "Oversampling and Effective Resolution",
+        content: `According to sampling theory, oversampling by a factor of 4 increases effective resolution by 1 bit ($2^{2n}$ samples for $n$ additional bits). Averaging 64 samples increases the Effective Number of Bits (ENOB) by 3 bits while filtering out high-frequency white noise.`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Robust Calibrated Analog Acquisition with Outlier Rejection",
+        language: "c",
+        description: "Samples ADC1 with 16-sample multisampling and eFuse millivolt conversion.",
+        code: `#include <Arduino.h>
+#include "esp_adc_cal.h"
+
+#define ADC_PIN 34
+esp_adc_cal_characteristics_t adcChars;
+
+void setup() {
+  Serial.begin(115200);
+  analogReadResolution(12);
+  analogSetPinAttenuation(ADC_PIN, ADC_11db);
+
+  esp_adc_cal_characterize(
+    ADC_UNIT_1,
+    ADC_ATTEN_DB_11,
+    ADC_WIDTH_BIT_12,
+    1100,
+    &adcChars
+  );
+}
+
+void loop() {
+  uint32_t rawSum = 0;
+  const uint8_t SAMPLES = 32;
+  for (uint8_t i = 0; i < SAMPLES; i++) {
+    rawSum += analogRead(ADC_PIN);
+    delayMicroseconds(50);
+  }
+  uint32_t rawAvg = rawSum / SAMPLES;
+  uint32_t voltageMv = esp_adc_cal_raw_to_voltage(rawAvg, &adcChars);
+
+  Serial.printf("Raw: %u, Calibrated Voltage: %u mV\\n", rawAvg, voltageMv);
+  delay(1000);
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-esp-adc",
+      "Linearize and Calibrate Raw 12-Bit ADC Samples",
+      "Implement a function `calibrateADCSamples(rawSamples, vMaxMv = 3300)` that discards the lowest and highest raw sample (trimmed mean to reject spikes), averages the remaining samples, and maps the average 12-bit value ($0-4095$) linearly into millivolts rounded to the nearest integer.",
+      `function calibrateADCSamples(rawSamples, vMaxMv = 3300) {
+  if (rawSamples.length < 3) return 0;
+  const sorted = [...rawSamples].sort((a, b) => a - b);
+  const trimmed = sorted.slice(1, sorted.length - 1);
+  const sum = trimmed.reduce((acc, val) => acc + val, 0);
+  const avg = sum / trimmed.length;
+  return Math.round((avg / 4095) * vMaxMv);
+}
+
+console.log(calibrateADCSamples([2000, 2048, 2050, 4095, 100]));`,
+      "esp-adc-multisampling",
+      "Apply outlier rejection and proportional voltage mapping to multi-sample ADC data.",
+      [
+        "Sort rawSamples in ascending numeric order.",
+        "Slice off index 0 and the final index to reject extreme outliers.",
+        "Compute average of trimmed samples, multiply by (vMaxMv / 4095), and round.",
+      ],
+      "Developing",
+      `function calibrateADCSamples(rawSamples, vMaxMv = 3300) {
+  // Discard min/max, average remaining, and convert 12-bit to millivolts
+  return 0;
+}
+
+console.log(calibrateADCSamples([2000, 2048, 2050, 4095, 100]));`,
+      [
+        testCase("tc-esp-adc-1", "Trims spikes and converts mid-scale to ~1650 mV", "1650"),
+        testCase("tc-esp-adc-2", "Converts full scale reading correctly", "3300", "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why should you never connect analog sensors to ADC2 pins when building a Wi-Fi enabled ESP32 project?",
+      "ADC2 hardware is shared with the 2.4 GHz Wi-Fi radio; when the Wi-Fi stack transmits or receives, ADC2 reads fail or yield corrupted values.",
+    ),
+  },
+
+  // Module 5: Ultra-Low-Power Duty Cycles & MQTT Capstone
+  {
+    id: "esp32-deep-sleep-wakeup",
+    order: 10,
+    title: "Advanced Ultra-Low-Power Deep Sleep & Multiple Wakeup Sources",
+    summary: "Maximize battery endurance by dropping to 10µA sleep current, configuring timer/ext0/ext1 wakeups, and persisting variables in RTC memory.",
+    type: "guided-coding",
+    objectiveIds: ["esp-deep-sleep-advanced"],
+    prerequisiteLessonIds: ["esp32-adc-calibration"],
+    estimatedDurationMinutes: 30,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "ESP32 Battery Lifetime & Sleep Mode Calculator",
+      description: "Model battery discharge profiles across Active, Modem-Sleep, Light-Sleep, and Deep-Sleep duty cycles.",
+    },
+    content: `# Advanced Ultra-Low-Power Deep Sleep & Multiple Wakeup Sources
+
+A standard ESP32 operating in Active Wi-Fi transmit mode draws approximately **$160\\text{ mA}$ to $240\\text{ mA}$**. Powered continuously from a typical 2500 mAh 18650 Li-ion battery, the device exhausts its charge in under **12 hours**!
+
+By utilizing **Deep Sleep**, current consumption plummets to just **$10\\text{ }\\mu\\text{A} - 15\\text{ }\\mu\\text{A}$**, extending battery runtime from hours to **multiple years**.
+
+## What Happens in Deep Sleep?
+
+When entering Deep Sleep via \`esp_deep_sleep_start()\`:
+- Both Xtensa CPU cores, high-speed RAM, and digital peripherals are completely unpowered.
+- The 2.4 GHz Wi-Fi and Bluetooth radios are shut down.
+- **Powered Components**: Only the Real-Time Clock (RTC) controller, RTC peripherals, and **8 KB of RTC Slow Memory** remain energized.
+
+\`\`\`
+Active Phase (100 ms at 150 mA) ──> Connect Wi-Fi, Read Sensors, POST Telemetry
+                                  │
+                                  ▼ esp_deep_sleep_start()
+Sleep Phase (10 minutes at 10 µA) ──> CPU OFF, Radios OFF, RTC Running
+                                  │
+                                  ▼ Timer or GPIO Wakeup Event
+System Reset / Re-execution     ──> CPU Bootstraps setup() again
+\`\`\`
+
+## Multiple Wakeup Sources
+
+The ESP32 can be awakened by multiple independent hardware triggers:
+
+1. **Timer Wakeup**:
+\`\`\`cpp
+esp_sleep_enable_timer_wakeup(10ULL * 60 * 1000000); // 10 minutes in microseconds
+\`\`\`
+
+2. **EXT0 Wakeup (Single RTC GPIO)**:
+Wakes up when a specific RTC pin reaches HIGH or LOW logic level:
+\`\`\`cpp
+esp_sleep_enable_ext0_wakeup(GPIO_NUM_33, 1); // Wake on HIGH
+\`\`\`
+
+3. **EXT1 Wakeup (Multiple RTC GPIOs)**:
+Wakes up when any combination of RTC pins matches a bitmask:
+\`\`\`cpp
+esp_sleep_enable_ext1_wakeup((1ULL << GPIO_NUM_33) | (1ULL << GPIO_NUM_32), ESP_EXT1_WAKEUP_ANY_HIGH);
+\`\`\`
+
+## Preserving State Across Sleep Cycles with RTC_DATA_ATTR
+
+Because standard SRAM is powered down during Deep Sleep, normal global variables reset to their initial values upon reboot. Storing data in **RTC Slow Memory** preserves it across sleep cycles:
+
+\`\`\`cpp
+RTC_DATA_ATTR uint32_t bootCount = 0;
+RTC_DATA_ATTR float lastRecordedTemperature = 0.0f;
+
+void setup() {
+  bootCount++; // Increments and persists across every sleep cycle!
+}
+\`\`\``,
+    theorySections: [
+      {
+        id: "wakeup-cause-detection",
+        title: "Inspecting Wakeup Cause",
+        content: `Upon waking from Deep Sleep, the chip executes setup() from the beginning. Call \`esp_sleep_get_wakeup_cause()\` to determine what woke the processor: \`ESP_SLEEP_WAKEUP_TIMER\`, \`ESP_SLEEP_WAKEUP_EXT0\`, or \`ESP_SLEEP_WAKEUP_TOUCHPAD\`.`,
+      },
+      {
+        id: "battery-duty-cycle-math",
+        title: "Calculating Average Current Draw",
+        content: `The average current draw of a duty-cycled sensor node is given by: $I_{avg} = \\frac{I_{active} t_{active} + I_{sleep} t_{sleep}}{t_{active} + t_{sleep}}$. If active time is 1 second at 100 mA and sleep time is 3599 seconds at 15 µA, $I_{avg} \\approx 42.7\\text{ }\\mu\\text{A}$, yielding over 5 years on a 2000 mAh battery!`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Deep Sleep with Timer Wakeup and RTC Memory Counter",
+        language: "c",
+        description: "Increments persistent boot count in RTC memory and sleeps for 60 seconds between boots.",
+        code: `#include <Arduino.h>
+
+RTC_DATA_ATTR int bootCounter = 0;
+
+void setup() {
+  Serial.begin(115200);
+  delay(500);
+
+  bootCounter++;
+  Serial.printf("Wakeup number: %d\\n", bootCounter);
+
+  esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  if (wakeup_reason == ESP_SLEEP_WAKEUP_TIMER) {
+    Serial.println("Wakeup caused by timer");
+  } else {
+    Serial.println("Initial power-on or external reset");
+  }
+
+  // Sleep for 60 seconds (in microseconds)
+  esp_sleep_enable_timer_wakeup(60ULL * 1000000);
+  Serial.println("Entering Deep Sleep...");
+  Serial.flush();
+  esp_deep_sleep_start();
+}
+
+void loop() {
+  // Never executed
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-esp-sleep",
+      "Calculate Battery Endurance from Duty Cycle",
+      "Implement a function `calculateBatteryLifeDays(batteryMah, activeMa, activeSec, sleepUa, sleepSec)` that computes the weighted average current draw in milliamperes and returns the expected operational lifetime in days (assuming 90% usable battery capacity): `Math.floor((batteryMah * 0.90) / (avgMa * 24))`.",
+      `function calculateBatteryLifeDays(batteryMah, activeMa, activeSec, sleepUa, sleepSec) {
+  const totalPeriod = activeSec + sleepSec;
+  const sleepMa = sleepUa / 1000;
+  const avgMa = (activeMa * activeSec + sleepMa * sleepSec) / totalPeriod;
+  const usableMah = batteryMah * 0.90;
+  return Math.floor(usableMah / (avgMa * 24));
+}
+
+console.log(calculateBatteryLifeDays(2000, 150, 2, 15, 298));`,
+      "esp-deep-sleep-advanced",
+      "Accurately calculate weighted average current and projected battery lifetime.",
+      [
+        "Convert sleepUa to sleepMa by dividing by 1000.",
+        "Calculate avgMa = (activeMa * activeSec + sleepMa * sleepSec) / (activeSec + sleepSec).",
+        "Calculate total lifetime in days = Math.floor((batteryMah * 0.90) / (avgMa * 24)).",
+      ],
+      "Developing",
+      `function calculateBatteryLifeDays(batteryMah, activeMa, activeSec, sleepUa, sleepSec) {
+  // Compute average current and return operational battery life in days
+  return 0;
+}
+
+console.log(calculateBatteryLifeDays(2000, 150, 2, 15, 298));`,
+      [
+        testCase("tc-esp-sleep-1", "Calculates realistic IoT sensor battery life", "73"),
+        testCase("tc-esp-sleep-2", "Models ultra-low active duty cycle", "724", "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why must variables intended to survive Deep Sleep be tagged with the RTC_DATA_ATTR qualifier?",
+      "Standard internal SRAM is unpowered in Deep Sleep to conserve energy; only the 8 KB RTC Slow Memory retains power and content during the sleep state.",
+    ),
+  },
+
+  // Lesson 11: MQTT Pub/Sub Telemetry Protocol
+  {
+    id: "esp32-mqtt-telemetry",
+    order: 11,
+    title: "MQTT Pub/Sub Telemetry Protocol for Constrained IoT Devices",
+    summary: "Implement lightweight MQTT client messaging, Quality of Service (QoS) levels, topic hierarchies, and keepalive pings.",
+    type: "guided-coding",
+    objectiveIds: ["esp-mqtt-telemetry"],
+    prerequisiteLessonIds: ["esp32-deep-sleep-wakeup"],
+    estimatedDurationMinutes: 30,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "MQTT Broker & Client Topic Hub Simulator",
+      description: "Publish telemetry to hierarchical MQTT topics and evaluate multi-level wildcard subscriptions (+ and #).",
+    },
+    content: `# MQTT Pub/Sub Telemetry Protocol for Constrained IoT Devices
+
+While HTTP REST is the cornerstone of the World Wide Web, it is notoriously inefficient for low-power microcontrollers. HTTP headers add hundreds of bytes of overhead per request, and opening a new TLS socket for every reading wastes severe battery power.
+
+**MQTT (Message Queuing Telemetry Transport)** is the industry standard protocol for IoT:
+- **Tiny 2-Byte Fixed Header**: Extreme bandwidth efficiency.
+- **Persistent Long-Lived TCP Connection**: Eliminates connection handshake overhead.
+- **Publish / Subscribe Decoupling**: Sensors publish data to named topics without knowing who (or how many) clients are receiving it.
+
+## MQTT Topic Hierarchies
+
+Topics are structured like file system paths with forward slashes:
+\`\`\`
+building-a/floor-2/room-204/temperature
+sensors/india/hyderabad/air-quality/pm25
+\`\`\`
+
+### Subscription Wildcards:
+- **\`+\` (Single-Level Wildcard)**: Matches exactly one topic level.
+  - \`building-a/+/room-204/temperature\` matches floor-1, floor-2, etc.
+- **\`#\` (Multi-Level Wildcard)**: Matches all remaining child levels (must be placed at the end).
+  - \`sensors/india/#\` matches all Indian sensors regardless of depth.
+
+## Quality of Service (QoS) Levels
+
+1. **QoS 0 (At most once / Fire & Forget)**: Fast and light; packets are transmitted without acknowledgment. Suitable for periodic sensor streams where dropping a reading is harmless.
+2. **QoS 1 (At least once)**: The broker acknowledges receipt with a \`PUBACK\`. Packets are retried until confirmed. May deliver duplicate packets.
+3. **QoS 2 (Exactly once)**: Four-step handshake ensuring no duplicate deliveries. Incurs higher latency and memory footprint.
+
+## The Arduino PubSubClient
+
+\`\`\`cpp
+#include <WiFi.h>
+#include <PubSubClient.h>
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void connectMQTT() {
+  while (!client.connected()) {
+    if (client.connect("ESP32_Sensor_Node_1")) {
+      client.publish("telemetry/status", "online");
+      client.subscribe("commands/actuators/#");
+    } else {
+      delay(2000);
+    }
+  }
+}
+\`\`\``,
+    theorySections: [
+      {
+        id: "lwt-and-retained",
+        title: "Last Will and Testament (LWT) & Retained Messages",
+        content: `When connecting, a client can register a Last Will and Testament (LWT) message with the broker. If the ESP32 unexpectedly loses power or Wi-Fi drops, the broker detects the dead socket and publishes the LWT payload (e.g. \`status: offline\`) automatically. A 'retained' message is held by the broker and immediately sent to any new subscriber.`,
+      },
+      {
+        id: "keep-alive-heartbeats",
+        title: "Keep-Alive Interval & PINGREQ",
+        content: `MQTT connections stay open indefinitely. If no data has been transmitted within the Keep-Alive interval (e.g. 60 seconds), the client sends a 2-byte PINGREQ frame. If the broker does not reply with PINGRESP, the client drops the socket and reconnects.`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "ESP32 MQTT Publisher with JSON Sensor Payload",
+        language: "c",
+        description: "Connects to Wi-Fi and MQTT broker, serializes telemetry JSON, and publishes to topic.",
+        code: `#include <WiFi.h>
+#include <PubSubClient.h>
+
+const char* ssid = "LabNetwork";
+const char* password = "SecretPassword";
+const char* mqttServer = "broker.hivemq.com";
+
+WiFiClient espClient;
+PubSubClient mqttClient(espClient);
+
+void setup() {
+  Serial.begin(115200);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) delay(250);
+
+  mqttClient.setServer(mqttServer, 1883);
+}
+
+void loop() {
+  if (!mqttClient.connected()) {
+    if (mqttClient.connect("ESP32_Telemetry_Node")) {
+      Serial.println("Connected to MQTT broker!");
+    }
+  }
+  mqttClient.loop();
+
+  static unsigned long lastPub = 0;
+  if (millis() - lastPub >= 5000) {
+    lastPub = millis();
+    char payload[64];
+    snprintf(payload, sizeof(payload), "{\\"adc\\":%d,\\"mv\\":%d}", analogRead(34), 1650);
+    mqttClient.publish("katalyst/nodes/node-1/telemetry", payload);
+  }
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-esp-mqtt",
+      "Evaluate MQTT Topic Wildcard Matcher",
+      "Implement a function `matchesMqttTopic(pattern, topic)` that evaluates whether an incoming topic string matches a subscription pattern supporting wildcards `+` (single level) and `#` (multi-level ending wildcard).",
+      `function matchesMqttTopic(pattern, topic) {
+  const pParts = pattern.split("/");
+  const tParts = topic.split("/");
+
+  for (let i = 0; i < pParts.length; i++) {
+    if (pParts[i] === "#") return true;
+    if (i >= tParts.length) return false;
+    if (pParts[i] !== "+" && pParts[i] !== tParts[i]) return false;
+  }
+
+  return pParts.length === tParts.length;
+}
+
+console.log(matchesMqttTopic("home/+/temperature", "home/kitchen/temperature"));`,
+      "esp-mqtt-telemetry",
+      "Accurately match MQTT topic paths using single-level and multi-level wildcard syntax.",
+      [
+        "Split pattern and topic by '/'.",
+        "Iterate through pattern segments; if '#' is encountered, return true immediately.",
+        "Compare segments; '+' matches any single word, otherwise literal strings must match.",
+        "If pattern finishes without '#', check that lengths are equal.",
+      ],
+      "Developing",
+      `function matchesMqttTopic(pattern, topic) {
+  // Test if topic matches MQTT wildcard pattern (+ and #)
+  return false;
+}
+
+console.log(matchesMqttTopic("home/+/temperature", "home/kitchen/temperature"));`,
+      [
+        testCase("tc-esp-mqtt-1", "Matches single level wildcard (+)", "true"),
+        testCase("tc-esp-mqtt-2", "Matches multi-level wildcard (#)", "true", "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is MQTT preferred over HTTP REST for battery-powered IoT devices?",
+      "MQTT maintains an open TCP socket with a tiny 2-byte header, avoiding the heavy HTTP header overhead, TLS re-handshakes, and connection teardown of REST.",
+    ),
+  },
+
+  // Lesson 12: IoT Station Capstone
+  {
+    id: "esp32-capstone-iot-station",
+    order: 12,
+    title: "IoT Station Capstone: Resilient Dual-Core Remote Telemetry Node",
+    summary: "Build a production-grade remote sensor station orchestrating dual-core FreeRTOS tasks, queue-buffered telemetry, Wi-Fi reconnection, and fail-safe recovery.",
+    type: "guided-coding",
+    objectiveIds: ["esp-iot-capstone"],
+    prerequisiteLessonIds: ["esp32-mqtt-telemetry"],
+    estimatedDurationMinutes: 35,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "Resilient IoT Telemetry Station Architecture",
+      description: "Simulate network dropouts, test offline queue buffer spooling, and verify automatic broker reconnect.",
+    },
+    content: `# IoT Station Capstone: Resilient Dual-Core Remote Telemetry Node
+
+Building a hobby prototype that sends data to the cloud is straightforward when Wi-Fi is flawless. However, production IoT devices must withstand real-world adversities: Wi-Fi routers rebooting, DHCP lease expirations, MQTT broker outages, and power brownouts.
+
+In this capstone, we architect a resilient, dual-core industrial IoT telemetry station.
+
+## Dual-Core Architecture Partitioning
+
+\`\`\`
+               CORE 0 (Networking & Cloud)            CORE 1 (Sensor Acquisition)
+             ┌─────────────────────────────┐        ┌─────────────────────────────┐
+             │                             │        │                             │
+             │   Wi-Fi Management Task     │        │    Analog Sampling Task     │
+             │   • Auto-reconnect          │        │    • Multisampling (32x)    │
+             │   • Exponential backoff     │        │    • Outlier trimming       │
+             │                             │        │                             │
+             │   MQTT Transmission Task    │        │    Digital Filter Task      │
+             │   • Dequeues sensor packets │        │    • Threshold evaluation   │
+             │   • Publishes JSON payload  │        │                             │
+             └──────────────▲──────────────┘        └──────────────┬──────────────┘
+                            │                                      │
+                            │      FreeRTOS Thread-Safe Queue      │
+                            └──────────────────────────────────────┘
+                                  (16-Packet FIFO Ring Buffer)
+\`\`\`
+
+## Offline Ring Buffering & Network Backpressure
+
+When Wi-Fi or MQTT connectivity drops, sensor acquisition must continue uninterrupted:
+1. Core 1 continues reading sensors and pushes packets into the FreeRTOS Queue.
+2. If connectivity remains down and the queue reaches full capacity (16 packets), the oldest packets are discarded or spooled to flash (LittleFS).
+3. Once Core 0 restores network connection, it drains the queued telemetry backlog in FIFO order.
+
+## Exponential Backoff for Reconnection
+
+When the Wi-Fi router restarts, dozens of connected devices must not batter it with simultaneous reconnection attempts (a **thundering herd** problem):
+
+\`\`\`cpp
+uint32_t retryDelayMs = 1000;
+const uint32_t MAX_RETRY_MS = 60000;
+
+void reconnectWiFi() {
+  while (WiFi.status() != WL_CONNECTED) {
+    WiFi.reconnect();
+    vTaskDelay(pdMS_TO_TICKS(retryDelayMs));
+    retryDelayMs = min(retryDelayMs * 2, MAX_RETRY_MS); // Exponential backoff
+  }
+  retryDelayMs = 1000; // Reset upon successful connection
+}
+\`\`\``,
+    theorySections: [
+      {
+        id: "thundering-herd-mitigation",
+        title: "Reconnection Storms & Jitter",
+        content: `To prevent synchronized reconnection spikes across a building after a power outage, add randomized jitter to the backoff interval: \`delay = retryDelayMs + random(0, 1000)\`.`,
+      },
+      {
+        id: "spiffs-littlefs-spooling",
+        title: "Non-Volatile Spooling with LittleFS",
+        content: `When offline periods extend beyond available SRAM buffer limits (e.g. hours of outage), packets can be written to the on-chip SPI flash file system using LittleFS, then uploaded once cloud connectivity resumes.`,
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Production Dual-Core Telemetry Node Architecture",
+        language: "c",
+        description: "Complete firmware orchestrating FreeRTOS queues, dual-core task isolation, and exponential reconnect.",
+        code: `#include <WiFi.h>
+#include <PubSubClient.h>
+
+typedef struct {
+  uint16_t adcRaw;
+  uint32_t timestamp;
+} TelemetryPacket;
+
+QueueHandle_t dataQueue;
+WiFiClient netClient;
+PubSubClient mqttClient(netClient);
+
+void telemetryTask(void *pvParam) {
+  for (;;) {
+    TelemetryPacket pkt;
+    if (xQueueReceive(dataQueue, &pkt, pdMS_TO_TICKS(500)) == pdTRUE) {
+      if (mqttClient.connected()) {
+        char buf[64];
+        snprintf(buf, sizeof(buf), "{\\"raw\\":%u,\\"t\\":%u}", pkt.adcRaw, pkt.timestamp);
+        mqttClient.publish("katalyst/node/data", buf);
+      }
+    }
+  }
+}
+
+void sensorTask(void *pvParam) {
+  for (;;) {
+    TelemetryPacket pkt;
+    pkt.adcRaw = analogRead(34);
+    pkt.timestamp = millis();
+    xQueueSend(dataQueue, &pkt, 0); // Non-blocking
+    vTaskDelay(pdMS_TO_TICKS(1000));
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  dataQueue = xQueueCreate(16, sizeof(TelemetryPacket));
+
+  xTaskCreatePinnedToCore(telemetryTask, "NetTask", 4096, NULL, 1, NULL, 0);
+  xTaskCreatePinnedToCore(sensorTask, "SensTask", 2048, NULL, 2, NULL, 1);
+}
+
+void loop() {
+  vTaskDelay(pdMS_TO_TICKS(1000));
+}`,
+      },
+    ],
+    exercise: exercise(
+      "ex-esp-capstone",
+      "Simulate Resilient Telemetry Queue and Auto-Flush",
+      "Implement a function `simulateResilientNode(events, queueCapacity)` that models an offline spooling queue. Events is an array of `{ action: 'SAMPLE' | 'NET_DOWN' | 'NET_UP', reading?: number }`. When online, samples transmit immediately (push to `transmitted`). When offline, samples enter queue up to `queueCapacity` (excess are `dropped`). When 'NET_UP' occurs, all queued items are flushed to `transmitted` in FIFO order. Return `{ transmitted: [...], droppedCount: number, finalQueueLength: number }`.",
+      `function simulateResilientNode(events, queueCapacity) {
+  let isOnline = true;
+  const queue = [];
+  const transmitted = [];
+  let droppedCount = 0;
+
+  for (const ev of events) {
+    if (ev.action === "NET_DOWN") {
+      isOnline = false;
+    } else if (ev.action === "NET_UP") {
+      isOnline = true;
+      while (queue.length > 0) {
+        transmitted.push(queue.shift());
+      }
+    } else if (ev.action === "SAMPLE") {
+      if (isOnline) {
+        transmitted.push(ev.reading);
+      } else {
+        if (queue.length < queueCapacity) {
+          queue.push(ev.reading);
+        } else {
+          droppedCount++;
+        }
+      }
+    }
+  }
+
+  return { transmitted, droppedCount, finalQueueLength: queue.length };
+}
+
+console.log(JSON.stringify(simulateResilientNode([
+  { action: "SAMPLE", reading: 100 },
+  { action: "NET_DOWN" },
+  { action: "SAMPLE", reading: 200 },
+  { action: "SAMPLE", reading: 300 },
+  { action: "SAMPLE", reading: 400 },
+  { action: "NET_UP" }
+], 2)));`,
+      "esp-iot-capstone",
+      "Simulate resilient offline queueing, packet dropping, and auto-flush on reconnection.",
+      [
+        "Track isOnline state flag initialized to true.",
+        "On 'NET_DOWN', set isOnline = false.",
+        "On 'SAMPLE', if isOnline push to transmitted; else push to queue if length < queueCapacity, else increment droppedCount.",
+        "On 'NET_UP', set isOnline = true and flush queue into transmitted.",
+      ],
+      "Developing",
+      `function simulateResilientNode(events, queueCapacity) {
+  // Simulate offline spooling, queue limits, and auto-flush
+  return null;
+}
+
+console.log(JSON.stringify(simulateResilientNode([
+  { action: "SAMPLE", reading: 100 },
+  { action: "NET_DOWN" },
+  { action: "SAMPLE", reading: 200 },
+  { action: "SAMPLE", reading: 300 },
+  { action: "SAMPLE", reading: 400 },
+  { action: "NET_UP" }
+], 2)));`,
+      [
+        testCase("tc-esp-cap-1", "Flushes queued packets upon reconnection and records drops", '{"transmitted":[100,200,300],"droppedCount":1,"finalQueueLength":0}'),
+        testCase("tc-esp-cap-2", "Direct transmission when online without drops", '{"transmitted":[50],"droppedCount":0,"finalQueueLength":0}', "", true),
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is segregating networking tasks to Core 0 and sensor tasks to Core 1 best practice on the ESP32?",
+      "Wi-Fi handshakes and TCP transmissions can block for hundreds of milliseconds; pinning sensor acquisition to Core 1 ensures physical data sampling never suffers timing jitter or deadline misses.",
+    ),
+  },
 ];
 
 export const esp32IotModules: LearningModule[] = [
@@ -867,6 +1933,20 @@ export const esp32IotModules: LearningModule[] = [
     "Connect to 802.11 Wi-Fi networks, stream JSON REST payloads, and maximize battery lifetime using Deep Sleep.",
     esp32IotLessons.slice(4, 6),
   ),
+  moduleData(
+    "esp-module-freertos",
+    4,
+    "FreeRTOS Dual-Core Concurrency & Calibration",
+    "Architect multi-core firmware with FreeRTOS tasks, thread-safe queues, and 12-bit ADC curve linearization.",
+    esp32IotLessons.slice(6, 9),
+  ),
+  moduleData(
+    "esp-module-iot-telemetry-capstone",
+    5,
+    "Ultra-Low-Power Duty Cycles & MQTT Capstone",
+    "Optimize battery duty cycles, implement lightweight MQTT telemetry, and build a resilient dual-core IoT node.",
+    esp32IotLessons.slice(9, 12),
+  ),
 ];
 
 export const esp32IotCourse: LearningCourse = {
@@ -886,8 +1966,13 @@ export const esp32IotCourse: LearningCourse = {
     "Allocate hardware LEDC timers and modulate PWM duty cycle with up to 16-bit resolution.",
     "Stream structured JSON sensor telemetry over 802.11 Wi-Fi networks.",
     "Reduce power consumption to 15µA using Deep Sleep and RTC memory.",
+    "Pin real-time tasks to Core 0 and Core 1 with priority preemption.",
+    "Transfer structured telemetry between cores using thread-safe FreeRTOS queues.",
+    "Linearize and calibrate 12-bit ADC sensor data using multisampling.",
+    "Publish and subscribe to lightweight MQTT broker topics with wildcard filtering.",
+    "Architect resilient, fault-tolerant edge IoT nodes with auto-reconnection and buffering.",
   ],
-  estimatedDurationMinutes: 175,
+  estimatedDurationMinutes: 330,
   publicationStatus: "published",
   modules: esp32IotModules,
 };

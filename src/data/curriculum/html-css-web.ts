@@ -26,6 +26,10 @@ export const htmlCssWebObjectives: LearningObjective[] = [
   { id: "web-media-queries", title: "Implement mobile-first responsive interfaces using CSS media queries and viewport breakpoints." },
   { id: "web-custom-properties", title: "Architect maintainable design systems with scoped CSS custom properties and dark mode tokens." },
   { id: "web-transitions-motion", title: "Implement smooth micro-interactions using CSS transitions, transform matrixes, and keyframe animations." },
+  { id: "web-grid-areas", title: "Structure complex responsive layouts using CSS Grid template areas and named lines." },
+  { id: "web-a11y-wcag", title: "Implement WCAG 2.1 accessible web landmarks, ARIA live regions, and keyboard focus traps." },
+  { id: "web-container-queries", title: "Build modular context-aware UI components using CSS Container Queries (@container)." },
+  { id: "web-capstone-dashboard", title: "Synthesize semantic HTML5, CSS Grid, custom properties, and accessible components in a responsive dashboard." },
 ];
 
 function exercise(
@@ -1003,6 +1007,393 @@ Animating layout properties (e.g. \`width\`, \`height\`, \`top\`, \`left\`, \`ma
     ),
     exampleRun: exampleRun(".action-btn:hover { transform: scale(1.05); }"),
   },
+
+  {
+    id: "web-grid-template-areas",
+    order: 9,
+    title: "CSS Grid Template Areas and Named Lines",
+    summary: "Define declarative 2D page architectures using grid-template-areas and ASCII-like grid placement.",
+    type: "guided-coding",
+    objectiveIds: ["web-grid-areas"],
+    prerequisiteLessonIds: ["css-transitions-animations"],
+    estimatedDurationMinutes: 30,
+    content: `CSS Grid's \`grid-template-areas\` allows developers to define full-page responsive layouts using an intuitive, visual ASCII-art style syntax.
+
+### Declaring Grid Areas
+~~~css
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 240px 1fr 300px;
+  grid-template-rows: 64px 1fr 48px;
+  grid-template-areas:
+    "nav    header  header"
+    "nav    main    aside"
+    "nav    footer  footer";
+  min-height: 100vh;
+}
+~~~
+Child elements are assigned to named regions using \`grid-area\`:
+~~~css
+.sidebar { grid-area: nav; }
+.header  { grid-area: header; }
+.content { grid-area: main; }
+~~~`,
+    theorySections: [
+      {
+        id: "web-grid-empty-cells",
+        title: "Empty Cells with the Dot Notation",
+        content: "In grid-template-areas, a period ('.') represents an empty, unassigned grid cell, allowing white space without empty placeholder DOM nodes.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Named Grid Layout",
+        language: "html",
+        code: `<style>
+.app-grid {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  grid-template-areas:
+    "sidebar main";
+}
+.sidebar { grid-area: sidebar; }
+.main { grid-area: main; }
+</style>`,
+        description: "Declarative sidebar-content grid layout.",
+      },
+    ],
+    resources: [
+      {
+        title: "grid-template-areas MDN",
+        url: "https://developer.mozilla.org/en-US/docs/Web/CSS/grid-template-areas",
+        description: "Official documentation and examples for grid template areas.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "html", target: "browser-wasm" },
+    exampleRun: exampleRun(".sidebar { grid-area: sidebar; }\n.main { grid-area: main; }\n"),
+    exercise: exercise(
+      "ex-web-grid-areas-layout",
+      "Construct a responsive header-main-aside grid layout",
+      "Write CSS for `.page-container` using `display: grid;`, `grid-template-columns: 1fr 300px;`, and `grid-template-areas: 'header header' 'main aside';`. Assign `.site-header { grid-area: header; }`, `.site-content { grid-area: main; }`, and `.site-aside { grid-area: aside; }`.",
+      `.page-container {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-areas:
+    "header header"
+    "main aside";
+}
+.site-header { grid-area: header; }
+.site-content { grid-area: main; }
+.site-aside { grid-area: aside; }`,
+      "web-grid-areas",
+      "2D layout structured with grid-template-areas.",
+      [
+        "Set display: grid on .page-container.",
+        "Declare grid-template-areas with header header on row 1 and main aside on row 2.",
+        "Assign matching grid-area values to children.",
+      ],
+      "Developing",
+      `.page-container {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  grid-template-areas:
+    "header header"
+    "main aside";
+}
+.site-header { grid-area: header; }
+.site-content { grid-area: main; }
+.site-aside { grid-area: aside; }`,
+      [
+        {
+          id: "tc-grid-areas-1",
+          label: "Contains grid-template-areas specification",
+          expectedStdout: "grid-template-areas",
+          matchMode: "contains",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "What character represents an unoccupied cell in a CSS grid-template-areas definition?",
+      "The period ('.') token.",
+    ),
+  },
+
+  {
+    id: "web-accessibility-wcag-aria",
+    order: 10,
+    title: "Web Accessibility, WCAG 2.1 and ARIA",
+    summary: "Ensure equitable access using semantic ARIA roles (aria-expanded, aria-live, aria-labelledby) and focus management.",
+    type: "practical-exercise",
+    objectiveIds: ["web-a11y-wcag"],
+    prerequisiteLessonIds: ["web-grid-template-areas"],
+    estimatedDurationMinutes: 30,
+    content: `Web accessibility (a11y) ensures digital interfaces can be perceived, navigated, and operated by everyone, including people using screen readers, keyboard-only navigation, or voice controls.
+
+### The First Rule of ARIA
+> *If you can use a native HTML element or attribute with the semantics and behavior already built in, do so instead of re-purposing an element and adding an ARIA role.*
+
+### Essential ARIA Attributes
+- \`aria-expanded="true|false"\`: Signals toggle state on accordions and disclosure menus.
+- \`aria-live="polite|assertive"\`: Instructs screen readers to announce dynamic content updates.
+- \`aria-describedby="error-id"\`: Associates input fields with helper and error text.
+- Visible focus rings with \`:focus-visible\`!`,
+    theorySections: [
+      {
+        id: "web-focus-visible-rule",
+        title: "Keyboard Focus Indicators",
+        content: "Never set outline: none without providing a high-contrast replacement. The :focus-visible pseudo-class applies focus styling specifically when users navigate via keyboard tabs.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Accessible Disclosure Button",
+        language: "html",
+        code: `<button type="button" aria-expanded="false" aria-controls="menu-panel">
+  Toggle Navigation
+</button>
+<div id="menu-panel" hidden>
+  <a href="/dashboard">Dashboard</a>
+</div>`,
+        description: "Associating button toggle state with an expandable region.",
+      },
+    ],
+    resources: [
+      {
+        title: "W3C WAI-ARIA Authoring Practices",
+        url: "https://www.w3.org/WAI/ARIA/apg/",
+        description: "Official design patterns and keyboard interaction models.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "html", target: "browser-wasm" },
+    exampleRun: exampleRun('<button aria-expanded="true" aria-controls="nav">Menu</button>\n'),
+    exercise: exercise(
+      "ex-web-a11y-button",
+      "Build an accessible collapsible toggle button",
+      "Write an accessible HTML button with attributes: `type='button'`, `aria-expanded='false'`, `aria-controls='filter-drawer'`, and class `btn-filter`. Inside the button, include text 'Filters'.",
+      `<button type="button" class="btn-filter" aria-expanded="false" aria-controls="filter-drawer">Filters</button>`,
+      "web-a11y-wcag",
+      "Accessible disclosure control with ARIA attributes.",
+      [
+        "Include type='button' and class='btn-filter'.",
+        "Add aria-expanded='false' and aria-controls='filter-drawer'.",
+      ],
+      "Developing",
+      `<button type="button" class="btn-filter" aria-expanded="false" aria-controls="filter-drawer">Filters</button>`,
+      [
+        {
+          id: "tc-a11y-1",
+          label: "Contains aria-expanded and aria-controls attributes",
+          expectedStdout: "aria-expanded",
+          matchMode: "contains",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why should developers prefer native HTML elements over custom elements with ARIA roles?",
+      "Native HTML elements provide built-in keyboard navigation, focus management, and accessibility semantics across all browsers with zero custom scripting.",
+    ),
+  },
+
+  {
+    id: "web-container-queries",
+    order: 11,
+    title: "Component-Level Responsive Design with Container Queries",
+    summary: "Adapt UI components based on parent container dimensions (@container) rather than global viewport size.",
+    type: "guided-coding",
+    objectiveIds: ["web-container-queries"],
+    prerequisiteLessonIds: ["web-accessibility-wcag-aria"],
+    estimatedDurationMinutes: 30,
+    content: `Traditional CSS media queries (\`@media\`) query the **global viewport width**. In modern modular component architectures, a card component may be placed in a narrow 300px sidebar or a wide 1200px main content area within the same viewport.
+
+### Container Queries (@container)
+Container Queries allow a component to style itself relative to the size of its immediate parent container:
+~~~css
+.card-wrapper {
+  container-type: inline-size;
+  container-name: card;
+}
+
+@container card (min-width: 500px) {
+  .card {
+    display: flex;
+    flex-direction: row;
+  }
+}
+~~~`,
+    theorySections: [
+      {
+        id: "web-container-units",
+        title: "Container Query Units",
+        content: "Container queries introduce units relative to container dimensions: cqw (1% of container width), cqh (1% of height), and cqi (1% of inline size).",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Adaptive Card Layout with Container Query",
+        language: "html",
+        code: `<style>
+.widget-slot {
+  container-type: inline-size;
+}
+.widget {
+  display: block;
+}
+@container (min-width: 400px) {
+  .widget {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
+</style>`,
+        description: "Responsive switching from block to grid based on container width.",
+      },
+    ],
+    resources: [
+      {
+        title: "CSS Container Queries MDN",
+        url: "https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_containment/Container_queries",
+        description: "Guide to container-type and @container rules.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "html", target: "browser-wasm" },
+    exampleRun: exampleRun("@container (min-width: 400px) { ... }\n"),
+    exercise: exercise(
+      "ex-web-container-query",
+      "Declare an inline-size container and responsive rule",
+      "Write CSS that: 1) Gives `.metric-card-container` the property `container-type: inline-size;`. 2) Adds `@container (min-width: 350px)` where `.metric-card` displays `flex-direction: row;`.",
+      `.metric-card-container {
+  container-type: inline-size;
+}
+
+@container (min-width: 350px) {
+  .metric-card {
+    flex-direction: row;
+  }
+}`,
+      "web-container-queries",
+      "Component styling bound to parent container inline-size.",
+      [
+        "Set container-type: inline-size on .metric-card-container.",
+        "Add @container (min-width: 350px) targeting .metric-card.",
+      ],
+      "Developing",
+      `.metric-card-container {
+  container-type: inline-size;
+}
+
+@container (min-width: 350px) {
+  .metric-card {
+    flex-direction: row;
+  }
+}`,
+      [
+        {
+          id: "tc-cq-1",
+          label: "Declares container-type inline-size and @container rule",
+          expectedStdout: "container-type",
+          matchMode: "contains",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "What is the fundamental architectural benefit of Container Queries over standard Media Queries?",
+      "Container queries enable truly modular, reusable components that adapt dynamically based on the width of their parent container rather than the browser window.",
+    ),
+  },
+
+  {
+    id: "web-capstone-responsive-dashboard",
+    order: 12,
+    title: "Responsive Engineering Dashboard Capstone",
+    summary: "Synthesize semantic landmarks, CSS Grid areas, custom property tokens, and WCAG accessibility in a production dashboard.",
+    type: "assessment",
+    objectiveIds: ["web-capstone-dashboard"],
+    prerequisiteLessonIds: ["web-container-queries"],
+    estimatedDurationMinutes: 40,
+    content: `### Capstone Project Overview
+In this capstone, you will architect a production-grade, accessible web dashboard layout that integrates:
+1. **Semantic Landmarks**: \`<header>\`, \`<nav>\`, \`<main>\`, \`<aside>\`.
+2. **CSS Custom Properties**: Design tokens for colors, spacing, and elevation.
+3. **Responsive CSS Grid Areas**: Transitioning from a single column on mobile to a multi-column dashboard on desktop.
+4. **Keyboard Accessibility**: Focus rings and accessible button labeling.`,
+    theorySections: [
+      {
+        id: "web-capstone-rubric",
+        title: "Frontend Engineering Criteria",
+        content: "Layouts are evaluated on clean CSS token organization, mobile-first responsive adaptability, zero reflow motion, and WCAG AA contrast compliance.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Production Dashboard Skeleton",
+        language: "html",
+        code: `<div class="dash-shell">
+  <header role="banner">App Header</header>
+  <main role="main">Content</main>
+</div>`,
+        description: "Semantic shell for responsive application dashboards.",
+      },
+    ],
+    resources: [
+      {
+        title: "Modern Web Layout Best Practices",
+        url: "https://web.dev/learn/design/",
+        description: "Google web.dev responsive design curriculum.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "html", target: "browser-wasm" },
+    exampleRun: exampleRun(".dash-shell { display: grid; }\n"),
+    exercise: exercise(
+      "ex-web-capstone-dash",
+      "Build an accessible responsive telemetry dashboard layout",
+      "Write CSS for `.telemetry-dashboard` using CSS Grid: default to `grid-template-columns: 1fr;` on mobile, and within `@media (min-width: 768px)` apply `grid-template-columns: 260px 1fr;` with `gap: var(--space-md, 16px);`.",
+      `.telemetry-dashboard {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-md, 16px);
+}
+
+@media (min-width: 768px) {
+  .telemetry-dashboard {
+    grid-template-columns: 260px 1fr;
+  }
+}`,
+      "web-capstone-dashboard",
+      "Responsive telemetry dashboard layout with custom properties.",
+      [
+        "Declare mobile-first display: grid and 1fr columns.",
+        "Add @media (min-width: 768px) rule with 260px 1fr columns.",
+      ],
+      "Applied",
+      `.telemetry-dashboard {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-md, 16px);
+}
+
+@media (min-width: 768px) {
+  .telemetry-dashboard {
+    grid-template-columns: 260px 1fr;
+  }
+}`,
+      [
+        {
+          id: "tc-web-cap-1",
+          label: "Applies mobile-first 1fr and desktop 260px 1fr column layout",
+          expectedStdout: "grid-template-columns",
+          matchMode: "contains",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is a mobile-first media query architecture (@media (min-width: ...)) preferred over desktop-first?",
+      "Mobile devices have lower computing power; mobile-first ensures mobile browsers parse simpler baseline styles without overriding desktop rules.",
+    ),
+  },
 ];
 
 // Module Groupings
@@ -1028,13 +1419,20 @@ export const htmlCssWebModules: LearningModule[] = [
     "Architect design systems with CSS custom property tokens, zero-runtime dark mode, and 60fps GPU-accelerated motion.",
     htmlCssWebLessons.slice(6, 8),
   ),
+  moduleData(
+    "web-module-advanced-architecture",
+    4,
+    "Advanced Layout, A11y & Performance",
+    "CSS Grid template areas, WCAG accessibility, container queries, and responsive dashboard architecture.",
+    htmlCssWebLessons.slice(8),
+  ),
 ];
 
 export const htmlCssWebPath: LearningCourse = {
   id: "html-css-web",
   subjectId: htmlCssWebSubject.id,
   title: "Modern HTML5 & Responsive CSS Architecture",
-  description: "Semantic markup, accessible forms, Flexbox, Grid, custom properties, and GPU-accelerated motion.",
+  description: "Semantic markup, accessible forms, Flexbox, Grid, custom properties, container queries, and GPU-accelerated motion.",
   level: "Beginner",
   version: "1.0.0",
   prerequisites: [
@@ -1047,9 +1445,10 @@ export const htmlCssWebPath: LearningCourse = {
       "Deliver responsive images with picture, srcset, and native lazy loading.",
       "Construct 1-dimensional layouts with Flexbox and 2-dimensional layouts with CSS Grid.",
       "Architect maintainable design systems with scoped CSS custom properties.",
-      "Deliver smooth 60fps micro-interactions using GPU-accelerated CSS transitions."
+      "Deliver smooth 60fps micro-interactions using GPU-accelerated CSS transitions.",
+      "Implement accessible WCAG 2.1 compliance and modern container queries."
   ],
-  estimatedDurationMinutes: 360,
+  estimatedDurationMinutes: 480,
   publicationStatus: "published",
   modules: htmlCssWebModules,
 };

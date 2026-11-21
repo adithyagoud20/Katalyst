@@ -24,6 +24,8 @@ export const photoEditingMediaObjectives: LearningObjective[] = [
   { id: "media-tone-curves", title: "Apply non-linear contrast curves, exposure offsets, and white balance color channel gains." },
   { id: "media-convolutions", title: "Apply 3x3 spatial convolution kernels for Gaussian blur, sharpening, and edge detection." },
   { id: "media-blend-modes", title: "Implement Porter-Duff alpha compositing and photometric blend modes (Multiply, Screen, Overlay)." },
+  { id: "media-hist-equalization", title: "Enhance global image contrast using cumulative distribution function (CDF) histogram equalization." },
+  { id: "media-sobel-gradients", title: "Compute edge magnitude and gradient angles using horizontal and vertical Sobel spatial filters." },
 ];
 
 function exercise(
@@ -698,6 +700,174 @@ console.log(alphaBlend(100, 200, 0.2));`,
     ),
     exampleRun: exampleRun("128\n180"),
   },
+
+  {
+    id: "media-histogram-equalization",
+    order: 7,
+    title: "Histogram Equalization & Contrast Stretching",
+    summary: "Enhance global image contrast using cumulative distribution function (CDF) histogram equalization.",
+    type: "guided-coding",
+    interactiveDemo: {
+      kind: "image-lab",
+      title: "Histogram Equalization Lab",
+      description: "Interactive tone mapping visualizer stretching image dynamic range with CDF curves.",
+    },
+    objectiveIds: ["media-hist-equalization"],
+    prerequisiteLessonIds: ["media-blend-modes-compositing"],
+    estimatedDurationMinutes: 30,
+    content: `Images captured in fog, underwater, or low-light conditions often cluster in a narrow band of luminance values, appearing dull and washed out. **Histogram Equalization** redistributes pixel intensities so they span the entire available dynamic range ($0$ to $255$).
+
+### The Cumulative Distribution Function (CDF)
+1. **Histogram**: Count the frequency $H(v)$ of every pixel brightness value $v \\in [0, 255]$.
+2. **Cumulative Histogram (CDF)**: Sum the cumulative frequencies up to brightness $v$:
+$$\\text{CDF}(v) = \\sum_{i=0}^{v} H(i)$$
+3. **Equalization Mapping**: Map each pixel value $v$ to an equalized value $v'$:
+$$v' = \\text{round}\\left(\\frac{\\text{CDF}(v) - \\text{CDF}_{\\min}}{N - \\text{CDF}_{\\min}} \\times 255\\right)$$
+where $N$ is total pixel count and $\\text{CDF}_{\\min}$ is the first non-zero cumulative frequency.`,
+    theorySections: [
+      {
+        id: "media-clahe-concept",
+        title: "Adaptive Histogram Equalization (CLAHE)",
+        content: "Global histogram equalization can amplify background noise. Contrast Limited Adaptive Histogram Equalization (CLAHE) divides images into small contextual tiles and clips the histogram to prevent noise over-amplification.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Computing Cumulative Distribution Function",
+        language: "javascript",
+        code: `function computeCDF(hist) {
+  const cdf = new Array(256).fill(0);
+  cdf[0] = hist[0];
+  for (let i = 1; i < 256; i++) {
+    cdf[i] = cdf[i - 1] + hist[i];
+  }
+  return cdf;
+}
+console.log("CDF computed successfully");`,
+        description: "Accumulating frequency histogram into a running CDF array.",
+      },
+    ],
+    resources: [
+      {
+        title: "Histogram Equalization in Digital Image Processing",
+        url: "https://en.wikipedia.org/wiki/Histogram_equalization",
+        description: "Mathematical formulation of CDF transfer functions.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("CDF computed successfully\n"),
+    exercise: exercise(
+      "ex-media-cdf-equalize",
+      "Equalize a 4-pixel grayscale image",
+      "Given 4 grayscale pixels: [50, 50, 100, 200]. Compute the equalized value of pixel 100: with cdf(50)=2, cdf(100)=3, cdf(200)=4, cdf_min=2, and N=4, apply formula: Math.round(((3 - 2) / (4 - 2)) * 255). Write a script that computes this and prints 'Equalized: ' followed by the result.",
+      `const v = Math.round(((3 - 2) / (4 - 2)) * 255);\nconsole.log(\`Equalized: \${v}\`);`,
+      "media-hist-equalization",
+      "Compute normalized histogram equalization mapping.",
+      [
+        "Apply formula Math.round(((3 - 2) / (4 - 2)) * 255).",
+        "Print 'Equalized: 128'.",
+      ],
+      "Developing",
+      `// Compute equalized value and print Equalized: 128\nconst v = Math.round(((3 - 2) / (4 - 2)) * 255);\nconsole.log(\`Equalized: \${v}\`);\n`,
+      [
+        {
+          id: "tc-eq-1",
+          label: "Computes equalized luminance to 128",
+          stdin: "",
+          expectedStdout: "Equalized: 128",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "What mathematical function transforms an arbitrary input histogram into a uniform flat distribution?",
+      "The normalized Cumulative Distribution Function (CDF) of the input image.",
+    ),
+  },
+
+  {
+    id: "media-sobel-edge-detection",
+    order: 8,
+    title: "Sobel Edge Detection & Gradient Vector Fields",
+    summary: "Compute horizontal and vertical intensity gradients (Gx, Gy) to detect spatial edges.",
+    type: "assessment",
+    interactiveDemo: {
+      kind: "image-lab",
+      title: "Sobel Gradient Filter Lab",
+      description: "Interactive visualizer displaying horizontal, vertical, and combined gradient magnitude edge maps.",
+    },
+    objectiveIds: ["media-sobel-gradients"],
+    prerequisiteLessonIds: ["media-histogram-equalization"],
+    estimatedDurationMinutes: 35,
+    content: `Edges in images correspond to sharp transitions in pixel intensity. The **Sobel Operator** approximates the first-order derivative of image brightness in two orthogonal directions:
+
+### The Sobel Convolution Kernels
+- **Horizontal Kernel ($G_x$)** (detects vertical edges):
+$$\\begin{bmatrix} -1 & 0 & +1 \\\\ -2 & 0 & +2 \\\\ -1 & 0 & +1 \\end{bmatrix}$$
+- **Vertical Kernel ($G_y$)** (detects horizontal edges):
+$$\\begin{bmatrix} -1 & -2 & -1 \\\\ 0 & 0 & 0 \\\\ +1 & +2 & +1 \\end{bmatrix}$$
+
+### Edge Magnitude and Orientation
+At each pixel $(x, y)$, the total edge gradient magnitude $G$ and direction $\\theta$ are calculated as:
+$$G = \\sqrt{G_x^2 + G_y^2} \\approx |G_x| + |G_y|, \\quad \\theta = \\operatorname{atan2}(G_y, G_x)$$`,
+    theorySections: [
+      {
+        id: "media-canny-pipeline",
+        title: "From Sobel to Canny Edge Detection",
+        content: "The Canny edge detector builds on Sobel gradients by adding Gaussian pre-smoothing, Non-Maximum Suppression (thinning thick edge ridges), and Hysteresis Thresholding with dual thresholds.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Sobel Gradient Magnitude in JavaScript",
+        language: "javascript",
+        code: `function sobelMagnitude(gx, gy) {
+  return Math.min(255, Math.round(Math.sqrt(gx * gx + gy * gy)));
+}
+console.log("Edge Magnitude:", sobelMagnitude(100, 100));`,
+        description: "Combining horizontal and vertical derivatives into a scalar gradient.",
+      },
+    ],
+    resources: [
+      {
+        title: "Sobel Operator Specification",
+        url: "https://en.wikipedia.org/wiki/Sobel_operator",
+        description: "Discrete differentiation operator for edge detection.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Edge Magnitude: 141\n"),
+    exercise: exercise(
+      "ex-media-sobel-calc",
+      "Compute Sobel Gx and gradient magnitude",
+      "Given a 3x3 pixel neighborhood: [[10, 10, 50], [10, 10, 50], [10, 10, 50]]. Compute Gx using kernel [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]. Result: (-10 + 50) + (-20 + 100) + (-10 + 50) = 40 + 80 + 40 = 160. Gy is 0. Print 'Gx: 160, Magnitude: 160'.",
+      `const gx = (-10 + 50) + (-20 + 100) + (-10 + 50);\nconst gy = 0;\nconst mag = Math.round(Math.sqrt(gx * gx + gy * gy));\nconsole.log(\`Gx: \${gx}, Magnitude: \${mag}\`);`,
+      "media-sobel-gradients",
+      "Calculate directional spatial gradients and edge magnitudes.",
+      [
+        "Compute Gx by convolving the 3x3 pixel values with the Sobel Gx kernel.",
+        "Compute magnitude = Math.round(Math.sqrt(gx * gx + gy * gy)).",
+        "Print 'Gx: 160, Magnitude: 160'.",
+      ],
+      "Applied",
+      `// Calculate Gx and magnitude and print Gx: 160, Magnitude: 160\nconst gx = 160;\nconst mag = 160;\nconsole.log(\`Gx: \${gx}, Magnitude: \${mag}\`);\n`,
+      [
+        {
+          id: "tc-sobel-1",
+          label: "Computes correct Sobel horizontal gradient and magnitude",
+          stdin: "",
+          expectedStdout: "Gx: 160, Magnitude: 160",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why does the Sobel operator apply weights of [-1, 0, 1] with a center row of [-2, 0, 2] instead of a simple difference [-1, 0, 1]?",
+      "The larger center weight incorporates a 1D Gaussian smoothing filter perpendicular to the derivative direction, reducing sensitivity to high-frequency image noise.",
+    ),
+  },
 ];
 
 // Module Groupings
@@ -723,13 +893,20 @@ export const photoEditingMediaModules: LearningModule[] = [
     "Apply 3x3 spatial convolution kernels for blur and edge detection, and compute Porter-Duff alpha blend modes.",
     photoEditingMediaLessons.slice(4, 6),
   ),
+  moduleData(
+    "media-module-frequency-equalization",
+    4,
+    "Histogram Equalization & Kernel Frequency Filters",
+    "Cumulative distribution function (CDF) histogram equalization and Sobel gradient edge detection kernels.",
+    photoEditingMediaLessons.slice(6),
+  ),
 ];
 
 export const photoEditingMediaPath: LearningCourse = {
   id: "photo-editing-media",
   subjectId: photoEditingMediaSubject.id,
   title: "Computational Photography & Digital Image Processing",
-  description: "Pixel buffers, RGBA color models, histograms, contrast curves, 2D convolutions, and alpha compositing.",
+  description: "Pixel buffers, RGBA color models, histograms, contrast curves, 2D convolutions, CDF equalization, and Sobel edge detection.",
   level: "Beginner",
   version: "1.0.0",
   prerequisites: [
@@ -742,9 +919,10 @@ export const photoEditingMediaPath: LearningCourse = {
       "Analyze luminance histograms and detect highlight/shadow clipping.",
       "Shape tonal distributions with contrast curves and white balance channel gains.",
       "Apply 3x3 spatial convolution kernels for blur, sharpen, and edge detection.",
-      "Implement Porter-Duff alpha compositing and photometric blend modes."
+      "Implement Porter-Duff alpha compositing and photometric blend modes.",
+      "Perform global contrast stretching using histogram equalization and compute Sobel gradients."
   ],
-  estimatedDurationMinutes: 300,
+  estimatedDurationMinutes: 400,
   publicationStatus: "published",
   modules: photoEditingMediaModules,
 };

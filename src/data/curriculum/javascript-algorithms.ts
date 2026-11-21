@@ -28,6 +28,10 @@ export const javascriptObjectives: LearningObjective[] = [
   { id: "js-heaps-pq", title: "Build binary min-heaps with bubble-up and sink-down operations for priority queue scheduling." },
   { id: "js-dp-memo", title: "Optimize recursive subproblems through dynamic programming memoization and bottom-up tabulation." },
   { id: "js-capstone-systems", title: "Architect an event-driven telemetry engine with publish-subscribe decoupling and listener management." },
+  { id: "js-microtask-queue", title: "Trace job queue microtask execution priorities against timer macrotasks in the event loop." },
+  { id: "js-web-workers", title: "Coordinate background thread operations using Web Workers and structured messaging." },
+  { id: "js-streams-transform", title: "Process chunks of high-frequency data using ReadableStream pipeline transforms." },
+  { id: "js-binary-protocol", title: "Serialize and parse custom binary framing packets with TypedArrays." },
 ];
 
 function exercise(
@@ -952,6 +956,367 @@ A **Min-Heap** is a complete binary tree stored compactly in a 1D array where ev
       "If listeners are not removed, references to the callback functions (and any outer scope closures they capture) remain pinned in memory, causing insidious memory leaks.",
     ),
   },
+
+  {
+    id: "js-microtasks-macrotasks",
+    order: 11,
+    title: "Event Loop: Microtasks and Macrotasks",
+    summary: "Deep-dive into event loop tick priorities: Promise microtasks and queueMicrotask vs timer macrotasks.",
+    type: "guided-coding",
+    objectiveIds: ["js-microtask-queue"],
+    prerequisiteLessonIds: ["js-event-engine-capstone"],
+    estimatedDurationMinutes: 35,
+    content: `The JavaScript runtime is single-threaded, concurrency is managed by an **event loop** that coordinates two priority queues:
+1. **Microtask Queue**: Promises (\`.then()\`, \`.catch()\`, \`.finally()\`), \`queueMicrotask()\`, and MutationObserver callbacks.
+2. **Macrotask (Task) Queue**: \`setTimeout()\`, \`setInterval()\`, I/O, UI rendering, and \`MessageChannel\` callbacks.
+
+### Execution Priority
+On each tick of the event loop:
+1. Execute one macrotask from the task queue.
+2. **Drain the entire microtask queue completely** before rendering or selecting the next macrotask.
+3. Microtasks queued by currently executing microtasks are run in the same cycle!`,
+    theorySections: [
+      {
+        id: "js-microtask-starvation",
+        title: "Microtask Starvation Hazard",
+        content: "If a microtask recursively enqueues another microtask, the microtask queue will never empty, starving macrotasks, user inputs, and screen repaints completely.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Tracing Microtask and Macrotask Order",
+        language: "javascript",
+        code: `console.log("1: Synchronous");
+setTimeout(() => console.log("4: Macrotask timer"), 0);
+Promise.resolve().then(() => console.log("2: Microtask promise"));
+queueMicrotask(() => console.log("3: queueMicrotask"));`,
+        description: "Predicting asynchronous execution sequences.",
+      },
+    ],
+    resources: [
+      {
+        title: "JavaScript Event Loop Explained",
+        url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Event_loop",
+        description: "MDN guide to event loop phases and queue dispatching.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("1: Synchronous\n2: Microtask promise\n3: queueMicrotask\n4: Macrotask timer\n"),
+    exercise: exercise(
+      "ex-js-task-ordering",
+      "Trace execution order across microtasks and macrotasks",
+      "Write a function scheduleJobs() that appends execution labels into an array 'order'. It must: 1) Push 'sync-start'. 2) Schedule a setTimeout with 0ms delay pushing 'macrotask'. 3) Schedule a Promise.resolve().then pushing 'microtask-1'. 4) Schedule queueMicrotask pushing 'microtask-2'. 5) Push 'sync-end'. Run scheduleJobs() and inside the setTimeout print the final sequence joined by '->'.",
+      `function scheduleJobs() {\n  const order = [];\n  order.push("sync-start");\n  setTimeout(() => {\n    order.push("macrotask");\n    console.log(order.join("->"));\n  }, 0);\n  Promise.resolve().then(() => order.push("microtask-1"));\n  queueMicrotask(() => order.push("microtask-2"));\n  order.push("sync-end");\n}\nscheduleJobs();`,
+      "js-microtask-queue",
+      "Demonstrate microtask queue precedence over timer macrotasks.",
+      [
+        "Synchronous statements run first (sync-start, sync-end).",
+        "Microtasks run next (microtask-1, microtask-2).",
+        "The macrotask timer runs last.",
+      ],
+      "Developing",
+      `function scheduleJobs() {\n  // Implement job scheduling and print order in setTimeout\n}\nscheduleJobs();\n`,
+      [
+        {
+          id: "tc-jobs-1",
+          label: "Prints correct execution priority sequence",
+          expectedStdout: "sync-start->sync-end->microtask-1->microtask-2->macrotask",
+          matchMode: "trimmed",
+        },
+        {
+          id: "tc-jobs-hidden",
+          label: "Sequence check",
+          expectedStdout: "sync-start->sync-end->microtask-1->microtask-2->macrotask",
+          matchMode: "contains",
+          hidden: true,
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "When are microtask callbacks executed relative to macrotask timer callbacks?",
+      "All pending microtasks are drained immediately after the current synchronous script finishes and before any pending macrotask timer callback runs.",
+    ),
+  },
+
+  {
+    id: "js-web-workers-messaging",
+    order: 12,
+    title: "Web Workers and Threaded Message Passing",
+    summary: "Offload compute-intensive tasks to background threads using the Web Worker API and postMessage.",
+    type: "practical-exercise",
+    objectiveIds: ["js-web-workers"],
+    prerequisiteLessonIds: ["js-microtasks-macrotasks"],
+    estimatedDurationMinutes: 35,
+    content: `Web Workers enable true multi-core parallel processing in JavaScript runtimes by spawning background OS threads that run isolated from the main UI thread.
+
+### Thread Isolation and postMessage
+Workers do not share heap memory directly with the main thread. Instead, data is transmitted across thread boundaries using message passing:
+~~~javascript
+// Main thread dispatch
+worker.postMessage({ type: "COMPUTE", data: [1, 2, 3] });
+
+// Worker thread listener
+self.onmessage = (e) => {
+  const result = e.data.data.reduce((a, b) => a + b, 0);
+  self.postMessage({ type: "RESULT", result });
+};
+~~~
+Messages are serialized using the **Structured Clone Algorithm**, copying primitive values, arrays, and objects safely.`,
+    theorySections: [
+      {
+        id: "js-worker-transferables",
+        title: "Zero-Copy Transferable Objects",
+        content: "To avoid copying megabytes of binary data, ArrayBuffers can be transferred using postMessage(buf, [buf]). The sender immediately relinquishes memory ownership in O(1) time.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Simulating Worker Message Handler",
+        language: "javascript",
+        code: `class MockWorker {
+  constructor(handler) { this.handler = handler; }
+  postMessage(msg) {
+    setTimeout(() => this.handler(msg), 0);
+  }
+}
+const w = new MockWorker((msg) => console.log("Handled payload:", msg.id));
+w.postMessage({ id: 101 });`,
+        description: "Simulating asynchronous worker message dispatch.",
+      },
+    ],
+    resources: [
+      {
+        title: "Web Workers API",
+        url: "https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API",
+        description: "Official documentation on dedicated workers and message passing.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Handled payload: 101\n"),
+    exercise: exercise(
+      "ex-js-worker-dispatcher",
+      "Model a background task dispatcher",
+      "Implement a TaskDispatcher class that accepts jobs via dispatch(taskName, payload) and returns a Promise resolving with the result. If taskName is 'sum', sum the array in payload; if 'square', return payload * payload. Test with await dispatch('sum', [5, 10, 15]) and await dispatch('square', 8). Print: `Sum: ${sumRes}, Square: ${sqRes}`.",
+      `class TaskDispatcher {\n  async dispatch(taskName, payload) {\n    return new Promise((resolve) => {\n      setTimeout(() => {\n        if (taskName === "sum") resolve(payload.reduce((a, b) => a + b, 0));\n        else if (taskName === "square") resolve(payload * payload);\n      }, 0);\n    });\n  }\n}\n\nasync function run() {\n  const td = new TaskDispatcher();\n  const sumRes = await td.dispatch("sum", [5, 10, 15]);\n  const sqRes = await td.dispatch("square", 8);\n  console.log(\`Sum: \${sumRes}, Square: \${sqRes}\`);\n}\nrun();`,
+      "js-web-workers",
+      "Simulate asynchronous background task scheduling with Promises.",
+      [
+        "Return a Promise inside dispatch.",
+        "Handle 'sum' by summing the array.",
+        "Handle 'square' by squaring the numeric payload.",
+      ],
+      "Developing",
+      `class TaskDispatcher {\n  // Implement async dispatch(taskName, payload)\n}\n\n// Run tasks and print Sum: 30, Square: 64\n`,
+      [
+        {
+          id: "tc-worker-1",
+          label: "Dispatches tasks and resolves computed results",
+          expectedStdout: "Sum: 30, Square: 64",
+          matchMode: "trimmed",
+        },
+        {
+          id: "tc-worker-hidden",
+          label: "Result verification",
+          expectedStdout: "Sum: 30, Square: 64",
+          matchMode: "contains",
+          hidden: true,
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Can a dedicated Web Worker directly manipulate the browser DOM (document or window)?",
+      "No. Web Workers execute in a separate global context (WorkerGlobalScope) without direct access to the DOM or window object.",
+    ),
+  },
+
+  {
+    id: "js-streams-pipeline",
+    order: 13,
+    title: "Streaming Data Pipelines and Transformations",
+    summary: "Process streaming telemetry without loading entire datasets into memory using asynchronous iterators and generator transforms.",
+    type: "guided-coding",
+    objectiveIds: ["js-streams-transform"],
+    prerequisiteLessonIds: ["js-web-workers-messaging"],
+    estimatedDurationMinutes: 35,
+    content: `When handling high-throughput sensor telemetry or multi-megabyte log downloads, storing the entire dataset in an in-memory array causes latency spikes and potential out-of-memory errors.
+
+### Streaming with Async Generators
+Async generators (\`async function*\`) produce items on-demand using \`yield\` and \`await\`:
+~~~javascript
+async function* sensorStream(limit) {
+  for (let i = 1; i <= limit; i++) {
+    yield { id: i, value: i * 2.5 };
+  }
+}
+
+for await (const packet of sensorStream(3)) {
+  console.log(packet.value);
+}
+~~~
+
+### Composing Transform Pipelines
+Streaming pipelines pipe data from a source through filter and transform stages into a consumer sink with minimal intermediate buffering.`,
+    theorySections: [
+      {
+        id: "js-backpressure-flow",
+        title: "Backpressure in Streaming Systems",
+        content: "Backpressure prevents a fast data producer from overwhelming a slower data consumer by signaling the producer to pause until the consumer has processed current chunks.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Streaming Transform Pipeline",
+        language: "javascript",
+        code: `async function* filterAbove(stream, threshold) {
+  for await (const chunk of stream) {
+    if (chunk.val > threshold) yield chunk;
+  }
+}
+async function* source() {
+  yield { val: 10 }; yield { val: 25 }; yield { val: 15 };
+}
+(async () => {
+  for await (const item of filterAbove(source(), 20)) {
+    console.log("Passed:", item.val);
+  }
+})();`,
+        description: "Filtering asynchronous stream chunks.",
+      },
+    ],
+    resources: [
+      {
+        title: "Streams API Concepts",
+        url: "https://developer.mozilla.org/en-US/docs/Web/API/Streams_API/Concepts",
+        description: "ReadableStream, WritableStream, and TransformStream fundamentals.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Passed: 25\n"),
+    exercise: exercise(
+      "ex-js-stream-pipeline",
+      "Build a streaming telemetry aggregator pipeline",
+      "Write two async generators: 1) generateTelemetry(readings: number[]) yielding each reading. 2) calibrateStream(stream, offset: number) yielding reading + offset. Consume calibrateStream(generateTelemetry([10.5, 20.0, 15.5]), 1.5) with 'for await', sum all values, and print 'Total: ' followed by total.toFixed(1).",
+      `async function* generateTelemetry(readings) {\n  for (const r of readings) yield r;\n}\n\nasync function* calibrateStream(stream, offset) {\n  for await (const val of stream) yield val + offset;\n}\n\nasync function run() {\n  let total = 0;\n  for await (const val of calibrateStream(generateTelemetry([10.5, 20.0, 15.5]), 1.5)) {\n    total += val;\n  }\n  console.log(\`Total: \${total.toFixed(1)}\`);\n}\nrun();`,
+      "js-streams-transform",
+      "Compose async generator pipelines for on-demand stream processing.",
+      [
+        "Implement generateTelemetry yielding each item.",
+        "Implement calibrateStream yielding val + offset for each chunk.",
+        "Sum the calibrated values to reach Total: 50.5.",
+      ],
+      "Developing",
+      `async function* generateTelemetry(readings) {\n  // Implement generator\n}\nasync function* calibrateStream(stream, offset) {\n  // Implement calibration transform\n}\n// Run pipeline and print Total: 50.5\n`,
+      [
+        {
+          id: "tc-stream-1",
+          label: "Streams and transforms chunks correctly",
+          expectedStdout: "Total: 50.5",
+          matchMode: "trimmed",
+        },
+        {
+          id: "tc-stream-hidden",
+          label: "Verify total value",
+          expectedStdout: "Total: 50.5",
+          matchMode: "contains",
+          hidden: true,
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why do asynchronous streaming pipelines consume significantly less RAM than batch arrays?",
+      "Streaming processes elements one chunk at a time on-demand, maintaining O(1) auxiliary memory regardless of total stream duration.",
+    ),
+  },
+
+  {
+    id: "js-typedarrays-binary-protocol",
+    order: 14,
+    title: "High-Performance Binary Protocol Serialization",
+    summary: "Pack sensor IDs, flags, and floating-point measurements into binary framing packets using Uint8Array and DataView.",
+    type: "assessment",
+    objectiveIds: ["js-binary-protocol"],
+    prerequisiteLessonIds: ["js-streams-pipeline"],
+    estimatedDurationMinutes: 40,
+    content: `### Binary Protocol Framing
+In embedded IoT networks and robotics, telemetry packets are encoded in dense binary formats rather than JSON to minimize bandwidth and CPU serialization overhead.
+
+### Packet Framing Layout
+A typical 8-byte telemetry packet layout:
+- **Bytes 0–1 (Uint16)**: Magic header \`0xABCD\`
+- **Byte 2 (Uint8)**: Node ID (0–255)
+- **Byte 3 (Uint8)**: Status bitflags
+- **Bytes 4–7 (Float32)**: Floating-point sensor reading (e.g. Temperature in Celsius)
+
+Using \`DataView\`, you can write and read big-endian or little-endian binary representations with exact byte-level control.`,
+    theorySections: [
+      {
+        id: "js-endianness-control",
+        title: "Endianness in Network Protocols",
+        content: "Network standard protocols (like TCP/IP) use Big-Endian (most significant byte first). DataView allows specifying the littleEndian boolean flag explicitly for portable cross-platform binary exchange.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Binary Telemetry Frame Packing",
+        language: "javascript",
+        code: `const buffer = new ArrayBuffer(8);
+const view = new DataView(buffer);
+view.setUint16(0, 0xABCD, false); // Big endian magic
+view.setUint8(2, 42);             // Node 42
+view.setUint8(3, 0x01);           // Flag: OK
+view.setFloat32(4, 26.5, false);  // Temp 26.5 C
+console.log("Magic:", view.getUint16(0, false).toString(16));`,
+        description: "Serializing structured fields into a contiguous 8-byte buffer.",
+      },
+    ],
+    resources: [
+      {
+        title: "TypedArray and DataView Guide",
+        url: "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/DataView",
+        description: "Low-level binary memory manipulation in JavaScript.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Magic: abcd\n"),
+    exercise: exercise(
+      "ex-js-pack-unpack-binary",
+      "Pack and unpack a binary telemetry packet",
+      "Implement two functions: 1) packTelemetry(nodeId: number, temp: number): returns an 8-byte ArrayBuffer with Uint16 magic 0xAA55 at offset 0, Uint8 nodeId at offset 2, Uint8 status 0x01 at offset 3, and Float32 temp at offset 4 (all big-endian). 2) unpackTelemetry(buffer): reads and returns { nodeId, temp: Math.round(temp * 10) / 10 }. In main, pack nodeId 7 and temp 32.4, unpack it, and print `Packet: Node \${unpacked.nodeId}, Temp \${unpacked.temp}C`.",
+      `function packTelemetry(nodeId, temp) {\n  const buf = new ArrayBuffer(8);\n  const view = new DataView(buf);\n  view.setUint16(0, 0xAA55, false);\n  view.setUint8(2, nodeId);\n  view.setUint8(3, 0x01);\n  view.setFloat32(4, temp, false);\n  return buf;\n}\n\nfunction unpackTelemetry(buf) {\n  const view = new DataView(buf);\n  const nodeId = view.getUint8(2);\n  const temp = Math.round(view.getFloat32(4, false) * 10) / 10;\n  return { nodeId, temp };\n}\n\nconst packet = packTelemetry(7, 32.4);\nconst res = unpackTelemetry(packet);\nconsole.log(\`Packet: Node \${res.nodeId}, Temp \${res.temp}C\`);`,
+      "js-binary-protocol",
+      "Serialize and deserialize binary telemetry packets with DataView.",
+      [
+        "Use setUint16(0, 0xAA55, false) for the magic header.",
+        "Read Float32 at offset 4 using getFloat32(4, false).",
+        "Verify output matches 'Packet: Node 7, Temp 32.4C'.",
+      ],
+      "Applied",
+      `function packTelemetry(nodeId, temp) {\n  // Implement binary packing\n}\nfunction unpackTelemetry(buf) {\n  // Implement binary unpacking\n}\n// Pack Node 7 and Temp 32.4, unpack, and print\n`,
+      [
+        {
+          id: "tc-pack-1",
+          label: "Packs and unpacks binary telemetry frame correctly",
+          expectedStdout: "Packet: Node 7, Temp 32.4C",
+          matchMode: "trimmed",
+        },
+        {
+          id: "tc-pack-hidden",
+          label: "Verify packet fields",
+          expectedStdout: "Packet: Node 7, Temp 32.4C",
+          matchMode: "contains",
+          hidden: true,
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is DataView preferred over typed array views (like Float32Array) when parsing network protocol headers?",
+      "DataView allows reading multiple heterogeneous types (Uint16, Uint8, Float32) at arbitrary unaligned byte offsets and explicitly controlling endianness.",
+    ),
+  },
 ];
 
 export const javascriptProgrammingPath: LearningCourse = {
@@ -974,13 +1339,15 @@ export const javascriptProgrammingPath: LearningCourse = {
     "Traverse tree and graph networks using DFS, BFS, and in-order traversals.",
     "Optimize recursive algorithms using dynamic programming memoization and bottom-up tabulation.",
     "Design extensible event-driven architectures with decoupled pub/sub emitters.",
+    "Coordinate background multithreading with Web Workers and high-throughput streams.",
   ],
-  estimatedDurationMinutes: 360,
+  estimatedDurationMinutes: 480,
   publicationStatus: "published",
   modules: [
     moduleData("js-async-fundamentals", 1, "Scope, closures, and asynchronous JavaScript", "Lexical scoping, closures, the event loop, microtask queues, Promises, and async/await.", javascriptLessons.slice(0, 3)),
     moduleData("js-linear-data-structures", 2, "Binary buffers and linear data structures", "ArrayBuffer, DataView, binary memory manipulation, stacks, and queues.", javascriptLessons.slice(3, 5)),
     moduleData("js-trees-and-graphs", 3, "Trees, graphs, and hierarchical traversal", "Binary search trees, in-order traversal, BFS shortest paths, and binary min-heaps.", javascriptLessons.slice(5, 8)),
-    moduleData("js-dp-and-systems", 4, "Dynamic programming and event-driven systems", "Memoization, bottom-up DP tabulation, and event-driven telemetry engines.", javascriptLessons.slice(8)),
+    moduleData("js-dp-and-systems", 4, "Dynamic programming and event-driven systems", "Memoization, bottom-up DP tabulation, and event-driven telemetry engines.", javascriptLessons.slice(8, 10)),
+    moduleData("js-advanced-systems-concurrency", 5, "Advanced Concurrency & Web Workers", "Microtask vs macrotask scheduling, Web Workers multithreaded messaging, Streams pipelines, and structured binary transfers.", javascriptLessons.slice(10)),
   ],
 };

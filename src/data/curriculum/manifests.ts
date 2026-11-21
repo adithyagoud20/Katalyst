@@ -158,6 +158,30 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "function-pointers",
         "title": "Store function addresses in pointer variables and dispatch dynamic callbacks."
+      },
+      {
+        "id": "recursion-callstack",
+        "title": "Trace recursive calls and stack frame allocation."
+      },
+      {
+        "id": "preprocessor-macros",
+        "title": "Write parameterized preprocessor macros and header guards safely."
+      },
+      {
+        "id": "structures-padding-alignment",
+        "title": "Explain struct memory alignment, member ordering, and padding."
+      },
+      {
+        "id": "error-handling-errno",
+        "title": "Handle runtime faults defensively using return codes and errno."
+      },
+      {
+        "id": "defensive-programming-assert",
+        "title": "Enforce internal state invariants with runtime assertions."
+      },
+      {
+        "id": "c-foundations-capstone",
+        "title": "Integrate pointers, bitwise math, structures, and defensive checks in a capstone review."
       }
     ],
     "learningOutcomes": [
@@ -627,6 +651,164 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "robust-systems-engineering",
+        "order": 7,
+        "title": "Robust systems & defensive C",
+        "summary": "Trace stack frames, configure safe preprocessor macros, handle memory alignment, manage errno, and write defensive assertions.",
+        "lessons": [
+          {
+            "id": "recursion-callstack",
+            "order": 17,
+            "title": "Call Stack and Recursion",
+            "summary": "Trace how recursive functions allocate stack frames and return through base cases.",
+            "objectiveIds": [
+              "recursion-callstack"
+            ],
+            "prerequisiteLessonIds": [
+              "function-pointers"
+            ],
+            "exercise": {
+              "id": "ex-recursion-sum",
+              "title": "Recursive range sum",
+              "difficulty": "Developing",
+              "expectedOutcome": "Compute sum of first N positive integers using recursion.",
+              "prompt": "Write a recursive function sum_range(int n) that computes the sum from 1 to n.",
+              "objectiveId": "recursion-callstack",
+              "starterCode": "#include <stdio.h>\n\nstatic int sum_range(int n) {\n    /* TODO: base case and recursive call */\n    return 0;\n}\n\nint main(void) {\n    printf(\"Sum: %d\\n\", sum_range(5));\n    return 0;\n}"
+            },
+            "checkpoint": {
+              "prompt": "What happens if a recursive function lacks a base case?",
+              "answer": "The function calls itself indefinitely until all thread stack memory is exhausted, resulting in a stack overflow crash."
+            }
+          },
+          {
+            "id": "preprocessor-macros",
+            "order": 18,
+            "title": "Preprocessor Macros & Guards",
+            "summary": "Write safe parameterized macros and conditional compilation blocks.",
+            "objectiveIds": [
+              "preprocessor-macros"
+            ],
+            "prerequisiteLessonIds": [
+              "recursion-callstack"
+            ],
+            "exercise": {
+              "id": "ex-macro-cube",
+              "title": "Safe arithmetic macro",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Define CUBE(x) with parentheses around every argument and the whole expression.",
+              "prompt": "Define a macro CUBE(x) that safely cubes its argument with full parentheses.",
+              "objectiveId": "preprocessor-macros",
+              "starterCode": "#include <stdio.h>\n\n/* TODO: Define CUBE(x) */\n\nint main(void) {\n    printf(\"Cube: %d\\n\", CUBE(3));\n    return 0;\n}"
+            },
+            "checkpoint": {
+              "prompt": "Why must every parameter in a parameterized macro be wrapped in parentheses?",
+              "answer": "Because macro substitution is text replacement; without parentheses, operator precedence in callers can alter evaluation order."
+            }
+          },
+          {
+            "id": "structures-padding-alignment",
+            "order": 19,
+            "title": "Structure Memory Alignment",
+            "summary": "Understand CPU memory alignment requirements and structure padding.",
+            "objectiveIds": [
+              "structures-padding-alignment"
+            ],
+            "prerequisiteLessonIds": [
+              "preprocessor-macros"
+            ],
+            "exercise": {
+              "id": "ex-struct-alignment",
+              "title": "Struct field initialization",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Print struct header values.",
+              "prompt": "Initialize and print the fields of a structured packet.",
+              "objectiveId": "structures-padding-alignment",
+              "starterCode": "#include <stdio.h>\n\nstruct Header {\n    int version;\n    char type;\n};\n\nint main(void) {\n    /* TODO: initialize and print */\n    return 0;\n}"
+            },
+            "checkpoint": {
+              "prompt": "Why does the compiler insert padding bytes into a structure?",
+              "answer": "CPUs fetch data more efficiently when words align on matching memory address boundaries."
+            }
+          },
+          {
+            "id": "error-handling-errno",
+            "order": 20,
+            "title": "Defensive Error Handling with errno",
+            "summary": "Return status codes and inspect standard error indicators defensively.",
+            "objectiveIds": [
+              "error-handling-errno"
+            ],
+            "prerequisiteLessonIds": [
+              "structures-padding-alignment"
+            ],
+            "exercise": {
+              "id": "ex-safe-subtraction",
+              "title": "Safe non-negative subtraction",
+              "difficulty": "Developing",
+              "expectedOutcome": "Write safe_sub checking subtraction constraints.",
+              "prompt": "Implement safe_sub(int a, int b, int *diff) returning -1 if b > a, otherwise 0.",
+              "objectiveId": "error-handling-errno",
+              "starterCode": "#include <stdio.h>\n\nstatic int safe_sub(int a, int b, int *diff) {\n    /* TODO: check and assign */\n    return 0;\n}\n\nint main(void) {\n    int out = 0;\n    if (safe_sub(10, 3, &out) == 0) {\n        printf(\"Diff: %d\\n\", out);\n    }\n    return 0;\n}"
+            },
+            "checkpoint": {
+              "prompt": "Why do C systems APIs return status codes instead of throwing exceptions?",
+              "answer": "C is designed for deterministic execution and low runtime overhead without stack unwinding mechanisms."
+            }
+          },
+          {
+            "id": "defensive-programming-assert",
+            "order": 21,
+            "title": "Assertions & Defensive Invariants",
+            "summary": "Validate internal assumptions and catch developer logic errors with assert.",
+            "objectiveIds": [
+              "defensive-programming-assert"
+            ],
+            "prerequisiteLessonIds": [
+              "error-handling-errno"
+            ],
+            "exercise": {
+              "id": "ex-validate-positive",
+              "title": "Assertion guard",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Write double_val using assert.",
+              "prompt": "Write a function double_val(int x) that asserts x >= 0 and returns x * 2.",
+              "objectiveId": "defensive-programming-assert",
+              "starterCode": "#include <stdio.h>\n#include <assert.h>\n\nstatic int double_val(int x) {\n    /* TODO: assert and return */\n    return 0;\n}\n\nint main(void) {\n    printf(\"Doubled: %d\\n\", double_val(21));\n    return 0;\n}"
+            },
+            "checkpoint": {
+              "prompt": "What happens to assert() statements when compiling with -DNDEBUG?",
+              "answer": "All assertions are disabled and expand to nothing, producing zero runtime overhead in production."
+            }
+          },
+          {
+            "id": "c-foundations-capstone-quiz",
+            "order": 22,
+            "title": "C Systems Checkpoint & Capstone",
+            "summary": "Integrate pointers, memory alignment, bitwise math, and defensive checks.",
+            "objectiveIds": [
+              "c-foundations-capstone"
+            ],
+            "prerequisiteLessonIds": [
+              "defensive-programming-assert"
+            ],
+            "exercise": {
+              "id": "ex-capstone-validate",
+              "title": "Packet ID validator",
+              "difficulty": "Beginner",
+              "expectedOutcome": "Implement packet range validation.",
+              "prompt": "Write a function validate_id(int id) that returns 1 if id is between 1 and 255, else 0.",
+              "objectiveId": "c-foundations-capstone",
+              "starterCode": "#include <stdio.h>\n\nstatic int validate_id(int id) {\n    /* TODO: range check */\n    return 0;\n}\n\nint main(void) {\n    printf(\"Valid: %d\\n\", validate_id(42));\n    return 0;\n}"
+            },
+            "checkpoint": {
+              "prompt": "Why are byte-level pointer casts (unsigned char *) preferred for serializing data packets?",
+              "answer": "Because unsigned char pointers are guaranteed by the C standard to safely inspect the object representation of any type without violating strict aliasing."
+            }
+          }
+        ]
       }
     ]
   },
@@ -672,6 +854,22 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "cpp-templates",
         "title": "Write reusable generic functions and container class templates with compile-time type safety."
+      },
+      {
+        "id": "cpp-move-semantics",
+        "title": "Apply rvalue references and std::move for zero-copy ownership transfer."
+      },
+      {
+        "id": "cpp-lambdas-capture",
+        "title": "Capture state with lambdas and pass callbacks via std::function."
+      },
+      {
+        "id": "cpp-concurrency-threads",
+        "title": "Coordinate multithreaded tasks using std::thread and std::lock_guard."
+      },
+      {
+        "id": "cpp-capstone-quiz",
+        "title": "Synthesize modern C++ idioms, RAII, STL, and memory management."
       }
     ],
     "learningOutcomes": [
@@ -680,7 +878,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Utilize standard template library containers, iterators, and lambdas for high-performance data processing.",
       "Implement generic data structures and algorithms using function and class templates."
     ],
-    "estimatedDurationMinutes": 220,
+    "estimatedDurationMinutes": 320,
     "publicationStatus": "published",
     "modules": [
       {
@@ -944,6 +1142,138 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "cpp-m4-move-concurrency",
+        "order": 4,
+        "title": "Move Semantics, Concurrency & Modern C++ Idioms",
+        "summary": "Zero-copy move semantics, lambda capture closures, std::thread, and multithreaded synchronization.",
+        "lessons": [
+          {
+            "id": "cpp-move-semantics-rvalue",
+            "order": 9,
+            "title": "Move Semantics and Rvalue References",
+            "summary": "Eliminate expensive buffer copies using rvalue references (T&&) and std::move transfer semantics.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "cpp-move-semantics"
+            ],
+            "prerequisiteLessonIds": [
+              "cpp-templates-polymorphism"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "cpp",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-cpp-move-transfer",
+              "title": "Implement Move Semantics on a Buffer Holder",
+              "difficulty": "Developing",
+              "expectedOutcome": "Transfer vector ownership with std::move and output 'MOVED' followed by size 5.",
+              "prompt": "Implement a MoveBuffer struct with a std::vector<int> data member. Provide a constructor MoveBuffer(size_t n) filling data with value 42, and a move constructor MoveBuffer(MoveBuffer&& o) noexcept that moves o.data into data and prints 'MOVED'. In main(), construct b1 with size 5, then construct b2 using std::move(b1), and print b2.data.size().",
+              "objectiveId": "cpp-move-semantics",
+              "starterCode": "#include <iostream>\n#include <vector>\n#include <utility>\n\nstruct MoveBuffer {\n    std::vector<int> data;\n    // Add constructor and move constructor\n};\n\nint main() {\n    // Construct b1 and move to b2\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "What state is a moved-from standard library object left in?",
+              "answer": "It is left in a valid but unspecified state, meaning it can be safely destroyed or reassigned, but its value cannot be relied upon."
+            }
+          },
+          {
+            "id": "cpp-lambdas-capture",
+            "order": 10,
+            "title": "Lambda Expressions and Functional Callbacks",
+            "summary": "Write concise inline lambdas with explicit capture clauses and pass them via std::function.",
+            "type": "practical-exercise",
+            "objectiveIds": [
+              "cpp-lambdas-capture"
+            ],
+            "prerequisiteLessonIds": [
+              "cpp-move-semantics-rvalue"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "cpp",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-cpp-lambda-callback",
+              "title": "Pass a stateful lambda callback to a processor",
+              "difficulty": "Developing",
+              "expectedOutcome": "Accumulate filtered values with a capture-by-reference lambda to produce 'Sum: 100'.",
+              "prompt": "Write a function `void apply_filter(const std::vector<int>& vals, const std::function<void(int)>& fn)` that loops through vals and invokes fn for each value. In main(), create vals = {10, 25, 30, 45}, maintain total = 0, call apply_filter with a lambda capturing total by reference to sum elements greater than 20, and print 'Sum: ' followed by total.",
+              "objectiveId": "cpp-lambdas-capture",
+              "starterCode": "#include <iostream>\n#include <vector>\n#include <functional>\n\nvoid apply_filter(const std::vector<int>& vals, const std::function<void(int)>& fn) {\n    // Iterate and invoke fn\n}\n\nint main() {\n    // Define vector, run filter, and print Sum\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "When should you prefer std::function over a template argument for callbacks?",
+              "answer": "std::function is preferred when callbacks need to be stored in containers or headers without exposing template definitions, at the cost of a small type-erasure indirection."
+            }
+          },
+          {
+            "id": "cpp-concurrency-threads",
+            "order": 11,
+            "title": "Concurrency with std::thread and std::mutex",
+            "summary": "Coordinate concurrent execution safely using std::thread, std::mutex, and RAII locks.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "cpp-concurrency-threads"
+            ],
+            "prerequisiteLessonIds": [
+              "cpp-lambdas-capture"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "cpp",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-cpp-thread-counter",
+              "title": "Safely increment a shared counter across threads",
+              "difficulty": "Developing",
+              "expectedOutcome": "Synchronized concurrent execution resulting in 'Counter: 1000'.",
+              "prompt": "Implement a thread-safe increment program. Declare a global `int counter = 0;` and `std::mutex mtx;`. Write a function `void add_ticks(int n)` that loops n times, locking mtx with `std::lock_guard<std::mutex>` on each step to increment counter. In main(), spawn two threads each adding 500 ticks, join both threads, and print 'Counter: ' followed by counter.",
+              "objectiveId": "cpp-concurrency-threads",
+              "starterCode": "#include <iostream>\n#include <thread>\n#include <mutex>\n\nint counter = 0;\nstd::mutex mtx;\n\nvoid add_ticks(int n) {\n    // Loop and safely increment counter\n}\n\nint main() {\n    // Launch 2 threads, join, and print Counter\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "Why must std::thread objects be joined or detached before destruction?",
+              "answer": "If a joinable std::thread object is destroyed without being joined or detached, its destructor calls std::terminate, immediately crashing the program."
+            }
+          },
+          {
+            "id": "cpp-capstone-modern-quiz",
+            "order": 12,
+            "title": "Modern C++ Systems Assessment",
+            "summary": "Synthesize RAII, move semantics, smart pointers, templates, and concurrency in a comprehensive systems assessment.",
+            "type": "assessment",
+            "objectiveIds": [
+              "cpp-capstone-quiz"
+            ],
+            "prerequisiteLessonIds": [
+              "cpp-concurrency-threads"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "cpp",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-cpp-capstone-telemetry",
+              "title": "Build a generic telemetry pipeline class",
+              "difficulty": "Applied",
+              "expectedOutcome": "Generic buffer output 'Count: 3 Last: 30'.",
+              "prompt": "Implement a template class `TelemetryBuffer<T>` with a private `std::vector<T> items;`. Add methods: `void push(T val)` which moves val into items, `size_t count() const` returning items.size(), and `T back() const` returning items.back(). In main(), instantiate TelemetryBuffer<int>, push values 10, 20, 30, and print 'Count: ' followed by count() and ' Last: ' followed by back().",
+              "objectiveId": "cpp-capstone-quiz",
+              "starterCode": "#include <iostream>\n#include <vector>\n#include <utility>\n\ntemplate <typename T>\nclass TelemetryBuffer {\n    // Implement push, count, back\n};\n\nint main() {\n    // Test with int buffer\n    return 0;\n}\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is ISO C++ preferred for low-latency robotics and high-frequency systems over garbage-collected languages?",
+              "answer": "C++ provides deterministic resource destruction via RAII, predictable cache-friendly memory layout, zero-cost abstractions, and no unpredictable garbage collection pauses."
+            }
+          }
+        ]
       }
     ]
   },
@@ -1034,6 +1364,30 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "py-algorithms-generators",
         "title": "Stream data efficiently with generators and yield, and implement O(log N) search algorithms."
+      },
+      {
+        "id": "py-context-managers",
+        "title": "Manage resources reliably using context managers and the with statement."
+      },
+      {
+        "id": "py-decorators-closures",
+        "title": "Wrap functions using decorators and closures with functools.wraps."
+      },
+      {
+        "id": "py-dunder-methods",
+        "title": "Customize object protocols using Python special dunder methods."
+      },
+      {
+        "id": "py-regular-expressions",
+        "title": "Parse structured telemetry text using regular expressions."
+      },
+      {
+        "id": "py-unit-testing",
+        "title": "Write automated test suites with assertions using the unittest framework."
+      },
+      {
+        "id": "py-pythonic-capstone",
+        "title": "Demonstrate comprehensive mastery of Pythonic idioms, algorithms, and design patterns."
       }
     ],
     "learningOutcomes": [
@@ -1044,7 +1398,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Design reusable functions with positional, default, and keyword arguments and clear variable scopes.",
       "Solve engineering and data-handling problems by combining data structures, modular logic, and file operations."
     ],
-    "estimatedDurationMinutes": 540,
+    "estimatedDurationMinutes": 660,
     "publicationStatus": "published",
     "modules": [
       {
@@ -1696,6 +2050,200 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "py-advanced-architecture",
+        "order": 8,
+        "title": "Pythonic Architecture and Advanced Constructs",
+        "summary": "Master context managers, function decorators, special dunder methods, regular expressions, unit testing, and architectural design patterns.",
+        "lessons": [
+          {
+            "id": "py-context-managers",
+            "order": 20,
+            "title": "Context Managers and Resource Management",
+            "summary": "Manage external resources and enforce teardown guarantees using custom context managers and the with statement.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "py-context-managers"
+            ],
+            "prerequisiteLessonIds": [
+              "py-algorithms-and-generators"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "python",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-py-context-guard",
+              "title": "Build a custom ResourceGuard context manager",
+              "difficulty": "Developing",
+              "expectedOutcome": "Build a class-based context manager that guarantees resource acquisition and release.",
+              "prompt": "Create a class ResourceGuard with __init__(self, name: str). Its __enter__(self) prints f'[GUARD] Acquired: {self.name}' and returns self.name.upper(). Its __exit__(self, exc_type, exc_val, exc_tb) prints f'[GUARD] Released: {self.name}'. In the script, enter ResourceGuard with 'adc-bus' as bus, and print f'Active on {bus}'.",
+              "objectiveId": "py-context-managers",
+              "starterCode": "class ResourceGuard:\n    # Implement __init__, __enter__, and __exit__\n    pass\n\n# Use with ResourceGuard(\"adc-bus\") as bus\n"
+            },
+            "checkpoint": {
+              "prompt": "When is __exit__ executed in a Python context manager?",
+              "answer": "The __exit__ method is guaranteed to run whenever execution exits the with block, whether cleanly or via an uncaught exception."
+            }
+          },
+          {
+            "id": "py-decorators-closures",
+            "order": 21,
+            "title": "Function Decorators and Closures",
+            "summary": "Wrap functions to add cross-cutting concerns like logging, timing, and argument validation using closures and @functools.wraps.",
+            "type": "practical-exercise",
+            "objectiveIds": [
+              "py-decorators-closures"
+            ],
+            "prerequisiteLessonIds": [
+              "py-context-managers"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "python",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-py-log-decorator",
+              "title": "Write a logging decorator with functools.wraps",
+              "difficulty": "Developing",
+              "expectedOutcome": "Create a reusable decorator that wraps functions and emits trace logs.",
+              "prompt": "Import functools. Define a decorator log_execution(func) that uses @functools.wraps(func) and prints f'[CALL] {func.__name__}' before running the target function and returning its result. Decorate a function calculate_checksum(data: list) -> int that returns sum(data) % 256. Call calculate_checksum([10, 20, 30]) and print f'Checksum: {result}'.",
+              "objectiveId": "py-decorators-closures",
+              "starterCode": "import functools\n\n# Implement log_execution decorator\n\n# Define @log_execution calculate_checksum(data)\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is @functools.wraps recommended when writing decorators?",
+              "answer": "It preserves the original function's name, docstring, and signature metadata, preventing the wrapper from masking debug traces."
+            }
+          },
+          {
+            "id": "py-dunder-methods",
+            "order": 22,
+            "title": "Object Protocols and Special Dunder Methods",
+            "summary": "Customize object behavior, operator overloading, and string representations using special dunder methods.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "py-dunder-methods"
+            ],
+            "prerequisiteLessonIds": [
+              "py-decorators-closures"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "python",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-py-vector-dunder",
+              "title": "Implement a Vector2D class with __add__ and __str__",
+              "difficulty": "Developing",
+              "expectedOutcome": "Overload the + operator and define string conversion for a custom mathematical vector class.",
+              "prompt": "Define a class Vector2D with __init__(self, x: float, y: float), __add__(self, other: 'Vector2D') returning a new Vector2D with summed coordinates, and __str__(self) returning f'Vector2D({self.x:.1f}, {self.y:.1f})'. Instantiate v1 = Vector2D(3.0, 4.0) and v2 = Vector2D(1.5, 2.5), compute v3 = v1 + v2, and print v3.",
+              "objectiveId": "py-dunder-methods",
+              "starterCode": "class Vector2D:\n    # Define __init__, __add__, and __str__\n    pass\n\nv1 = Vector2D(3.0, 4.0)\nv2 = Vector2D(1.5, 2.5)\n# Compute and print v1 + v2\n"
+            },
+            "checkpoint": {
+              "prompt": "What is the difference between __str__ and __repr__?",
+              "answer": "__str__ provides an informal, human-readable string representation, while __repr__ provides an unambiguous representation used for debugging."
+            }
+          },
+          {
+            "id": "py-regular-expressions",
+            "order": 23,
+            "title": "Text Parsing and Validation with Regular Expressions",
+            "summary": "Match, extract, and validate structured text telemetry using Python's standard re library.",
+            "type": "practical-exercise",
+            "objectiveIds": [
+              "py-regular-expressions"
+            ],
+            "prerequisiteLessonIds": [
+              "py-dunder-methods"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "python",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-py-parse-telemetry-re",
+              "title": "Parse node telemetry using capture groups",
+              "difficulty": "Developing",
+              "expectedOutcome": "Use regular expression capture groups to parse structured values from sensor strings.",
+              "prompt": "Import re. Given string telemetry = 'NODE=42,VOLT=3.30V,TEMP=26.4C', use re.search with capture groups to extract the integer node ID and float temperature. Parse node_id = int(match.group(1)) and temp = float(match.group(2)). Print f'Node: {node_id}, Temp: {temp} C'.",
+              "objectiveId": "py-regular-expressions",
+              "starterCode": "import re\n\ntelemetry = \"NODE=42,VOLT=3.30V,TEMP=26.4C\"\n# Use re.search with capture groups and print formatted output\n"
+            },
+            "checkpoint": {
+              "prompt": "Why are raw strings (r'...') preferred when declaring regular expression patterns?",
+              "answer": "Raw strings prevent Python from interpreting backslash escape sequences like \\n or \\t, passing literal backslashes directly to the regex engine."
+            }
+          },
+          {
+            "id": "py-unit-testing",
+            "order": 24,
+            "title": "Automated Unit Testing with unittest",
+            "summary": "Write automated test suites with assertions and test discovery using Python's standard unittest framework.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "py-unit-testing"
+            ],
+            "prerequisiteLessonIds": [
+              "py-regular-expressions"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "python",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-py-temp-unittest",
+              "title": "Write a unit test suite for temperature conversion",
+              "difficulty": "Developing",
+              "expectedOutcome": "Construct automated unit test cases with assertions for numeric tolerance verification.",
+              "prompt": "Import unittest. Define fahrenheit_to_celsius(f: float) -> float that returns (f - 32.0) * 5.0 / 9.0. Create a TestCase class TestTemperature with two test methods: test_boiling asserting that fahrenheit_to_celsius(212.0) is almost equal to 100.0 (places=2), and test_freezing asserting that fahrenheit_to_celsius(32.0) is almost equal to 0.0 (places=2). Run the suite programmatically using suite = unittest.TestLoader().loadTestsFromTestCase(TestTemperature); runner = unittest.TextTestRunner(verbosity=0); res = runner.run(suite); print(f'Passed: {res.wasSuccessful()}, Ran: {res.testsRun}').",
+              "objectiveId": "py-unit-testing",
+              "starterCode": "import unittest\n\n# Define conversion function and TestTemperature class\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is assertAlmostEqual preferred over assertEqual when comparing floating point calculations?",
+              "answer": "Floating point arithmetic introduces minor binary precision inaccuracies; assertAlmostEqual checks that values match within a specified decimal tolerance."
+            }
+          },
+          {
+            "id": "py-pythonic-capstone-quiz",
+            "order": 25,
+            "title": "Python Foundations Comprehensive Assessment",
+            "summary": "Synthesize modern Pythonic idioms, algorithmic pipelines, object-oriented design, and defensive engineering patterns.",
+            "type": "assessment",
+            "objectiveIds": [
+              "py-pythonic-capstone"
+            ],
+            "prerequisiteLessonIds": [
+              "py-unit-testing"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "python",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-py-capstone-pipeline",
+              "title": "Build a streaming telemetry aggregator pipeline",
+              "difficulty": "Applied",
+              "expectedOutcome": "Synthesize parsing, filtering, and aggregation into a complete telemetry processing function.",
+              "prompt": "Implement a function parse_and_average(records: list[str]) -> float that processes a list of telemetry strings in format 'DEVICE:ID,VALUE:NUM'. The function must: 1) Skip strings that do not start with 'DEVICE:'. 2) Extract the float NUM value using string splitting or regex. 3) Compute and return the average of all valid numeric values rounded to 2 decimal places. Test with records = ['DEVICE:1,VALUE:12.5', 'COMMENT:SKIP', 'DEVICE:2,VALUE:17.5', 'DEVICE:3,VALUE:20.0'] and print f'Average: {parse_and_average(records):.2f}'.",
+              "objectiveId": "py-pythonic-capstone",
+              "starterCode": "def parse_and_average(records: list[str]) -> float:\n    # Implement parser and return average\n    pass\n\nrecords = [\"DEVICE:1,VALUE:12.5\", \"COMMENT:SKIP\", \"DEVICE:2,VALUE:17.5\", \"DEVICE:3,VALUE:20.0\"]\n# Call and print Average: {val:.2f}\n"
+            },
+            "checkpoint": {
+              "prompt": "What core engineering trade-off is achieved by streaming data processing using generators?",
+              "answer": "Generators trade negligible execution overhead for massive memory savings (O(1) memory), enabling systems to process datasets larger than available RAM."
+            }
+          }
+        ]
       }
     ]
   },
@@ -1703,7 +2251,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
     "id": "ai-app-web-dev",
     "subjectId": "ai-engineering",
     "title": "AI-Powered App & Web Development",
-    "description": "Learn to build, architect, and deploy production-grade full-stack web applications using generative AI tools, free-tier cloud backends, and Next.js.",
+    "description": "Learn to build, architect, and deploy production-grade full-stack web applications using generative AI tools, free-tier cloud backends, vector embeddings, and Next.js.",
     "level": "Applied",
     "version": "1.0.0",
     "prerequisites": [
@@ -1734,6 +2282,18 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "ai-deploy-checklist",
         "title": "Deploy production web apps to Vercel/Cloudflare with COOP/COEP isolation, secret management, and zero compute costs."
+      },
+      {
+        "id": "ai-structured-zod",
+        "title": "Extract structured, strictly typed JSON responses from LLM endpoints using Zod schema validation."
+      },
+      {
+        "id": "ai-vector-search",
+        "title": "Compute cosine similarity over high-dimensional vector embeddings for in-browser semantic retrieval."
+      },
+      {
+        "id": "ai-resilient-fallbacks",
+        "title": "Implement exponential backoff retry and multi-provider failover routing for production AI availability."
       }
     ],
     "learningOutcomes": [
@@ -1742,9 +2302,11 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Route AI inference through Gemini, Cloudflare, and OpenRouter free tiers without client-side key leakage.",
       "Build type-safe Next.js Route Handlers with Zod request validation.",
       "Configure Supabase Google OAuth and write bulletproof PostgreSQL Row Level Security (RLS) policies.",
-      "Deploy production applications with security headers and automated health checks."
+      "Deploy production applications with security headers and automated health checks.",
+      "Extract strictly validated JSON with Zod and implement client-side vector embeddings search.",
+      "Architect resilient multi-provider failover routing with timeout abort controllers."
     ],
-    "estimatedDurationMinutes": 165,
+    "estimatedDurationMinutes": 260,
     "publicationStatus": "published",
     "modules": [
       {
@@ -1930,6 +2492,107 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "ai-module-production-systems",
+        "order": 4,
+        "title": "Production AI Systems Engineering",
+        "summary": "Structured JSON extraction with Zod schemas, client-side vector search with cosine similarity, and resilient streaming fallbacks.",
+        "lessons": [
+          {
+            "id": "ai-structured-outputs-zod",
+            "order": 7,
+            "title": "Structured JSON Extraction & Zod Validation",
+            "summary": "Force models to emit valid JSON conforming to strict schemas and validate payloads using Zod.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ai-structured-zod"
+            ],
+            "prerequisiteLessonIds": [
+              "ai-production-deployment-checklist"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-ai-validate-json",
+              "title": "Validate AI Output with Manual Schema Checks",
+              "difficulty": "Developing",
+              "expectedOutcome": "Validate AI response schemas defensively.",
+              "prompt": "Implement a function `validateTelemetryPayload(jsonStr)`: parse the string, check that `station` is a non-empty string, `temp` is a number between -50 and 100, and `online` is a boolean. If valid, return `{ valid: true, data: { station, temp, online } }`, else `{ valid: false, error: 'Invalid schema' }`. Test with valid payload `{\"station\": \"ST-01\", \"temp\": 24.5, \"online\": true}` and print: `Status: ${result.valid}, Station: ${result.data.station}`.",
+              "objectiveId": "ai-structured-zod",
+              "starterCode": "function validateTelemetryPayload(jsonStr) {\n  // Implement validation\n}\n\nconst raw = '{\"station\": \"ST-01\", \"temp\": 24.5, \"online\": true}';\n// Validate and print Status and Station\n"
+            },
+            "checkpoint": {
+              "prompt": "Why must raw model JSON output be parsed inside a try/catch block?",
+              "answer": "Models occasionally truncate tokens at max length, prepend conversational text, or emit malformed commas, which triggers a syntax error in JSON.parse."
+            }
+          },
+          {
+            "id": "ai-client-vector-search",
+            "order": 8,
+            "title": "Client-Side Vector Embeddings & Cosine Similarity",
+            "summary": "Implement in-browser semantic retrieval using normalized dot products over vector embeddings.",
+            "type": "practical-exercise",
+            "objectiveIds": [
+              "ai-vector-search"
+            ],
+            "prerequisiteLessonIds": [
+              "ai-structured-outputs-zod"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-ai-vector-search",
+              "title": "Rank documents by cosine similarity against a query vector",
+              "difficulty": "Developing",
+              "expectedOutcome": "Rank vector embeddings using geometric cosine similarity.",
+              "prompt": "Implement a function `findBestMatch(queryVec, docVecs)`: calculate cosine similarity between queryVec and each doc vector in docVecs (an array of { id: string, vec: number[] }), and return the id of the highest scoring document. Test with query `[1, 0, 0]` and docs `[{ id: 'doc-A', vec: [0.8, 0.2, 0] }, { id: 'doc-B', vec: [0.1, 0.9, 0] }]`. Print 'Best Match: ' followed by the matched document id.",
+              "objectiveId": "ai-vector-search",
+              "starterCode": "function findBestMatch(queryVec, docVecs) {\n  // Implement similarity search\n}\n\nconst query = [1, 0, 0];\nconst docs = [{ id: \"doc-A\", vec: [0.8, 0.2, 0] }, { id: \"doc-B\", vec: [0.1, 0.9, 0] }];\n// Call and print Best Match\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is cosine similarity preferred over Euclidean distance for text embeddings?",
+              "answer": "Cosine similarity evaluates orientation rather than magnitude, ensuring long and short texts with equivalent meaning remain closely clustered."
+            }
+          },
+          {
+            "id": "ai-resilient-streaming-fallbacks",
+            "order": 9,
+            "title": "Resilient AI Streaming & Provider Failover Architecture",
+            "summary": "Build fault-tolerant AI gateways with timeout aborts, exponential backoff, and multi-provider failover.",
+            "type": "assessment",
+            "objectiveIds": [
+              "ai-resilient-fallbacks"
+            ],
+            "prerequisiteLessonIds": [
+              "ai-client-vector-search"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-ai-failover-router",
+              "title": "Implement a multi-provider fallback executor",
+              "difficulty": "Applied",
+              "expectedOutcome": "Build resilient multi-provider failover routing.",
+              "prompt": "Implement an async function `executeWithFailover(providers, prompt)`: iterate through array `providers` (each an object `{ name: string, run: async (prompt) => string }`). If a provider succeeds, return `{ provider: p.name, result: text }`. If it throws, log and continue to the next provider. If all fail, return `{ provider: 'none', result: 'Offline fallback response' }`. Test with provider 1 throwing error and provider 2 returning 'Hello from backup'. Print: `Source: ${res.provider}, Message: ${res.result}`.",
+              "objectiveId": "ai-resilient-fallbacks",
+              "starterCode": "async function executeWithFailover(providers, prompt) {\n  // Implement failover cascade\n}\n\n// Run test and print Source and Message\n"
+            },
+            "checkpoint": {
+              "prompt": "Why should AI client applications implement AbortController timeouts on fetch requests?",
+              "answer": "Model inference endpoints can stall indefinitely under severe server load; AbortController aborts dead TCP sockets within a fixed latency budget so failovers can trigger."
+            }
+          }
+        ]
       }
     ]
   },
@@ -1968,6 +2631,30 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "ard-millis-fsm",
         "title": "Design non-blocking finite state machines using millis() time slicing to eliminate blocking delay() calls."
+      },
+      {
+        "id": "ard-hardware-interrupts",
+        "title": "Attach external hardware interrupts (INT0/INT1) and write race-free ISRs with volatile flags."
+      },
+      {
+        "id": "ard-non-blocking-timing",
+        "title": "Build complex multi-rate non-blocking schedulers and software timers without blocking delays."
+      },
+      {
+        "id": "ard-tone-piezo",
+        "title": "Drive piezo buzzers using Timer2 square waves with tone() and calculate acoustic pitch frequencies."
+      },
+      {
+        "id": "ard-servo-actuator",
+        "title": "Control 50 Hz PWM servo motors with 544µs to 2400µs pulse widths for angular positioning."
+      },
+      {
+        "id": "ard-i2c-bus",
+        "title": "Communicate with sensors and displays over the 2-wire I2C bus (A4/SDA, A5/SCL) using the Wire library."
+      },
+      {
+        "id": "ard-multisensor-capstone",
+        "title": "Synthesize interrupt handling, sensor fusion, and actuator actuation in an autonomous controller."
       }
     ],
     "learningOutcomes": [
@@ -1976,9 +2663,15 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Eliminate floating input noise using internal pull-up resistors and debouncing.",
       "Sample continuous physical quantities with the 10-bit Successive Approximation ADC.",
       "Modulate actuator power and brightness using hardware PWM duty cycles.",
-      "Construct cooperative non-blocking state machines with millis() timing."
+      "Construct cooperative non-blocking state machines with millis() timing.",
+      "Attach external hardware interrupts (INT0/INT1) and write race-free ISRs.",
+      "Build multi-rate non-blocking schedulers and eliminate blocking delay calls.",
+      "Synthesize acoustic musical tones using Timer2 CTC square waves.",
+      "Actuate precision RC hobby servos using 50 Hz PWM timing pulses.",
+      "Master the I2C two-wire bus protocol to communicate with sensors and OLEDs.",
+      "Architect resilient embedded systems with watchdog timers and moving average filtering."
     ],
-    "estimatedDurationMinutes": 165,
+    "estimatedDurationMinutes": 320,
     "publicationStatus": "published",
     "modules": [
       {
@@ -2200,6 +2893,220 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "ard-module-timers-actuators",
+        "order": 4,
+        "title": "Hardware Timers, Interrupts & Actuators",
+        "summary": "Attach external hardware interrupts, construct multi-rate software schedulers, generate piezo tones, and command servo motors.",
+        "lessons": [
+          {
+            "id": "arduino-hardware-interrupts",
+            "order": 7,
+            "title": "External Hardware Interrupts (INT0 / INT1) & Race-Free ISRs",
+            "summary": "Harness hardware interrupt pins 2 and 3, configure RISING/FALLING edges, and write volatile-safe ISR routines.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-hardware-interrupts"
+            ],
+            "prerequisiteLessonIds": [
+              "arduino-millis-fsm"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-ard-interrupts",
+              "title": "Simulate Interrupt Pulse Counter with Debounce",
+              "difficulty": "Developing",
+              "expectedOutcome": "Accurately filter noisy interrupt pulses using software timestamp debouncing.",
+              "prompt": "Implement a function `simulatePulseCounter(pulseTimesMs, debounceMs)` that filters a chronological series of incoming pulse timestamps, rejecting bounces occurring within `debounceMs` of the last registered pulse. Return the final count of valid pulses.",
+              "objectiveId": "ard-hardware-interrupts",
+              "language": "javascript",
+              "starterCode": "function simulatePulseCounter(pulseTimesMs, debounceMs) {\n  // Filter noisy pulse events using debounce threshold\n  return 0;\n}\n\nconsole.log(simulatePulseCounter([10, 15, 22, 60, 65, 120], 20));"
+            },
+            "checkpoint": {
+              "prompt": "Why must multi-byte variables updated in an ISR be read with interrupts disabled in the main loop?",
+              "answer": "On an 8-bit AVR, reading a 16-bit or 32-bit variable takes multiple CPU instructions; without disabling interrupts, an ISR could fire mid-read and produce a corrupted torn value."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "ATmega328P External Interrupt Simulator",
+              "description": "Trigger digital pulses on INT0 (Pin 2) and observe asynchronous ISR invocation and variable updates."
+            }
+          },
+          {
+            "id": "arduino-non-blocking-millis",
+            "order": 8,
+            "title": "Multi-Rate Cooperative Schedulers with millis()",
+            "summary": "Build scalable multi-rate task schedulers using millis() interval tracking without blocking delay() calls.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-non-blocking-timing"
+            ],
+            "prerequisiteLessonIds": [
+              "arduino-hardware-interrupts"
+            ],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-ard-scheduler",
+              "title": "Simulate Multi-Rate Cooperative Scheduler",
+              "difficulty": "Developing",
+              "expectedOutcome": "Accurately model periodic task firing in cooperative systems.",
+              "prompt": "Implement a function `simulateScheduler(tasks, totalDurationMs)` that models a cooperative scheduler. Each task is an object `{ name: string, period: number }`. When `t % period === 0` (starting at t = 0), record the task name. Return an array of all executed task events in chronological order.",
+              "objectiveId": "ard-non-blocking-timing",
+              "language": "javascript",
+              "starterCode": "function simulateScheduler(tasks, totalDurationMs) {\n  // Simulate task firing at their respective periods\n  return [];\n}\n\nconsole.log(JSON.stringify(simulateScheduler([\n  { name: \"LED\", period: 20 },\n  { name: \"SENS\", period: 40 }\n], 50)));"
+            },
+            "checkpoint": {
+              "prompt": "Why is (currentMillis - previousMillis >= interval) mathematically safe against timer overflow at 49.7 days?",
+              "answer": "In unsigned two's complement subtraction, wrapping around 0 yields the true positive elapsed difference without negative numbers or special case branches."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Cooperative Task Scheduler Visualizer",
+              "description": "Observe independent software timers executing sensor reads, LED flashes, and serial telemetry concurrently."
+            }
+          },
+          {
+            "id": "arduino-tone-buzzer",
+            "order": 9,
+            "title": "Acoustic Tone Generation, Timer2 & Piezo Transducers",
+            "summary": "Generate square-wave audio frequencies using ATmega328P Timer2 CTC mode and the tone() library API.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-tone-piezo"
+            ],
+            "prerequisiteLessonIds": [
+              "arduino-non-blocking-millis"
+            ],
+            "estimatedDurationMinutes": 25,
+            "exercise": {
+              "id": "ex-ard-tone",
+              "title": "Calculate 12-TET Note Frequencies",
+              "difficulty": "Developing",
+              "expectedOutcome": "Accurately calculate acoustic note frequencies using 12-TET logarithmic pitch math.",
+              "prompt": "Implement a function `calculateNoteFrequencies(semitoneOffsets)` that takes an array of integer semitone offsets relative to A4 (0 = 440 Hz, -9 = C4 ~ 262 Hz, 3 = C5 ~ 523 Hz) and computes the exact frequency in Hz rounded to the nearest integer: `round(440 * Math.pow(2, offset / 12))`.",
+              "objectiveId": "ard-tone-piezo",
+              "language": "javascript",
+              "starterCode": "function calculateNoteFrequencies(semitoneOffsets) {\n  // Map semitone offsets from A4 into rounded Hz frequencies\n  return [];\n}\n\nconsole.log(JSON.stringify(calculateNoteFrequencies([0, -9, 3])));"
+            },
+            "checkpoint": {
+              "prompt": "Why does calling tone() on an Arduino Uno disable analogWrite() PWM on pins 3 and 11?",
+              "answer": "tone() takes over the 8-bit Timer2 hardware to generate the CTC square wave, which disables Timer2's PWM channels OC2A (pin 11) and OC2B (pin 3)."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Piezo Acoustic Transducer Synthesizer",
+              "description": "Trigger musical scale notes, adjust square wave frequencies, and inspect acoustic duty-cycle waveforms."
+            }
+          },
+          {
+            "id": "arduino-servo-control",
+            "order": 10,
+            "title": "Precision Servo Motor Actuation & 50 Hz PWM Pulses",
+            "summary": "Control angular position of RC hobby servos using 50 Hz control pulses (544µs to 2400µs) and the Servo library.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-servo-actuator"
+            ],
+            "prerequisiteLessonIds": [
+              "arduino-tone-buzzer"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-ard-servo",
+              "title": "Calculate Servo Angle from Microsecond Pulse Width",
+              "difficulty": "Developing",
+              "expectedOutcome": "Correctly translate microsecond pulse widths into calibrated servo rotation angles.",
+              "prompt": "Implement a function `pulseToAngle(pulseUs, minPulseUs = 544, maxPulseUs = 2400)` that clamps the microsecond pulse between `minPulseUs` and `maxPulseUs` and converts it linearly into degrees in the range `[0, 180]`, rounded to the nearest integer.",
+              "objectiveId": "ard-servo-actuator",
+              "language": "javascript",
+              "starterCode": "function pulseToAngle(pulseUs, minPulseUs = 544, maxPulseUs = 2400) {\n  // Convert pulse microsecond duration to rounded degree angle\n  return 0;\n}\n\nconsole.log(pulseToAngle(1472));"
+            },
+            "checkpoint": {
+              "prompt": "Why must the ground of an external servo power supply be connected to the Arduino GND pin?",
+              "answer": "Voltage is a relative potential difference; without a common ground reference between the external supply and the Arduino, the control signal cannot be referenced and causes erratic servo jitter."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "RC Servo Motor Pulse-Width Simulator",
+              "description": "Vary control pulse durations between 544µs and 2400µs and watch the simulated servo horn rotate from 0° to 180°."
+            }
+          }
+        ]
+      },
+      {
+        "id": "ard-module-buses-capstone",
+        "order": 5,
+        "title": "Communication Buses & Capstone System",
+        "summary": "Interface I2C OLED displays and environmental sensors, and build a resilient multi-sensor embedded controller.",
+        "lessons": [
+          {
+            "id": "arduino-i2c-wire-oled",
+            "order": 11,
+            "title": "The I2C Bus Protocol, Two-Wire Interface & OLED Displays",
+            "summary": "Master synchronous serial I2C bus communication (SDA/SCL), 7-bit addressing, and interfacing SSD1306 OLED displays.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-i2c-bus"
+            ],
+            "prerequisiteLessonIds": [
+              "arduino-servo-control"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-ard-i2c",
+              "title": "Parse I2C Protocol Frame Packet",
+              "difficulty": "Developing",
+              "expectedOutcome": "Correctly decode I2C address bytes and read/write control flags.",
+              "prompt": "Implement a function `parseI2CFrame(addressByte, dataBytes)` that parses the first I2C transaction byte into the 7-bit target device address in hex (e.g. \"0x3C\") and the operation mode (\"READ\" if bit 0 is 1, \"WRITE\" if bit 0 is 0), along with payload count.",
+              "objectiveId": "ard-i2c-bus",
+              "language": "javascript",
+              "starterCode": "function parseI2CFrame(addressByte, dataBytes) {\n  // Decode 7-bit address and mode from addressByte\n  return null;\n}\n\nconsole.log(JSON.stringify(parseI2CFrame(0x78, [0x00, 0xAF])));"
+            },
+            "checkpoint": {
+              "prompt": "What happens on an I2C bus if the pull-up resistors on SDA and SCL are completely missing?",
+              "answer": "Because I2C drivers are open-drain, the lines cannot return to a logic HIGH state on their own, causing the bus to remain permanently LOW and freeze."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "I2C Bus Protocol Packet Analyzer",
+              "description": "Transmit 7-bit slave address frames, R/W control bits, and inspect ACK/NACK handshake states on SDA and SCL."
+            }
+          },
+          {
+            "id": "arduino-capstone-multisensor",
+            "order": 12,
+            "title": "Embedded Capstone: Autonomous Multisensor Controller",
+            "summary": "Synthesize hardware interrupts, ADC sensor filtering, non-blocking state schedulers, and actuator control into a complete embedded application.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "ard-multisensor-capstone"
+            ],
+            "prerequisiteLessonIds": [
+              "arduino-i2c-wire-oled"
+            ],
+            "estimatedDurationMinutes": 35,
+            "exercise": {
+              "id": "ex-ard-capstone",
+              "title": "Simulate Moving Average Environmental Controller",
+              "difficulty": "Developing",
+              "expectedOutcome": "Implement real-time moving average smoothing and multi-threshold state classification.",
+              "prompt": "Implement a function `simulateController(rawReadings, windowSize, warningThreshold, criticalThreshold)` that processes an array of raw sensor readings through a moving average filter of size `windowSize`. For each step (once window is primed), classify state as \"CRITICAL\" if average >= criticalThreshold, \"WARNING\" if average >= warningThreshold, or \"NORMAL\". Return array of classifications.",
+              "objectiveId": "ard-multisensor-capstone",
+              "language": "javascript",
+              "starterCode": "function simulateController(rawReadings, windowSize, warningThreshold, criticalThreshold) {\n  // Process readings through moving average and return state classifications\n  return [];\n}\n\nconsole.log(JSON.stringify(simulateController([300, 320, 350, 420, 500, 750], 3, 400, 700)));"
+            },
+            "checkpoint": {
+              "prompt": "Why must the Watchdog Timer be refreshed in the main loop rather than inside a hardware timer ISR?",
+              "answer": "An ISR may continue firing even if the main loop has locked up or crashed; refreshing the watchdog in the main loop verifies that the entire application scheduling loop is running normally."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Autonomous Multisensor Controller Dashboard",
+              "description": "Interact with live sensor streams, test watchdog timer auto-recovery, and inspect closed-loop motor/buzzer responses."
+            }
+          }
+        ]
       }
     ]
   },
@@ -2238,6 +3145,30 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "esp-deep-sleep",
         "title": "Configure Ultra-Low-Power (ULP) deep sleep modes, preserve variables in RTC slow memory, and handle external wakeups."
+      },
+      {
+        "id": "esp-freertos-tasks",
+        "title": "Create pinned tasks on Core 0 and Core 1 with priority scheduling and stack allocation."
+      },
+      {
+        "id": "esp-freertos-queues",
+        "title": "Implement thread-safe inter-task communication using FreeRTOS FIFO queues and mutexes."
+      },
+      {
+        "id": "esp-adc-multisampling",
+        "title": "Calibrate 12-bit ADC non-linearity using multisampling and lookup tables."
+      },
+      {
+        "id": "esp-deep-sleep-advanced",
+        "title": "Design ultra-low-power duty cycles using timer and touch wakeups with RTC SRAM state persistence."
+      },
+      {
+        "id": "esp-mqtt-telemetry",
+        "title": "Publish and subscribe to lightweight IoT telemetry using the MQTT protocol over TLS."
+      },
+      {
+        "id": "esp-iot-capstone",
+        "title": "Synthesize dual-core FreeRTOS tasks, sensor sampling, and cloud telemetry into a resilient IoT node."
       }
     ],
     "learningOutcomes": [
@@ -2247,9 +3178,14 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Sample analog sensors with the 12-bit ADC using dB attenuation curves.",
       "Allocate hardware LEDC timers and modulate PWM duty cycle with up to 16-bit resolution.",
       "Stream structured JSON sensor telemetry over 802.11 Wi-Fi networks.",
-      "Reduce power consumption to 15µA using Deep Sleep and RTC memory."
+      "Reduce power consumption to 15µA using Deep Sleep and RTC memory.",
+      "Pin real-time tasks to Core 0 and Core 1 with priority preemption.",
+      "Transfer structured telemetry between cores using thread-safe FreeRTOS queues.",
+      "Linearize and calibrate 12-bit ADC sensor data using multisampling.",
+      "Publish and subscribe to lightweight MQTT broker topics with wildcard filtering.",
+      "Architect resilient, fault-tolerant edge IoT nodes with auto-reconnection and buffering."
     ],
-    "estimatedDurationMinutes": 175,
+    "estimatedDurationMinutes": 330,
     "publicationStatus": "published",
     "modules": [
       {
@@ -2471,6 +3407,220 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "esp-module-freertos",
+        "order": 4,
+        "title": "FreeRTOS Dual-Core Concurrency & Calibration",
+        "summary": "Architect multi-core firmware with FreeRTOS tasks, thread-safe queues, and 12-bit ADC curve linearization.",
+        "lessons": [
+          {
+            "id": "esp32-freertos-tasks",
+            "order": 7,
+            "title": "FreeRTOS Dual-Core Multitasking & Task Pinning",
+            "summary": "Spawn dedicated tasks pinned to Core 0 and Core 1 with xTaskCreatePinnedToCore, configure priority levels, and handle watchdog timeouts.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-freertos-tasks"
+            ],
+            "prerequisiteLessonIds": [
+              "esp32-deep-sleep-rtc"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-esp-tasks",
+              "title": "Simulate Preemptive Priority Task Scheduling",
+              "difficulty": "Developing",
+              "expectedOutcome": "Model preemptive priority scheduling and IDLE yield semantics accurately.",
+              "prompt": "Implement a function `simulateTaskScheduler(tasks, totalTicks)` that models a single-core preemptive priority scheduler. Each task is `{ name: string, priority: number, period: number, duration: number }`. When a task triggers at `tick % period === 0`, it runs for `duration` ticks. If multiple tasks want to run, the one with highest priority runs. Return an array of task names executed at each tick (or 'IDLE').",
+              "objectiveId": "esp-freertos-tasks",
+              "language": "javascript",
+              "starterCode": "function simulateTaskScheduler(tasks, totalTicks) {\n  // Simulate preemptive priority execution log across totalTicks\n  return [];\n}\n\nconsole.log(JSON.stringify(simulateTaskScheduler([\n  { name: \"NET\", priority: 2, period: 4, duration: 1 },\n  { name: \"APP\", priority: 1, period: 2, duration: 1 }\n], 6)));"
+            },
+            "checkpoint": {
+              "prompt": "Why must every FreeRTOS task function contain a vTaskDelay() or blocking synchronization call inside its loop?",
+              "answer": "Without yielding or blocking, a task running on a core starves lower-priority threads and the FreeRTOS IDLE task, triggering the Task Watchdog Timer (TWDT) reset after 5 seconds."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "ESP32 Dual-Core FreeRTOS Task Scheduler",
+              "description": "Inspect concurrent task execution across Core 0 (Protocol) and Core 1 (Application) with real-time priority preemption."
+            }
+          },
+          {
+            "id": "esp32-freertos-queues",
+            "order": 8,
+            "title": "Thread-Safe Inter-Core Communication with FreeRTOS Queues",
+            "summary": "Transfer structured telemetry safely between Core 0 and Core 1 without race conditions using FreeRTOS FIFO queues and binary semaphores.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-freertos-queues"
+            ],
+            "prerequisiteLessonIds": [
+              "esp32-freertos-tasks"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-esp-queues",
+              "title": "Simulate Bounded FIFO Queue Operations",
+              "difficulty": "Developing",
+              "expectedOutcome": "Implement bounded FIFO capacity, packet dropping, and non-blocking dequeue behavior.",
+              "prompt": "Implement a function `simulateQueue(capacity, operations)` that models a FreeRTOS bounded FIFO queue. Operations is an array of `{ type: 'SEND' | 'RECEIVE', value?: any }`. If SEND is called when full, the item is dropped (increment `droppedCount`). If RECEIVE is called when empty, record `null` in `receivedValues`. Return `{ remainingItems: [...], droppedCount: number, receivedValues: [...] }`.",
+              "objectiveId": "esp-freertos-queues",
+              "language": "javascript",
+              "starterCode": "function simulateQueue(capacity, operations) {\n  // Simulate FIFO queue with capacity limits\n  return null;\n}\n\nconsole.log(JSON.stringify(simulateQueue(2, [\n  { type: \"SEND\", value: 10 },\n  { type: \"SEND\", value: 20 },\n  { type: \"SEND\", value: 30 },\n  { type: \"RECEIVE\" },\n  { type: \"RECEIVE\" }\n])));"
+            },
+            "checkpoint": {
+              "prompt": "Why is copying items by value into a FreeRTOS queue safer than passing pointers to local variables?",
+              "answer": "Local variables allocated on a task's stack are destroyed when that function exits or context changes; passing by value guarantees the receiving task receives valid, immutable data regardless of stack state."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Inter-Core FreeRTOS Queue Visualizer",
+              "description": "Push structured telemetry packets from Core 0 and observe atomic FIFO retrieval and buffer depth on Core 1."
+            }
+          },
+          {
+            "id": "esp32-adc-calibration",
+            "order": 9,
+            "title": "12-Bit ADC Non-Linearity Compensation & Multisampling",
+            "summary": "Overcome the ESP32 SAR ADC non-linear transfer curve, dead zones at 0V and 3.3V, and implement multi-sample statistical smoothing.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-adc-multisampling"
+            ],
+            "prerequisiteLessonIds": [
+              "esp32-freertos-queues"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-esp-adc",
+              "title": "Linearize and Calibrate Raw 12-Bit ADC Samples",
+              "difficulty": "Developing",
+              "expectedOutcome": "Apply outlier rejection and proportional voltage mapping to multi-sample ADC data.",
+              "prompt": "Implement a function `calibrateADCSamples(rawSamples, vMaxMv = 3300)` that discards the lowest and highest raw sample (trimmed mean to reject spikes), averages the remaining samples, and maps the average 12-bit value ($0-4095$) linearly into millivolts rounded to the nearest integer.",
+              "objectiveId": "esp-adc-multisampling",
+              "language": "javascript",
+              "starterCode": "function calibrateADCSamples(rawSamples, vMaxMv = 3300) {\n  // Discard min/max, average remaining, and convert 12-bit to millivolts\n  return 0;\n}\n\nconsole.log(calibrateADCSamples([2000, 2048, 2050, 4095, 100]));"
+            },
+            "checkpoint": {
+              "prompt": "Why should you never connect analog sensors to ADC2 pins when building a Wi-Fi enabled ESP32 project?",
+              "answer": "ADC2 hardware is shared with the 2.4 GHz Wi-Fi radio; when the Wi-Fi stack transmits or receives, ADC2 reads fail or yield corrupted values."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "ESP32 SAR ADC Linearization Curve Simulator",
+              "description": "Compare raw non-linear ADC transfer curves against factory eFuse characterized polynomial correction."
+            }
+          }
+        ]
+      },
+      {
+        "id": "esp-module-iot-telemetry-capstone",
+        "order": 5,
+        "title": "Ultra-Low-Power Duty Cycles & MQTT Capstone",
+        "summary": "Optimize battery duty cycles, implement lightweight MQTT telemetry, and build a resilient dual-core IoT node.",
+        "lessons": [
+          {
+            "id": "esp32-deep-sleep-wakeup",
+            "order": 10,
+            "title": "Advanced Ultra-Low-Power Deep Sleep & Multiple Wakeup Sources",
+            "summary": "Maximize battery endurance by dropping to 10µA sleep current, configuring timer/ext0/ext1 wakeups, and persisting variables in RTC memory.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-deep-sleep-advanced"
+            ],
+            "prerequisiteLessonIds": [
+              "esp32-adc-calibration"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-esp-sleep",
+              "title": "Calculate Battery Endurance from Duty Cycle",
+              "difficulty": "Developing",
+              "expectedOutcome": "Accurately calculate weighted average current and projected battery lifetime.",
+              "prompt": "Implement a function `calculateBatteryLifeDays(batteryMah, activeMa, activeSec, sleepUa, sleepSec)` that computes the weighted average current draw in milliamperes and returns the expected operational lifetime in days (assuming 90% usable battery capacity): `Math.floor((batteryMah * 0.90) / (avgMa * 24))`.",
+              "objectiveId": "esp-deep-sleep-advanced",
+              "language": "javascript",
+              "starterCode": "function calculateBatteryLifeDays(batteryMah, activeMa, activeSec, sleepUa, sleepSec) {\n  // Compute average current and return operational battery life in days\n  return 0;\n}\n\nconsole.log(calculateBatteryLifeDays(2000, 150, 2, 15, 298));"
+            },
+            "checkpoint": {
+              "prompt": "Why must variables intended to survive Deep Sleep be tagged with the RTC_DATA_ATTR qualifier?",
+              "answer": "Standard internal SRAM is unpowered in Deep Sleep to conserve energy; only the 8 KB RTC Slow Memory retains power and content during the sleep state."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "ESP32 Battery Lifetime & Sleep Mode Calculator",
+              "description": "Model battery discharge profiles across Active, Modem-Sleep, Light-Sleep, and Deep-Sleep duty cycles."
+            }
+          },
+          {
+            "id": "esp32-mqtt-telemetry",
+            "order": 11,
+            "title": "MQTT Pub/Sub Telemetry Protocol for Constrained IoT Devices",
+            "summary": "Implement lightweight MQTT client messaging, Quality of Service (QoS) levels, topic hierarchies, and keepalive pings.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-mqtt-telemetry"
+            ],
+            "prerequisiteLessonIds": [
+              "esp32-deep-sleep-wakeup"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-esp-mqtt",
+              "title": "Evaluate MQTT Topic Wildcard Matcher",
+              "difficulty": "Developing",
+              "expectedOutcome": "Accurately match MQTT topic paths using single-level and multi-level wildcard syntax.",
+              "prompt": "Implement a function `matchesMqttTopic(pattern, topic)` that evaluates whether an incoming topic string matches a subscription pattern supporting wildcards `+` (single level) and `#` (multi-level ending wildcard).",
+              "objectiveId": "esp-mqtt-telemetry",
+              "language": "javascript",
+              "starterCode": "function matchesMqttTopic(pattern, topic) {\n  // Test if topic matches MQTT wildcard pattern (+ and #)\n  return false;\n}\n\nconsole.log(matchesMqttTopic(\"home/+/temperature\", \"home/kitchen/temperature\"));"
+            },
+            "checkpoint": {
+              "prompt": "Why is MQTT preferred over HTTP REST for battery-powered IoT devices?",
+              "answer": "MQTT maintains an open TCP socket with a tiny 2-byte header, avoiding the heavy HTTP header overhead, TLS re-handshakes, and connection teardown of REST."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "MQTT Broker & Client Topic Hub Simulator",
+              "description": "Publish telemetry to hierarchical MQTT topics and evaluate multi-level wildcard subscriptions (+ and #)."
+            }
+          },
+          {
+            "id": "esp32-capstone-iot-station",
+            "order": 12,
+            "title": "IoT Station Capstone: Resilient Dual-Core Remote Telemetry Node",
+            "summary": "Build a production-grade remote sensor station orchestrating dual-core FreeRTOS tasks, queue-buffered telemetry, Wi-Fi reconnection, and fail-safe recovery.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "esp-iot-capstone"
+            ],
+            "prerequisiteLessonIds": [
+              "esp32-mqtt-telemetry"
+            ],
+            "estimatedDurationMinutes": 35,
+            "exercise": {
+              "id": "ex-esp-capstone",
+              "title": "Simulate Resilient Telemetry Queue and Auto-Flush",
+              "difficulty": "Developing",
+              "expectedOutcome": "Simulate resilient offline queueing, packet dropping, and auto-flush on reconnection.",
+              "prompt": "Implement a function `simulateResilientNode(events, queueCapacity)` that models an offline spooling queue. Events is an array of `{ action: 'SAMPLE' | 'NET_DOWN' | 'NET_UP', reading?: number }`. When online, samples transmit immediately (push to `transmitted`). When offline, samples enter queue up to `queueCapacity` (excess are `dropped`). When 'NET_UP' occurs, all queued items are flushed to `transmitted` in FIFO order. Return `{ transmitted: [...], droppedCount: number, finalQueueLength: number }`.",
+              "objectiveId": "esp-iot-capstone",
+              "language": "javascript",
+              "starterCode": "function simulateResilientNode(events, queueCapacity) {\n  // Simulate offline spooling, queue limits, and auto-flush\n  return null;\n}\n\nconsole.log(JSON.stringify(simulateResilientNode([\n  { action: \"SAMPLE\", reading: 100 },\n  { action: \"NET_DOWN\" },\n  { action: \"SAMPLE\", reading: 200 },\n  { action: \"SAMPLE\", reading: 300 },\n  { action: \"SAMPLE\", reading: 400 },\n  { action: \"NET_UP\" }\n], 2)));"
+            },
+            "checkpoint": {
+              "prompt": "Why is segregating networking tasks to Core 0 and sensor tasks to Core 1 best practice on the ESP32?",
+              "answer": "Wi-Fi handshakes and TCP transmissions can block for hundreds of milliseconds; pinning sensor acquisition to Core 1 ensures physical data sampling never suffers timing jitter or deadline misses."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Resilient IoT Telemetry Station Architecture",
+              "description": "Simulate network dropouts, test offline queue buffer spooling, and verify automatic broker reconnect."
+            }
+          }
+        ]
       }
     ]
   },
@@ -2478,7 +3628,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
     "id": "breadboard-electronics",
     "subjectId": "breadboard-electronics-subject",
     "title": "Practical Breadboard Prototyping & Circuits",
-    "description": "Master physical circuit prototyping on solderless breadboards, terminal bus architectures, current limiting, voltage dividers, and multimeter troubleshooting.",
+    "description": "Master physical circuit prototyping on solderless breadboards, terminal bus architectures, current limiting, voltage dividers, active semiconductors, and multimeter troubleshooting.",
     "level": "Beginner",
     "version": "1.0.0",
     "prerequisites": [
@@ -2509,6 +3659,22 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "bb-troubleshooting",
         "title": "Systematically debug breadboard faults using digital multimeters (voltage, continuity buzzer, and resistance modes)."
+      },
+      {
+        "id": "bb-diodes",
+        "title": "Analyze diode forward voltage drops (0.7V silicon), reverse breakdown, and bridge rectification circuits."
+      },
+      {
+        "id": "bb-bjt-switches",
+        "title": "Design NPN BJT transistor driver switches with base resistors to drive loads exceeding microcontroller GPIO current limits."
+      },
+      {
+        "id": "bb-555-astable",
+        "title": "Calculate frequency and duty cycle for 555 timer astable multivibrator pulse generator circuits."
+      },
+      {
+        "id": "bb-capstone-proto",
+        "title": "Synthesize breadboard layout rules, active semiconductors, and fault diagnosis in a prototyping assessment."
       }
     ],
     "learningOutcomes": [
@@ -2517,9 +3683,11 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Size current-limiting resistors for any LED color using Ohm's Law.",
       "Wire tactile momentary pushbuttons with pull-up and pull-down resistor networks.",
       "Design two-resistor voltage divider circuits and interface resistive analog sensors.",
-      "Systematically troubleshoot faulty hardware prototypes using digital multimeters."
+      "Systematically troubleshoot faulty hardware prototypes using digital multimeters.",
+      "Integrate silicon/Schottky diodes for reverse polarity and inductive flyback protection.",
+      "Drive high-current DC loads safely using NPN BJT transistor switches and 555 timer clocks."
     ],
-    "estimatedDurationMinutes": 150,
+    "estimatedDurationMinutes": 240,
     "publicationStatus": "published",
     "modules": [
       {
@@ -2741,6 +3909,146 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "bb-module-active-semiconductors",
+        "order": 4,
+        "title": "Active Semiconductors & Prototyping Projects",
+        "summary": "Diode rectifiers, BJT transistor switches, 555 timer pulse generators, and hardware prototyping assessment.",
+        "lessons": [
+          {
+            "id": "bb-diode-rectification-clipping",
+            "order": 7,
+            "title": "Diodes, Forward Voltage Drop & Rectification",
+            "summary": "Understand PN junction diodes, 0.7V forward threshold, reverse polarity protection, and half-wave rectification.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "bb-diodes"
+            ],
+            "prerequisiteLessonIds": [
+              "breadboard-troubleshooting"
+            ],
+            "estimatedDurationMinutes": 30,
+            "exercise": {
+              "id": "ex-bb-diode-calc",
+              "title": "Calculate Delivered Voltage after Reverse Polarity Diode",
+              "difficulty": "Developing",
+              "expectedOutcome": "Model diode forward voltage drops in DC circuits.",
+              "prompt": "Write a function `deliveredVoltage(vIn, diodeType)`: if diodeType is 'silicon', subtract 0.7V; if 'schottky', subtract 0.3V. If vIn is negative (reverse polarity) or less than the drop, return 0.0. Calculate for (5.0, 'silicon') and (5.0, 'schottky') rounded to 1 decimal place. Print: `Silicon: ${res1.toFixed(1)}V, Schottky: ${res2.toFixed(1)}V`.",
+              "objectiveId": "bb-diodes",
+              "language": "javascript",
+              "starterCode": "function deliveredVoltage(vIn, diodeType) {\n  // Implement diode voltage drop calculation\n}\n\n// Calculate and print Silicon: 4.3V, Schottky: 4.7V\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is a Schottky diode preferred over a silicon diode for battery reverse-polarity protection in low-voltage circuits?",
+              "answer": "Schottky diodes have a significantly lower forward voltage drop (0.3V vs 0.7V), wasting far less power as heat and delivering more voltage to the system."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Diode Rectification & Clipping Lab",
+              "description": "Interactive diode IV curve, forward bias voltage drop, and half-wave rectifier waveform with smoothing capacitor."
+            }
+          },
+          {
+            "id": "bb-bjt-transistor-switch",
+            "order": 8,
+            "title": "NPN BJT Transistors as Digital Switches",
+            "summary": "Control high-current loads (motors, relays, LED strips) from low-current microcontroller GPIO pins using 2N2222 / 2N3904 NPN transistors.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "bb-bjt-switches"
+            ],
+            "prerequisiteLessonIds": [
+              "bb-diode-rectification-clipping"
+            ],
+            "estimatedDurationMinutes": 35,
+            "exercise": {
+              "id": "ex-bb-bjt-base-calc",
+              "title": "Size the Base Resistor for a 100mA Load",
+              "difficulty": "Developing",
+              "expectedOutcome": "Calculate transistor base resistance for saturated switching.",
+              "prompt": "A microcontroller with 5V GPIO drives a 100mA motor via an NPN transistor. Using forced beta = 10: Ib = 100mA / 10 = 10mA (0.01A). Base-emitter drop Vbe = 0.7V. Compute Rb in Ohms: (5.0 - 0.7) / 0.01. Write a function calculateBaseResistor(vGpio, iLoad, betaForced) and print 'Rb: ' followed by the integer ohm value.",
+              "objectiveId": "bb-bjt-switches",
+              "language": "javascript",
+              "starterCode": "function calculateBaseResistor(vGpio, iLoad, betaForced) {\n  // Implement base resistor calculation\n}\n\n// Calculate for 5.0V, 0.10A, beta 10 and print Rb: 430 ohms\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is a base resistor mandatory when connecting a microcontroller GPIO to an NPN transistor base?",
+              "answer": "The base-emitter junction acts like a forward-biased silicon diode to ground (0.7V). Without a resistor, the GPIO pin would short into ground through the junction, destroying the microcontroller pin."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "BJT Transistor Switch Simulator",
+              "description": "Interactive NPN transistor circuit showing base drive current, collector load current, and cutoff vs. saturation modes."
+            }
+          },
+          {
+            "id": "bb-555-timer-astable",
+            "order": 9,
+            "title": "555 Timer Astable Multivibrator Pulse Generator",
+            "summary": "Wire the classic 555 IC in astable mode with two resistors and a capacitor to generate continuous square-wave clock pulses.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "bb-555-astable"
+            ],
+            "prerequisiteLessonIds": [
+              "bb-bjt-transistor-switch"
+            ],
+            "estimatedDurationMinutes": 35,
+            "exercise": {
+              "id": "ex-bb-555-freq-calc",
+              "title": "Calculate 555 Astable Frequency and Period",
+              "difficulty": "Developing",
+              "expectedOutcome": "Calculate timing characteristics of a 555 astable multivibrator.",
+              "prompt": "Write a function `calculate555Timer(r1, r2, cFarads)`: calculate total period T = 0.693 * (r1 + 2 * r2) * cFarads, and frequency f = 1 / T. For r1 = 10000 (10k), r2 = 47000 (47k), cFarads = 0.000010 (10uF): return { t: T.toFixed(2), f: f.toFixed(2) }. Print: `Period: ${res.t}s, Frequency: ${res.f}Hz`.",
+              "objectiveId": "bb-555-astable",
+              "language": "javascript",
+              "starterCode": "function calculate555Timer(r1, r2, cFarads) {\n  // Implement 555 timer math\n}\n\n// Calculate for 10k, 47k, 10uF and print Period: 0.72s, Frequency: 1.39Hz\n"
+            },
+            "checkpoint": {
+              "prompt": "Why can a standard 555 timer astable circuit never achieve a duty cycle under 50% without an added steering diode?",
+              "answer": "Because the capacitor charges through both R1 and R2, but discharges strictly through R2, meaning charge time (thigh) is always strictly greater than discharge time (tlow)."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "555 Timer Astable Circuit Lab",
+              "description": "Interactive 555 timer breadboard wiring showing capacitor charge/discharge between 1/3 Vcc and 2/3 Vcc."
+            }
+          },
+          {
+            "id": "bb-capstone-hardware-prototype",
+            "order": 10,
+            "title": "Comprehensive Breadboard Prototyping Assessment",
+            "summary": "Synthesize bus power distribution, pull-up/pull-down switching, voltage dividers, active semiconductors, and multimeter fault diagnosis.",
+            "type": "assessment",
+            "objectiveIds": [
+              "bb-capstone-proto"
+            ],
+            "prerequisiteLessonIds": [
+              "bb-555-timer-astable"
+            ],
+            "estimatedDurationMinutes": 40,
+            "exercise": {
+              "id": "ex-bb-capstone-audit",
+              "title": "Run Complete Hardware Prototype Design Audit",
+              "difficulty": "Applied",
+              "expectedOutcome": "Validate circuit prototype safety and electrical design criteria.",
+              "prompt": "Write a function `auditBreadboardPrototype(vRail, gndContinuity, hasFlybackDiode, rBaseSized)` that returns `{ pass: boolean, issues: string[] }`. Check: 1) gndContinuity must be true (else add 'MISSING_GND'). 2) vRail must be between 4.75 and 5.25 (else add 'OUT_OF_SPEC_VOLTAGE'). 3) hasFlybackDiode must be true (else add 'UNPROTECTED_INDUCTOR'). 4) rBaseSized must be true (else add 'UNSAFE_BASE_DRIVE'). pass is true if issues.length === 0. Test with a valid circuit `(5.0, true, true, true)` and print `Audit: ${res.pass ? 'PASS' : 'FAIL'}, Issues: ${res.issues.length}`.",
+              "objectiveId": "bb-capstone-proto",
+              "language": "javascript",
+              "starterCode": "function auditBreadboardPrototype(vRail, gndContinuity, hasFlybackDiode, rBaseSized) {\n  // Implement prototype design audit\n}\n\n// Audit healthy circuit and print Audit: PASS, Issues: 0\n"
+            },
+            "checkpoint": {
+              "prompt": "What is the single most common cause of erratic, intermittent behavior in breadboard circuits interfacing multiple modules?",
+              "answer": "A missing or unbonded common ground (GND) wire between separate boards or power supplies, leaving signals without a shared 0V reference."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Interactive Complete Hardware Prototyping Studio",
+              "description": "Full virtual breadboard laboratory with voltage regulators, active semiconductors, pushbuttons, LEDs, and virtual test equipment."
+            }
+          }
+        ]
       }
     ]
   },
@@ -2795,6 +4103,22 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "js-capstone-systems",
         "title": "Architect an event-driven telemetry engine with publish-subscribe decoupling and listener management."
+      },
+      {
+        "id": "js-microtask-queue",
+        "title": "Trace job queue microtask execution priorities against timer macrotasks in the event loop."
+      },
+      {
+        "id": "js-web-workers",
+        "title": "Coordinate background thread operations using Web Workers and structured messaging."
+      },
+      {
+        "id": "js-streams-transform",
+        "title": "Process chunks of high-frequency data using ReadableStream pipeline transforms."
+      },
+      {
+        "id": "js-binary-protocol",
+        "title": "Serialize and parse custom binary framing packets with TypedArrays."
       }
     ],
     "learningOutcomes": [
@@ -2804,9 +4128,10 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Implement classical linear data structures including stacks, queues, and priority heaps.",
       "Traverse tree and graph networks using DFS, BFS, and in-order traversals.",
       "Optimize recursive algorithms using dynamic programming memoization and bottom-up tabulation.",
-      "Design extensible event-driven architectures with decoupled pub/sub emitters."
+      "Design extensible event-driven architectures with decoupled pub/sub emitters.",
+      "Coordinate background multithreading with Web Workers and high-throughput streams."
     ],
-    "estimatedDurationMinutes": 360,
+    "estimatedDurationMinutes": 480,
     "publicationStatus": "published",
     "modules": [
       {
@@ -3148,6 +4473,138 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "js-advanced-systems-concurrency",
+        "order": 5,
+        "title": "Advanced Concurrency & Web Workers",
+        "summary": "Microtask vs macrotask scheduling, Web Workers multithreaded messaging, Streams pipelines, and structured binary transfers.",
+        "lessons": [
+          {
+            "id": "js-microtasks-macrotasks",
+            "order": 11,
+            "title": "Event Loop: Microtasks and Macrotasks",
+            "summary": "Deep-dive into event loop tick priorities: Promise microtasks and queueMicrotask vs timer macrotasks.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "js-microtask-queue"
+            ],
+            "prerequisiteLessonIds": [
+              "js-event-engine-capstone"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-js-task-ordering",
+              "title": "Trace execution order across microtasks and macrotasks",
+              "difficulty": "Developing",
+              "expectedOutcome": "Demonstrate microtask queue precedence over timer macrotasks.",
+              "prompt": "Write a function scheduleJobs() that appends execution labels into an array 'order'. It must: 1) Push 'sync-start'. 2) Schedule a setTimeout with 0ms delay pushing 'macrotask'. 3) Schedule a Promise.resolve().then pushing 'microtask-1'. 4) Schedule queueMicrotask pushing 'microtask-2'. 5) Push 'sync-end'. Run scheduleJobs() and inside the setTimeout print the final sequence joined by '->'.",
+              "objectiveId": "js-microtask-queue",
+              "starterCode": "function scheduleJobs() {\n  // Implement job scheduling and print order in setTimeout\n}\nscheduleJobs();\n"
+            },
+            "checkpoint": {
+              "prompt": "When are microtask callbacks executed relative to macrotask timer callbacks?",
+              "answer": "All pending microtasks are drained immediately after the current synchronous script finishes and before any pending macrotask timer callback runs."
+            }
+          },
+          {
+            "id": "js-web-workers-messaging",
+            "order": 12,
+            "title": "Web Workers and Threaded Message Passing",
+            "summary": "Offload compute-intensive tasks to background threads using the Web Worker API and postMessage.",
+            "type": "practical-exercise",
+            "objectiveIds": [
+              "js-web-workers"
+            ],
+            "prerequisiteLessonIds": [
+              "js-microtasks-macrotasks"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-js-worker-dispatcher",
+              "title": "Model a background task dispatcher",
+              "difficulty": "Developing",
+              "expectedOutcome": "Simulate asynchronous background task scheduling with Promises.",
+              "prompt": "Implement a TaskDispatcher class that accepts jobs via dispatch(taskName, payload) and returns a Promise resolving with the result. If taskName is 'sum', sum the array in payload; if 'square', return payload * payload. Test with await dispatch('sum', [5, 10, 15]) and await dispatch('square', 8). Print: `Sum: ${sumRes}, Square: ${sqRes}`.",
+              "objectiveId": "js-web-workers",
+              "starterCode": "class TaskDispatcher {\n  // Implement async dispatch(taskName, payload)\n}\n\n// Run tasks and print Sum: 30, Square: 64\n"
+            },
+            "checkpoint": {
+              "prompt": "Can a dedicated Web Worker directly manipulate the browser DOM (document or window)?",
+              "answer": "No. Web Workers execute in a separate global context (WorkerGlobalScope) without direct access to the DOM or window object."
+            }
+          },
+          {
+            "id": "js-streams-pipeline",
+            "order": 13,
+            "title": "Streaming Data Pipelines and Transformations",
+            "summary": "Process streaming telemetry without loading entire datasets into memory using asynchronous iterators and generator transforms.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "js-streams-transform"
+            ],
+            "prerequisiteLessonIds": [
+              "js-web-workers-messaging"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-js-stream-pipeline",
+              "title": "Build a streaming telemetry aggregator pipeline",
+              "difficulty": "Developing",
+              "expectedOutcome": "Compose async generator pipelines for on-demand stream processing.",
+              "prompt": "Write two async generators: 1) generateTelemetry(readings: number[]) yielding each reading. 2) calibrateStream(stream, offset: number) yielding reading + offset. Consume calibrateStream(generateTelemetry([10.5, 20.0, 15.5]), 1.5) with 'for await', sum all values, and print 'Total: ' followed by total.toFixed(1).",
+              "objectiveId": "js-streams-transform",
+              "starterCode": "async function* generateTelemetry(readings) {\n  // Implement generator\n}\nasync function* calibrateStream(stream, offset) {\n  // Implement calibration transform\n}\n// Run pipeline and print Total: 50.5\n"
+            },
+            "checkpoint": {
+              "prompt": "Why do asynchronous streaming pipelines consume significantly less RAM than batch arrays?",
+              "answer": "Streaming processes elements one chunk at a time on-demand, maintaining O(1) auxiliary memory regardless of total stream duration."
+            }
+          },
+          {
+            "id": "js-typedarrays-binary-protocol",
+            "order": 14,
+            "title": "High-Performance Binary Protocol Serialization",
+            "summary": "Pack sensor IDs, flags, and floating-point measurements into binary framing packets using Uint8Array and DataView.",
+            "type": "assessment",
+            "objectiveIds": [
+              "js-binary-protocol"
+            ],
+            "prerequisiteLessonIds": [
+              "js-streams-pipeline"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-js-pack-unpack-binary",
+              "title": "Pack and unpack a binary telemetry packet",
+              "difficulty": "Applied",
+              "expectedOutcome": "Serialize and deserialize binary telemetry packets with DataView.",
+              "prompt": "Implement two functions: 1) packTelemetry(nodeId: number, temp: number): returns an 8-byte ArrayBuffer with Uint16 magic 0xAA55 at offset 0, Uint8 nodeId at offset 2, Uint8 status 0x01 at offset 3, and Float32 temp at offset 4 (all big-endian). 2) unpackTelemetry(buffer): reads and returns { nodeId, temp: Math.round(temp * 10) / 10 }. In main, pack nodeId 7 and temp 32.4, unpack it, and print `Packet: Node ${unpacked.nodeId}, Temp ${unpacked.temp}C`.",
+              "objectiveId": "js-binary-protocol",
+              "starterCode": "function packTelemetry(nodeId, temp) {\n  // Implement binary packing\n}\nfunction unpackTelemetry(buf) {\n  // Implement binary unpacking\n}\n// Pack Node 7 and Temp 32.4, unpack, and print\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is DataView preferred over typed array views (like Float32Array) when parsing network protocol headers?",
+              "answer": "DataView allows reading multiple heterogeneous types (Uint16, Uint8, Float32) at arbitrary unaligned byte offsets and explicitly controlling endianness."
+            }
+          }
+        ]
       }
     ]
   },
@@ -3155,7 +4612,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
     "id": "sql-databases",
     "subjectId": "databases-sql",
     "title": "Relational Databases & SQL Foundations",
-    "description": "Relational modeling, schema integrity, multi-table joins, aggregations, CTEs, and ACID transactions.",
+    "description": "Relational modeling, schema integrity, multi-table joins, aggregations, CTEs, indexes, window functions, and ACID transactions.",
     "level": "Beginner",
     "version": "1.0.0",
     "prerequisites": [
@@ -3193,6 +4650,22 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "sql-transactions-acid",
         "title": "Execute atomic data mutations using INSERT, UPDATE, and DELETE enclosed in ACID transactions."
+      },
+      {
+        "id": "sql-btree-indexes",
+        "title": "Accelerate query execution times by creating B-Tree indexes on high-cardinality columns."
+      },
+      {
+        "id": "sql-explain-plans",
+        "title": "Analyze query execution plans using EXPLAIN QUERY PLAN to detect full table scans."
+      },
+      {
+        "id": "sql-window-analytics",
+        "title": "Compute running totals and rankings using SQL window functions (OVER, PARTITION BY)."
+      },
+      {
+        "id": "sql-capstone-optimization",
+        "title": "Synthesize relational schema design, indexing, and window analytics in a database capstone."
       }
     ],
     "learningOutcomes": [
@@ -3201,9 +4674,11 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Compute aggregate metrics using GROUP BY and HAVING.",
       "Join multiple relational tables using INNER JOIN and LEFT JOIN.",
       "Construct complex hierarchical queries with Common Table Expressions (WITH).",
-      "Execute safe data modifications using ACID transactions."
+      "Execute safe data modifications using ACID transactions.",
+      "Accelerate query performance with B-Tree indexes and inspect EXPLAIN plans.",
+      "Calculate running totals and rankings with analytical window functions."
     ],
-    "estimatedDurationMinutes": 360,
+    "estimatedDurationMinutes": 480,
     "publicationStatus": "published",
     "modules": [
       {
@@ -3443,6 +4918,138 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "sql-module-indexing-optimization",
+        "order": 4,
+        "title": "Indexing, Query Plans & Performance Optimization",
+        "summary": "B-Tree indexes, EXPLAIN QUERY PLAN, analytical window functions, and database normalization.",
+        "lessons": [
+          {
+            "id": "sql-indexes-b-tree",
+            "order": 9,
+            "title": "B-Tree Indexes and Query Performance",
+            "summary": "Accelerate SELECT query execution from O(N) linear table scans to O(log N) tree lookups with CREATE INDEX.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "sql-btree-indexes"
+            ],
+            "prerequisiteLessonIds": [
+              "sql-dml-transactions"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "sql",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-sql-create-index",
+              "title": "Create a composite index on telemetry logs",
+              "difficulty": "Developing",
+              "expectedOutcome": "Accelerate composite queries with multi-column indexes.",
+              "prompt": "Given table `telemetry (id INTEGER PRIMARY KEY, station TEXT, metric TEXT, value REAL)`: 1) Create an index named `idx_station_metric` on columns `(station, metric)`. 2) Query all rows where `station = 'ST-01'` and `metric = 'temp'`, ordered by `value ASC`. Select `station`, `metric`, and `value`.",
+              "objectiveId": "sql-btree-indexes",
+              "starterCode": "-- Create index and query filtered telemetry:\nCREATE INDEX idx_station_metric ON telemetry(station, metric);\n\nSELECT station, metric, value FROM telemetry WHERE station = 'ST-01' AND metric = 'temp' ORDER BY value ASC;"
+            },
+            "checkpoint": {
+              "prompt": "Why does adding too many indexes degrade database write performance?",
+              "answer": "Every INSERT, UPDATE, or DELETE operation must update every index on that table, incurring additional disk I/O and tree balancing operations."
+            }
+          },
+          {
+            "id": "sql-explain-query-plan",
+            "order": 10,
+            "title": "Analyzing Query Execution with EXPLAIN QUERY PLAN",
+            "summary": "Inspect query optimizer execution plans to detect SCAN TABLE bottlenecks and verify USING INDEX utilization.",
+            "type": "practical-exercise",
+            "objectiveIds": [
+              "sql-explain-plans"
+            ],
+            "prerequisiteLessonIds": [
+              "sql-indexes-b-tree"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "sql",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-sql-explain-plan",
+              "title": "Inspect execution plan for an indexed search",
+              "difficulty": "Developing",
+              "expectedOutcome": "Inspect and confirm index utilization with EXPLAIN QUERY PLAN.",
+              "prompt": "Given table `products (id INTEGER PRIMARY KEY, barcode TEXT, name TEXT)`. 1) Create index `idx_barcode ON products(barcode)`. 2) Run `EXPLAIN QUERY PLAN SELECT id, name FROM products WHERE barcode = '9780132350884';` to verify index utilization.",
+              "objectiveId": "sql-explain-plans",
+              "starterCode": "-- Create index and inspect query plan:\nCREATE INDEX idx_barcode ON products(barcode);\n\nEXPLAIN QUERY PLAN SELECT id, name FROM products WHERE barcode = '9780132350884';"
+            },
+            "checkpoint": {
+              "prompt": "In an EXPLAIN QUERY PLAN output, what is the critical difference between SCAN TABLE and SEARCH TABLE?",
+              "answer": "SCAN TABLE traverses every row sequentially (O(N)), whereas SEARCH TABLE navigates an index or primary key directly (O(log N) or O(1))."
+            }
+          },
+          {
+            "id": "sql-window-functions",
+            "order": 11,
+            "title": "Analytical Window Functions",
+            "summary": "Compute running totals, rankings, and partitioned metrics using ROW_NUMBER(), RANK(), and OVER (PARTITION BY ...).",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "sql-window-analytics"
+            ],
+            "prerequisiteLessonIds": [
+              "sql-explain-query-plan"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "sql",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-sql-window-rank",
+              "title": "Rank students within each department by GPA",
+              "difficulty": "Developing",
+              "expectedOutcome": "Partition records and compute departmental student rankings.",
+              "prompt": "Given table `students (id INTEGER PRIMARY KEY, dept TEXT, name TEXT, gpa REAL)`. Write a query selecting `dept`, `name`, `gpa`, and `ROW_NUMBER() OVER (PARTITION BY dept ORDER BY gpa DESC) AS rnk`, ordered by `dept ASC, rnk ASC`.",
+              "objectiveId": "sql-window-analytics",
+              "starterCode": "-- Select dept, name, gpa, and rank within department:\nSELECT dept, name, gpa,\n       ROW_NUMBER() OVER (PARTITION BY dept ORDER BY gpa DESC) AS rnk\nFROM students\nORDER BY dept ASC, rnk ASC;"
+            },
+            "checkpoint": {
+              "prompt": "How does a window function differ fundamentally from a standard GROUP BY aggregation?",
+              "answer": "GROUP BY collapses multiple rows into a single summary row, while a window function produces aggregate calculations while preserving all original individual rows."
+            }
+          },
+          {
+            "id": "sql-capstone-database-assessment",
+            "order": 12,
+            "title": "Relational Architecture & Performance Assessment",
+            "summary": "Synthesize relational schema design, multi-table joins, indexing, and window analytics in a comprehensive database capstone.",
+            "type": "assessment",
+            "objectiveIds": [
+              "sql-capstone-optimization"
+            ],
+            "prerequisiteLessonIds": [
+              "sql-window-functions"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "sql",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-sql-capstone-inventory",
+              "title": "Calculate warehouse stock and running totals",
+              "difficulty": "Applied",
+              "expectedOutcome": "Combine relational joins with cumulative window totals in a single query.",
+              "prompt": "Given tables `warehouses (id INT, location TEXT)` and `stock (id INT, warehouse_id INT, sku TEXT, qty INT)`. Join warehouses and stock on `warehouse_id = warehouses.id`. Select `warehouses.location`, `stock.sku`, `stock.qty`, and the cumulative sum `SUM(stock.qty) OVER (PARTITION BY warehouses.location ORDER BY stock.qty DESC) AS running_qty`. Order by `warehouses.location ASC, stock.qty DESC`.",
+              "objectiveId": "sql-capstone-optimization",
+              "starterCode": "-- Join warehouses and stock with running total:\nSELECT w.location, s.sku, s.qty,\n       SUM(s.qty) OVER (PARTITION BY w.location ORDER BY s.qty DESC) AS running_qty\nFROM warehouses w\nJOIN stock s ON w.id = s.warehouse_id\nORDER BY w.location ASC, s.qty DESC;"
+            },
+            "checkpoint": {
+              "prompt": "Why is normalizing tables to Third Normal Form (3NF) beneficial in high-volume relational systems?",
+              "answer": "3NF eliminates data redundancy and update anomalies, guaranteeing that each non-key field depends solely on the primary key."
+            }
+          }
+        ]
       }
     ]
   },
@@ -3450,7 +5057,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
     "id": "html-css-web",
     "subjectId": "web-engineering",
     "title": "Modern HTML5 & Responsive CSS Architecture",
-    "description": "Semantic markup, accessible forms, Flexbox, Grid, custom properties, and GPU-accelerated motion.",
+    "description": "Semantic markup, accessible forms, Flexbox, Grid, custom properties, container queries, and GPU-accelerated motion.",
     "level": "Beginner",
     "version": "1.0.0",
     "prerequisites": [
@@ -3488,6 +5095,22 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "web-transitions-motion",
         "title": "Implement smooth micro-interactions using CSS transitions, transform matrixes, and keyframe animations."
+      },
+      {
+        "id": "web-grid-areas",
+        "title": "Structure complex responsive layouts using CSS Grid template areas and named lines."
+      },
+      {
+        "id": "web-a11y-wcag",
+        "title": "Implement WCAG 2.1 accessible web landmarks, ARIA live regions, and keyboard focus traps."
+      },
+      {
+        "id": "web-container-queries",
+        "title": "Build modular context-aware UI components using CSS Container Queries (@container)."
+      },
+      {
+        "id": "web-capstone-dashboard",
+        "title": "Synthesize semantic HTML5, CSS Grid, custom properties, and accessible components in a responsive dashboard."
       }
     ],
     "learningOutcomes": [
@@ -3496,9 +5119,10 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Deliver responsive images with picture, srcset, and native lazy loading.",
       "Construct 1-dimensional layouts with Flexbox and 2-dimensional layouts with CSS Grid.",
       "Architect maintainable design systems with scoped CSS custom properties.",
-      "Deliver smooth 60fps micro-interactions using GPU-accelerated CSS transitions."
+      "Deliver smooth 60fps micro-interactions using GPU-accelerated CSS transitions.",
+      "Implement accessible WCAG 2.1 compliance and modern container queries."
     ],
-    "estimatedDurationMinutes": 360,
+    "estimatedDurationMinutes": 480,
     "publicationStatus": "published",
     "modules": [
       {
@@ -3738,6 +5362,138 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "web-module-advanced-architecture",
+        "order": 4,
+        "title": "Advanced Layout, A11y & Performance",
+        "summary": "CSS Grid template areas, WCAG accessibility, container queries, and responsive dashboard architecture.",
+        "lessons": [
+          {
+            "id": "web-grid-template-areas",
+            "order": 9,
+            "title": "CSS Grid Template Areas and Named Lines",
+            "summary": "Define declarative 2D page architectures using grid-template-areas and ASCII-like grid placement.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "web-grid-areas"
+            ],
+            "prerequisiteLessonIds": [
+              "css-transitions-animations"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "html",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-web-grid-areas-layout",
+              "title": "Construct a responsive header-main-aside grid layout",
+              "difficulty": "Developing",
+              "expectedOutcome": "2D layout structured with grid-template-areas.",
+              "prompt": "Write CSS for `.page-container` using `display: grid;`, `grid-template-columns: 1fr 300px;`, and `grid-template-areas: 'header header' 'main aside';`. Assign `.site-header { grid-area: header; }`, `.site-content { grid-area: main; }`, and `.site-aside { grid-area: aside; }`.",
+              "objectiveId": "web-grid-areas",
+              "starterCode": ".page-container {\n  display: grid;\n  grid-template-columns: 1fr 300px;\n  grid-template-areas:\n    \"header header\"\n    \"main aside\";\n}\n.site-header { grid-area: header; }\n.site-content { grid-area: main; }\n.site-aside { grid-area: aside; }"
+            },
+            "checkpoint": {
+              "prompt": "What character represents an unoccupied cell in a CSS grid-template-areas definition?",
+              "answer": "The period ('.') token."
+            }
+          },
+          {
+            "id": "web-accessibility-wcag-aria",
+            "order": 10,
+            "title": "Web Accessibility, WCAG 2.1 and ARIA",
+            "summary": "Ensure equitable access using semantic ARIA roles (aria-expanded, aria-live, aria-labelledby) and focus management.",
+            "type": "practical-exercise",
+            "objectiveIds": [
+              "web-a11y-wcag"
+            ],
+            "prerequisiteLessonIds": [
+              "web-grid-template-areas"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "html",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-web-a11y-button",
+              "title": "Build an accessible collapsible toggle button",
+              "difficulty": "Developing",
+              "expectedOutcome": "Accessible disclosure control with ARIA attributes.",
+              "prompt": "Write an accessible HTML button with attributes: `type='button'`, `aria-expanded='false'`, `aria-controls='filter-drawer'`, and class `btn-filter`. Inside the button, include text 'Filters'.",
+              "objectiveId": "web-a11y-wcag",
+              "starterCode": "<button type=\"button\" class=\"btn-filter\" aria-expanded=\"false\" aria-controls=\"filter-drawer\">Filters</button>"
+            },
+            "checkpoint": {
+              "prompt": "Why should developers prefer native HTML elements over custom elements with ARIA roles?",
+              "answer": "Native HTML elements provide built-in keyboard navigation, focus management, and accessibility semantics across all browsers with zero custom scripting."
+            }
+          },
+          {
+            "id": "web-container-queries",
+            "order": 11,
+            "title": "Component-Level Responsive Design with Container Queries",
+            "summary": "Adapt UI components based on parent container dimensions (@container) rather than global viewport size.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "web-container-queries"
+            ],
+            "prerequisiteLessonIds": [
+              "web-accessibility-wcag-aria"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "html",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-web-container-query",
+              "title": "Declare an inline-size container and responsive rule",
+              "difficulty": "Developing",
+              "expectedOutcome": "Component styling bound to parent container inline-size.",
+              "prompt": "Write CSS that: 1) Gives `.metric-card-container` the property `container-type: inline-size;`. 2) Adds `@container (min-width: 350px)` where `.metric-card` displays `flex-direction: row;`.",
+              "objectiveId": "web-container-queries",
+              "starterCode": ".metric-card-container {\n  container-type: inline-size;\n}\n\n@container (min-width: 350px) {\n  .metric-card {\n    flex-direction: row;\n  }\n}"
+            },
+            "checkpoint": {
+              "prompt": "What is the fundamental architectural benefit of Container Queries over standard Media Queries?",
+              "answer": "Container queries enable truly modular, reusable components that adapt dynamically based on the width of their parent container rather than the browser window."
+            }
+          },
+          {
+            "id": "web-capstone-responsive-dashboard",
+            "order": 12,
+            "title": "Responsive Engineering Dashboard Capstone",
+            "summary": "Synthesize semantic landmarks, CSS Grid areas, custom property tokens, and WCAG accessibility in a production dashboard.",
+            "type": "assessment",
+            "objectiveIds": [
+              "web-capstone-dashboard"
+            ],
+            "prerequisiteLessonIds": [
+              "web-container-queries"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "html",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-web-capstone-dash",
+              "title": "Build an accessible responsive telemetry dashboard layout",
+              "difficulty": "Applied",
+              "expectedOutcome": "Responsive telemetry dashboard layout with custom properties.",
+              "prompt": "Write CSS for `.telemetry-dashboard` using CSS Grid: default to `grid-template-columns: 1fr;` on mobile, and within `@media (min-width: 768px)` apply `grid-template-columns: 260px 1fr;` with `gap: var(--space-md, 16px);`.",
+              "objectiveId": "web-capstone-dashboard",
+              "starterCode": ".telemetry-dashboard {\n  display: grid;\n  grid-template-columns: 1fr;\n  gap: var(--space-md, 16px);\n}\n\n@media (min-width: 768px) {\n  .telemetry-dashboard {\n    grid-template-columns: 260px 1fr;\n  }\n}"
+            },
+            "checkpoint": {
+              "prompt": "Why is a mobile-first media query architecture (@media (min-width: ...)) preferred over desktop-first?",
+              "answer": "Mobile devices have lower computing power; mobile-first ensures mobile browsers parse simpler baseline styles without overriding desktop rules."
+            }
+          }
+        ]
       }
     ]
   },
@@ -3745,7 +5501,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
     "id": "dsa-mastery",
     "subjectId": "algorithms-dsa",
     "title": "Data Structures & Algorithms Mastery",
-    "description": "Big-O, two pointers, sliding windows, monotonic stacks, binary trees, graph BFS, and dynamic programming.",
+    "description": "Big-O, two pointers, sliding windows, monotonic stacks, binary trees, graph BFS, heaps, and dynamic programming.",
     "level": "Developing",
     "version": "1.0.0",
     "prerequisites": [
@@ -3791,6 +5547,30 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "dsa-dp",
         "title": "Solve optimization problems with overlapping subproblems using memoization and bottom-up dynamic programming."
+      },
+      {
+        "id": "dsa-doubly-linked",
+        "title": "Implement doubly linked list operations with sentinel head and tail nodes."
+      },
+      {
+        "id": "dsa-ring-buffer",
+        "title": "Construct fixed-capacity circular queues and ring buffers for telemetry streaming."
+      },
+      {
+        "id": "dsa-bst-traversal",
+        "title": "Execute BST insertions, searches, and sorted in-order traversals in O(H) time."
+      },
+      {
+        "id": "dsa-heaps-pq",
+        "title": "Build binary heaps with sift-up and sift-down operations to maintain priority queue invariants."
+      },
+      {
+        "id": "dsa-merge-sort",
+        "title": "Implement O(N log N) divide-and-conquer merge sort and evaluate recurrence trees."
+      },
+      {
+        "id": "dsa-capstone",
+        "title": "Synthesize non-linear data structures and optimal algorithmic design in a capstone assessment."
       }
     ],
     "learningOutcomes": [
@@ -3799,9 +5579,10 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Utilize monotonic stack invariants to solve Next Greater Element problems.",
       "Leverage O(1) hash maps to eliminate quadratic nested iterations.",
       "Traverse binary search trees and implement BFS shortest path in graphs.",
-      "Solve optimization problems with overlapping subproblems using dynamic programming."
+      "Solve optimization problems with overlapping subproblems using dynamic programming.",
+      "Implement circular buffers, binary heaps, and divide-and-conquer sorting algorithms."
     ],
-    "estimatedDurationMinutes": 480,
+    "estimatedDurationMinutes": 660,
     "publicationStatus": "published",
     "modules": [
       {
@@ -4103,6 +5884,200 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "dsa-module-advanced-structures",
+        "order": 5,
+        "title": "Advanced Structures & Algorithmic Paradigms",
+        "summary": "Doubly linked lists, circular ring buffers, BST operations, binary heaps, divide-and-conquer merge sort, and capstone assessment.",
+        "lessons": [
+          {
+            "id": "dsa-doubly-linked-list",
+            "order": 11,
+            "title": "Doubly Linked Lists and Sentinel Nodes",
+            "summary": "Eliminate edge-case null pointer checks using dummy head and tail sentinel nodes in doubly linked lists.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "dsa-doubly-linked"
+            ],
+            "prerequisiteLessonIds": [
+              "dsa-dynamic-programming-1d"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-dsa-dll-push-back",
+              "title": "Implement pushBack and popBack on a doubly linked list",
+              "difficulty": "Developing",
+              "expectedOutcome": "Manage pointers in a sentinel-backed doubly linked list.",
+              "prompt": "Implement a DoublyLinkedList class with sentinel head and tail. Add pushBack(val) that appends a node before tail, and popBack() that removes the node before tail and returns its val (or null if empty). In your code, pushBack 10, pushBack 20, call popBack(), and print 'Popped: ' followed by the returned value.",
+              "objectiveId": "dsa-doubly-linked",
+              "starterCode": "class Node {\n  constructor(val) { this.val = val; this.prev = null; this.next = null; }\n}\nclass DoublyLinkedList {\n  // Implement constructor, pushBack(val), and popBack()\n}\n\n// pushBack 10, 20, popBack, and print\n"
+            },
+            "checkpoint": {
+              "prompt": "How do sentinel (dummy) nodes simplify linked list implementations?",
+              "answer": "Sentinels ensure that head and tail pointers are never null, eliminating boundary checks during insertions and deletions."
+            }
+          },
+          {
+            "id": "dsa-circular-ring-buffer",
+            "order": 12,
+            "title": "Circular Queues and Ring Buffers",
+            "summary": "Implement fixed-capacity FIFO circular buffers using modular arithmetic for zero-allocation streaming.",
+            "type": "practical-exercise",
+            "objectiveIds": [
+              "dsa-ring-buffer"
+            ],
+            "prerequisiteLessonIds": [
+              "dsa-doubly-linked-list"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-dsa-ring-sim",
+              "title": "Implement a fixed-size circular queue",
+              "difficulty": "Developing",
+              "expectedOutcome": "Implement circular FIFO indexing with modular bounds.",
+              "prompt": "Implement a CircularQueue class with constructor(capacity) and methods enqueue(val) (returns false if full, else writes val and returns true) and dequeue() (returns null if empty, else reads oldest val and advances head). Instantiate with capacity 3, enqueue 10, 20, 30, dequeue once, enqueue 40, and print 'Queue: ' followed by dequeue(), dequeue(), dequeue() joined by comma.",
+              "objectiveId": "dsa-ring-buffer",
+              "starterCode": "class CircularQueue {\n  // Implement constructor, enqueue, and dequeue\n}\n\n// Run operations and print Queue: 20,30,40\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is a circular ring buffer preferred over a standard array queue with unshift()?",
+              "answer": "In a flat array, unshift() requires shifting all N elements (O(N) time). A ring buffer enqueues and dequeues in O(1) time with zero element shifting."
+            }
+          },
+          {
+            "id": "dsa-bst-operations",
+            "order": 13,
+            "title": "Binary Search Tree Insertion and Traversals",
+            "summary": "Maintain BST ordering invariants, insert nodes in O(log N) average time, and generate sorted arrays via in-order traversal.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "dsa-bst-traversal"
+            ],
+            "prerequisiteLessonIds": [
+              "dsa-circular-ring-buffer"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-dsa-bst-inorder",
+              "title": "Build a BST and output in-order sorted traversal",
+              "difficulty": "Developing",
+              "expectedOutcome": "Insert into a BST and collect nodes in ascending order using in-order traversal.",
+              "prompt": "Implement a BST with an insert(val) method and an inOrder() method returning an array of values. Insert values [40, 20, 60, 10, 30, 50, 70] into the tree, call inOrder(), and print 'Sorted: ' followed by the comma-separated sorted elements.",
+              "objectiveId": "dsa-bst-traversal",
+              "starterCode": "class BST {\n  // Implement insert(val) and inOrder()\n}\n\n// Insert values and print sorted\n"
+            },
+            "checkpoint": {
+              "prompt": "Which tree traversal order visits nodes of a Binary Search Tree in strictly ascending order?",
+              "answer": "In-Order Traversal (Left, Root, Right)."
+            }
+          },
+          {
+            "id": "dsa-binary-heap",
+            "order": 14,
+            "title": "Binary Heaps and Priority Queues",
+            "summary": "Implement array-backed binary min-heaps with sift-up and sift-down operations for O(1) peek and O(log N) extraction.",
+            "type": "practical-exercise",
+            "objectiveIds": [
+              "dsa-heaps-pq"
+            ],
+            "prerequisiteLessonIds": [
+              "dsa-bst-operations"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-dsa-heap-extract",
+              "title": "Implement push and popMin on a MinHeap",
+              "difficulty": "Developing",
+              "expectedOutcome": "Implement min-heap priority queue insertion and extraction.",
+              "prompt": "Implement a MinHeap class with push(val) (sifts up) and popMin() (swaps root with last, pops last, and sifts down root). Insert [25, 12, 35, 5, 18], then call popMin() twice. Print 'Extracted: ' followed by the two popped values separated by comma.",
+              "objectiveId": "dsa-heaps-pq",
+              "starterCode": "class MinHeap {\n  // Implement push(val) and popMin()\n}\n\n// Insert values and print Extracted: 5,12\n"
+            },
+            "checkpoint": {
+              "prompt": "In a 0-indexed array representation of a binary heap, what is the formula to find the parent index of element i?",
+              "answer": "Math.floor((i - 1) / 2)."
+            }
+          },
+          {
+            "id": "dsa-merge-sort-dnc",
+            "order": 15,
+            "title": "Divide-and-Conquer: Merge Sort",
+            "summary": "Recursively partition arrays, merge sorted subarrays in linear time, and analyze O(N log N) recurrence trees.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "dsa-merge-sort"
+            ],
+            "prerequisiteLessonIds": [
+              "dsa-binary-heap"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-dsa-merge-sort-full",
+              "title": "Implement recursive merge sort",
+              "difficulty": "Developing",
+              "expectedOutcome": "Implement the complete divide-and-conquer merge sort algorithm.",
+              "prompt": "Write a complete mergeSort(arr) function that recursively sorts an array of numbers using divide-and-conquer. Test with unsorted = [38, 27, 43, 3, 9, 82, 10] and print 'Sorted: ' followed by the sorted array joined by comma.",
+              "objectiveId": "dsa-merge-sort",
+              "starterCode": "function mergeSort(arr) {\n  // Implement mergeSort\n}\n\nconst unsorted = [38, 27, 43, 3, 9, 82, 10];\n// Sort and print output\n"
+            },
+            "checkpoint": {
+              "prompt": "What is the space complexity of standard recursive merge sort on arrays, and why?",
+              "answer": "O(N), because temporary arrays must be allocated to hold elements during the merge step."
+            }
+          },
+          {
+            "id": "dsa-capstone-assessment",
+            "order": 16,
+            "title": "Algorithmic Mastery Assessment",
+            "summary": "Synthesize frequency hashing, heaps, and monotonic pointers to solve complex algorithmic problems under asymptotic constraints.",
+            "type": "assessment",
+            "objectiveIds": [
+              "dsa-capstone"
+            ],
+            "prerequisiteLessonIds": [
+              "dsa-merge-sort-dnc"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-dsa-top-k-freq",
+              "title": "Find top-k most frequent elements in O(N log N) time",
+              "difficulty": "Applied",
+              "expectedOutcome": "Extract the top-k most frequent elements using frequency hashing and sorting.",
+              "prompt": "Implement a function topKFrequent(nums, k) that returns the k most frequent elements in nums sorted in descending order of frequency. If two numbers have equal frequency, sort them in descending numerical order. Test with nums = [1, 1, 1, 2, 2, 3, 4, 4, 4, 4] and k = 2. Print 'Top 2: ' followed by the result joined by comma.",
+              "objectiveId": "dsa-capstone",
+              "starterCode": "function topKFrequent(nums, k) {\n  // Implement topKFrequent\n}\n\nconst nums = [1, 1, 1, 2, 2, 3, 4, 4, 4, 4];\n// Call and print Top 2: 4,1\n"
+            },
+            "checkpoint": {
+              "prompt": "How can the top-K frequent elements problem be optimized from O(N log N) to O(N log K)?",
+              "answer": "By pushing elements into a Min-Heap of size K while iterating through the frequency map, maintaining only the K highest frequencies."
+            }
+          }
+        ]
       }
     ]
   },
@@ -4110,7 +6085,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
     "id": "prompt-engineering",
     "subjectId": "ai-prompting",
     "title": "Applied Prompt Architecture & LLM Systems",
-    "description": "Tokenization, temperature sampling, few-shot patterns, JSON schemas, ReAct loops, and RAG guardrails.",
+    "description": "Tokenization, temperature sampling, few-shot patterns, JSON schemas, ReAct loops, RAG guardrails, and adversarial red-teaming.",
     "level": "Beginner",
     "version": "1.0.0",
     "prerequisites": [
@@ -4140,6 +6115,14 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "prompt-rag-guardrails",
         "title": "Ground model responses using retrieved context chunks and mitigate prompt injection attacks."
+      },
+      {
+        "id": "prompt-eval-matrix",
+        "title": "Design automated prompt evaluation rubrics and measure consistency across model variants."
+      },
+      {
+        "id": "prompt-redteaming",
+        "title": "Implement system prompt defense perimeters against jailbreaks, extraction, and delimiter injection."
       }
     ],
     "learningOutcomes": [
@@ -4148,9 +6131,10 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Design balanced few-shot in-context learning prompts.",
       "Enforce deterministic JSON outputs using JSON Schema definitions.",
       "Implement Chain-of-Thought reasoning and ReAct agent loops.",
-      "Ground model responses with retrieved context chunks and defend against prompt injection."
+      "Ground model responses with retrieved context chunks and defend against prompt injection.",
+      "Construct quantitative prompt evaluation harnesses and protect endpoints against jailbreak attacks."
     ],
-    "estimatedDurationMinutes": 300,
+    "estimatedDurationMinutes": 400,
     "publicationStatus": "published",
     "modules": [
       {
@@ -4336,6 +6320,76 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "prompt-module-evaluation-redteaming",
+        "order": 4,
+        "title": "System Evaluation, Jailbreak Defense & Red-Teaming",
+        "summary": "Automated prompt evaluation matrices, LLM-as-a-judge, system prompt hardening, and adversarial jailbreak defense.",
+        "lessons": [
+          {
+            "id": "prompt-eval-benchmarking",
+            "order": 7,
+            "title": "Automated Prompt Evaluation & LLM-as-a-Judge",
+            "summary": "Build quantitative evaluation harnesses using assertion suites, regex extractors, and LLM-as-a-judge rubrics.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "prompt-eval-matrix"
+            ],
+            "prerequisiteLessonIds": [
+              "prompt-rag-grounding-guardrails"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "python",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-prompt-eval-harness",
+              "title": "Build an automated prompt response evaluation scorer",
+              "difficulty": "Developing",
+              "expectedOutcome": "Evaluate prompt output against programmatic criteria.",
+              "prompt": "Write a Python function `score_telemetry_output(text: str) -> float` that checks 3 criteria: 1) Contains 'STATUS:' (weight 0.4). 2) Contains 'NODE:' (weight 0.3). 3) Total length is under 50 characters (weight 0.3). Return the total score rounded to 2 decimal places. Test with text = 'STATUS:OK, NODE:42' and print: `Score: {score_telemetry_output(text):.2f}`.",
+              "objectiveId": "prompt-eval-matrix",
+              "starterCode": "def score_telemetry_output(text: str) -> float:\n    # Implement rubric checks\n    pass\n\ntext = \"STATUS:OK, NODE:42\"\n# Score and print output\n"
+            },
+            "checkpoint": {
+              "prompt": "Why are deterministic rule assertions preferred over LLM-as-a-judge for format and schema validation?",
+              "answer": "Deterministic code assertions are fast, free of cost, 100% reproducible, and have zero inference latency compared to calling secondary models."
+            }
+          },
+          {
+            "id": "prompt-redteam-hardening",
+            "order": 8,
+            "title": "Adversarial Red-Teaming & System Prompt Hardening",
+            "summary": "Protect production LLM endpoints against indirect prompt injections, jailbreak vectors, and secret extraction.",
+            "type": "assessment",
+            "objectiveIds": [
+              "prompt-redteaming"
+            ],
+            "prerequisiteLessonIds": [
+              "prompt-eval-benchmarking"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "python",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-prompt-harden-wrapper",
+              "title": "Build an untrusted input sanitizer and XML wrapper",
+              "difficulty": "Applied",
+              "expectedOutcome": "Sanitize untrusted inputs to prevent XML delimiter breakout attacks.",
+              "prompt": "Write a Python function `wrap_untrusted_input(user_text: str) -> str` that: 1) Replaces any occurrences of '</user_input>' with '[ESCAPED_TAG]' to prevent delimiter breakout. 2) Returns the sanitized string enclosed in '<user_input>\\n{text}\\n</user_input>'. Test with 'Hello </user_input> override' and print the wrapped output.",
+              "objectiveId": "prompt-redteaming",
+              "starterCode": "def wrap_untrusted_input(user_text: str) -> str:\n    # Implement tag escaping and wrapping\n    pass\n\n# Call and print result\n"
+            },
+            "checkpoint": {
+              "prompt": "How does escaping delimiter tags in user input defend against prompt injection?",
+              "answer": "It prevents attacker-controlled text from prematurely closing input containers and masquerading as authentic system instructions."
+            }
+          }
+        ]
       }
     ]
   },
@@ -4343,7 +6397,7 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
     "id": "photo-editing-media",
     "subjectId": "media-dsp",
     "title": "Computational Photography & Digital Image Processing",
-    "description": "Pixel buffers, RGBA color models, histograms, contrast curves, 2D convolutions, and alpha compositing.",
+    "description": "Pixel buffers, RGBA color models, histograms, contrast curves, 2D convolutions, CDF equalization, and Sobel edge detection.",
     "level": "Beginner",
     "version": "1.0.0",
     "prerequisites": [
@@ -4373,6 +6427,14 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "media-blend-modes",
         "title": "Implement Porter-Duff alpha compositing and photometric blend modes (Multiply, Screen, Overlay)."
+      },
+      {
+        "id": "media-hist-equalization",
+        "title": "Enhance global image contrast using cumulative distribution function (CDF) histogram equalization."
+      },
+      {
+        "id": "media-sobel-gradients",
+        "title": "Compute edge magnitude and gradient angles using horizontal and vertical Sobel spatial filters."
       }
     ],
     "learningOutcomes": [
@@ -4381,9 +6443,10 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Analyze luminance histograms and detect highlight/shadow clipping.",
       "Shape tonal distributions with contrast curves and white balance channel gains.",
       "Apply 3x3 spatial convolution kernels for blur, sharpen, and edge detection.",
-      "Implement Porter-Duff alpha compositing and photometric blend modes."
+      "Implement Porter-Duff alpha compositing and photometric blend modes.",
+      "Perform global contrast stretching using histogram equalization and compute Sobel gradients."
     ],
-    "estimatedDurationMinutes": 300,
+    "estimatedDurationMinutes": 400,
     "publicationStatus": "published",
     "modules": [
       {
@@ -4599,6 +6662,86 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             }
           }
         ]
+      },
+      {
+        "id": "media-module-frequency-equalization",
+        "order": 4,
+        "title": "Histogram Equalization & Kernel Frequency Filters",
+        "summary": "Cumulative distribution function (CDF) histogram equalization and Sobel gradient edge detection kernels.",
+        "lessons": [
+          {
+            "id": "media-histogram-equalization",
+            "order": 7,
+            "title": "Histogram Equalization & Contrast Stretching",
+            "summary": "Enhance global image contrast using cumulative distribution function (CDF) histogram equalization.",
+            "type": "guided-coding",
+            "objectiveIds": [
+              "media-hist-equalization"
+            ],
+            "prerequisiteLessonIds": [
+              "media-blend-modes-compositing"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-media-cdf-equalize",
+              "title": "Equalize a 4-pixel grayscale image",
+              "difficulty": "Developing",
+              "expectedOutcome": "Compute normalized histogram equalization mapping.",
+              "prompt": "Given 4 grayscale pixels: [50, 50, 100, 200]. Compute the equalized value of pixel 100: with cdf(50)=2, cdf(100)=3, cdf(200)=4, cdf_min=2, and N=4, apply formula: Math.round(((3 - 2) / (4 - 2)) * 255). Write a script that computes this and prints 'Equalized: ' followed by the result.",
+              "objectiveId": "media-hist-equalization",
+              "starterCode": "// Compute equalized value and print Equalized: 128\nconst v = Math.round(((3 - 2) / (4 - 2)) * 255);\nconsole.log(`Equalized: ${v}`);\n"
+            },
+            "checkpoint": {
+              "prompt": "What mathematical function transforms an arbitrary input histogram into a uniform flat distribution?",
+              "answer": "The normalized Cumulative Distribution Function (CDF) of the input image."
+            },
+            "interactiveDemo": {
+              "kind": "image-lab",
+              "title": "Histogram Equalization Lab",
+              "description": "Interactive tone mapping visualizer stretching image dynamic range with CDF curves."
+            }
+          },
+          {
+            "id": "media-sobel-edge-detection",
+            "order": 8,
+            "title": "Sobel Edge Detection & Gradient Vector Fields",
+            "summary": "Compute horizontal and vertical intensity gradients (Gx, Gy) to detect spatial edges.",
+            "type": "assessment",
+            "objectiveIds": [
+              "media-sobel-gradients"
+            ],
+            "prerequisiteLessonIds": [
+              "media-histogram-equalization"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-media-sobel-calc",
+              "title": "Compute Sobel Gx and gradient magnitude",
+              "difficulty": "Applied",
+              "expectedOutcome": "Calculate directional spatial gradients and edge magnitudes.",
+              "prompt": "Given a 3x3 pixel neighborhood: [[10, 10, 50], [10, 10, 50], [10, 10, 50]]. Compute Gx using kernel [[-1, 0, 1], [-2, 0, 2], [-1, 0, 1]]. Result: (-10 + 50) + (-20 + 100) + (-10 + 50) = 40 + 80 + 40 = 160. Gy is 0. Print 'Gx: 160, Magnitude: 160'.",
+              "objectiveId": "media-sobel-gradients",
+              "starterCode": "// Calculate Gx and magnitude and print Gx: 160, Magnitude: 160\nconst gx = 160;\nconst mag = 160;\nconsole.log(`Gx: ${gx}, Magnitude: ${mag}`);\n"
+            },
+            "checkpoint": {
+              "prompt": "Why does the Sobel operator apply weights of [-1, 0, 1] with a center row of [-2, 0, 2] instead of a simple difference [-1, 0, 1]?",
+              "answer": "The larger center weight incorporates a 1D Gaussian smoothing filter perpendicular to the derivative direction, reducing sensitivity to high-frequency image noise."
+            },
+            "interactiveDemo": {
+              "kind": "image-lab",
+              "title": "Sobel Gradient Filter Lab",
+              "description": "Interactive visualizer displaying horizontal, vertical, and combined gradient magnitude edge maps."
+            }
+          }
+        ]
       }
     ]
   },
@@ -4645,6 +6788,30 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       {
         "id": "circuits-latches-sequential",
         "title": "Trace edge-triggered memory storage and feedback loops in SR Latches and D Flip-Flops."
+      },
+      {
+        "id": "circuits-kmap-3var",
+        "title": "Simplify 3-variable Boolean equations into minimal Sum-of-Products (SOP) forms using Karnaugh maps."
+      },
+      {
+        "id": "circuits-kmap-4var",
+        "title": "Minimize 4-variable logic networks and leverage don't-care conditions with K-maps."
+      },
+      {
+        "id": "circuits-jk-flip-flop",
+        "title": "Construct JK Flip-Flops and evaluate toggle mode and race-around conditions."
+      },
+      {
+        "id": "circuits-ripple-counter",
+        "title": "Design multi-bit asynchronous binary ripple counters using cascaded toggle stages."
+      },
+      {
+        "id": "circuits-decade-counter",
+        "title": "Implement synchronous decade and modulo-N counters with reset feedback logic."
+      },
+      {
+        "id": "circuits-fsm-sequence",
+        "title": "Synthesize finite state machine state transition diagrams and sequence detector logic."
       }
     ],
     "learningOutcomes": [
@@ -4653,9 +6820,11 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
       "Formulate and minimize Boolean logic expressions using truth tables and De Morgan's laws.",
       "Synthesize arbitrary logic circuits using universal NAND and NOR gates.",
       "Construct combinational arithmetic units including Half Adders, Full Adders, and Multiplexers.",
-      "Explain edge-triggered state retention, clock distribution, and memory storage in D Flip-Flops."
+      "Explain edge-triggered state retention, clock distribution, and memory storage in D Flip-Flops.",
+      "Minimize multi-variable logic using Karnaugh maps and leverage don't-care conditions.",
+      "Design sequential counters and finite state machines for sequence detection."
     ],
-    "estimatedDurationMinutes": 300,
+    "estimatedDurationMinutes": 480,
     "publicationStatus": "published",
     "modules": [
       {
@@ -4964,6 +7133,238 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "kind": "circuit",
               "title": "D Flip-Flop Register Cell",
               "description": "Observe edge-triggered state retention and clock-synchronized memory updates."
+            }
+          }
+        ]
+      },
+      {
+        "id": "circuits-kmap-minimization",
+        "order": 4,
+        "title": "Boolean minimization with Karnaugh maps",
+        "summary": "3-variable and 4-variable K-maps, prime implicants, torus wrapping, and don't-care conditions.",
+        "lessons": [
+          {
+            "id": "circuits-kmap-3var",
+            "order": 9,
+            "title": "Karnaugh Maps: 3-Variable Boolean Minimization",
+            "summary": "Minimize 3-variable logic equations into optimal Sum-of-Products forms using adjacent Gray code grouping.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-kmap-3var"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-latches-flip-flops"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-kmap3-eval",
+              "title": "Implement a minimized 3-variable logic function",
+              "difficulty": "Developing",
+              "expectedOutcome": "Evaluate simplified Boolean functions derived from 3-variable Karnaugh map loops.",
+              "prompt": "Given minterms m(3, 5, 7) for inputs A, B, C (where m = A*4 + B*2 + C), simplification yields F = A*C + B*C. Write a function solveKMap(a, b, c) that returns 1 when F is true and 0 otherwise. Evaluate and print solveKMap(1, 0, 1) and solveKMap(0, 1, 0) in format 'F(1,0,1)=X, F(0,1,0)=Y'.",
+              "objectiveId": "circuits-kmap-3var",
+              "starterCode": "function solveKMap(a, b, c) {\n  // Implement simplified SOP\n}\n\n// Print evaluation\n"
+            },
+            "checkpoint": {
+              "prompt": "Why must K-map column headers use Gray code (00, 01, 11, 10) instead of binary (00, 01, 10, 11)?",
+              "answer": "Gray code ensures that adjacent physical cells differ by exactly one single binary variable, allowing terms like A*B*C + A*B*C' to simplify to A*B."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "3-Variable K-Map Visualizer",
+              "description": "Interactive 2x4 Gray code grid with adjacent cell loop grouping."
+            }
+          },
+          {
+            "id": "circuits-kmap-4var",
+            "order": 10,
+            "title": "4-Variable K-Maps and Don't-Care Conditions",
+            "summary": "Group 16-cell Karnaugh maps across torus edges and leverage don't-care (X) minterms to minimize gate counts.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-kmap-4var"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-kmap-3var"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-kmap4-eval",
+              "title": "Model a BCD valid digit detector with don't cares",
+              "difficulty": "Developing",
+              "expectedOutcome": "Determine valid BCD ranges using 4-variable logic evaluation.",
+              "prompt": "A BCD valid detector outputs 1 for inputs 0..9 and 0 for invalid inputs 10..15. Using inputs a, b, c, d representing 4-bit numbers (weight 8, 4, 2, 1), write isValidBcd(a, b, c, d) returning 1 if value <= 9, else 0. Evaluate with (1, 0, 0, 1) [9] and (1, 1, 0, 0) [12] and print 'BCD(9)=X, BCD(12)=Y'.",
+              "objectiveId": "circuits-kmap-4var",
+              "starterCode": "function isValidBcd(a, b, c, d) {\n  // Implement BCD range check\n}\n\n// Print output\n"
+            },
+            "checkpoint": {
+              "prompt": "Can a don't-care (X) condition be left uncircled in a K-map?",
+              "answer": "Yes. A don't-care is only circled if doing so enlarges a group of 1s (reducing literal count); it is never required to be covered on its own."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "4-Variable K-Map & Torus Solver",
+              "description": "16-cell K-map visualizer showing corner and edge wrap-around groupings."
+            }
+          }
+        ]
+      },
+      {
+        "id": "circuits-counters-fsm",
+        "order": 5,
+        "title": "Counters, registers, and finite state machines",
+        "summary": "JK flip-flops, asynchronous ripple counters, BCD decade counters, and sequence-detecting FSMs.",
+        "lessons": [
+          {
+            "id": "circuits-jk-flip-flop",
+            "order": 11,
+            "title": "JK Flip-Flops and Toggle Mode",
+            "summary": "Eliminate forbidden latch states with JK flip-flops and understand clock toggle mode (T = 1).",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-jk-flip-flop"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-kmap-4var"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-jk-sim",
+              "title": "Model a toggling JK flip-flop state machine",
+              "difficulty": "Developing",
+              "expectedOutcome": "Trace state transitions of a JK flip-flop through set and successive toggle pulses.",
+              "prompt": "Implement a class JKFlipFlop with initial state this.q = 0. Add method tick(j, k) that executes on a clock pulse: if j=0,k=1 q=0; if j=1,k=0 q=1; if j=1,k=1 q=1-q; if j=0,k=0 q stays unchanged. Initialize jk = new JKFlipFlop(), call tick(1, 0) [set], tick(1, 1) [toggle], and tick(1, 1) [toggle]. Print 'Q states: ' followed by the 3 output values joined by comma.",
+              "objectiveId": "circuits-jk-flip-flop",
+              "starterCode": "class JKFlipFlop {\n  // Implement constructor and tick(j, k)\n}\n\n// Run transitions and print Q states\n"
+            },
+            "checkpoint": {
+              "prompt": "What occurs in a JK flip-flop when both J and K inputs are held at logic HIGH during a clock pulse?",
+              "answer": "The output toggles (inverts) its current state, complementing Q from 0 to 1 or 1 to 0."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "JK Flip-Flop Simulator",
+              "description": "Interactive JK flip-flop with J, K, and clock pulse controls."
+            }
+          },
+          {
+            "id": "circuits-ripple-counter",
+            "order": 12,
+            "title": "Asynchronous Ripple Counters (MOD-16)",
+            "summary": "Cascade toggle flip-flops where each stage's output clocks the subsequent stage to build binary counters.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-ripple-counter"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-jk-flip-flop"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-ripple-sim",
+              "title": "Simulate a 4-bit binary ripple counter",
+              "difficulty": "Developing",
+              "expectedOutcome": "Model a 4-bit ripple counter and output zero-padded binary values.",
+              "prompt": "Create a class RippleCounter with property count = 0. Each call to pulse() increments count by 1 modulo 16 and returns its 4-bit binary representation padded with zeros (e.g. '0101'). Instantiate counter, pulse it 10 times, and print 'Binary at 10: ' followed by the 10th pulse output.",
+              "objectiveId": "circuits-ripple-counter",
+              "starterCode": "class RippleCounter {\n  // Implement constructor and pulse()\n}\n\n// Pulse 10 times and print output\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is a 4-stage toggle counter termed an 'asynchronous' ripple counter?",
+              "answer": "The stages do not share a common clock; each stage is clocked by the preceding stage's output, causing the clock pulse to ripple asynchronously across the chain."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "4-Bit Ripple Counter Visualizer",
+              "description": "Interactive 4-bit binary counter stepping through 0000 to 1111 with LED outputs."
+            }
+          },
+          {
+            "id": "circuits-decade-counter",
+            "order": 13,
+            "title": "Synchronous Decade and Modulo-N Counters",
+            "summary": "Design Modulo-10 (BCD) counters with feedback reset gates (7490 architecture) to drive decimal displays.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-decade-counter"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-ripple-counter"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-decade-sim",
+              "title": "Implement a BCD decade counter with carry out",
+              "difficulty": "Developing",
+              "expectedOutcome": "Model a modulo-10 BCD counter with rollover and carry pulse emission.",
+              "prompt": "Create a class BcdCounter with properties count = 0 and carry = 0. On each step(), increment count. If count reaches 10, set count = 0 and carry = 1, otherwise set carry = 0. Step the counter 25 times and print 'Count: {count}, Carry: {carry}'.",
+              "objectiveId": "circuits-decade-counter",
+              "starterCode": "class BcdCounter {\n  // Implement constructor and step()\n}\n\n// Step 25 times and print Count and Carry\n"
+            },
+            "checkpoint": {
+              "prompt": "Which two flip-flop output bits must be decoded by a NAND gate to reset a 4-bit binary counter into a decade (MOD-10) counter?",
+              "answer": "Q3 (weight 8) and Q1 (weight 2), because 8 + 2 = 10 (binary 1010)."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "BCD Decade Counter (MOD-10)",
+              "description": "Counter cycling 0000 to 1001 with NAND reset gate triggering at count 1010."
+            }
+          },
+          {
+            "id": "circuits-fsm-sequence-detector",
+            "order": 14,
+            "title": "Finite State Machine Design & Sequence Detection",
+            "summary": "Synthesize Moore and Mealy finite state machines to detect overlapping binary bit sequences (1011).",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circuits-fsm-sequence"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-decade-counter"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-fsm-sim",
+              "title": "Build a sequence detector FSM for pattern 1011",
+              "difficulty": "Applied",
+              "expectedOutcome": "Implement an overlapping sequence detector finite state machine.",
+              "prompt": "Implement a class SequenceDetector with consume(bit) returning 1 when the 4-bit sequence 1,0,1,1 has been completed, else 0. Feed bit stream [1, 0, 1, 1, 0, 1, 1] through the detector. Sum the total number of detections and print 'Total detections: ' followed by the sum.",
+              "objectiveId": "circuits-fsm-sequence",
+              "starterCode": "class SequenceDetector {\n  // Implement FSM states\n}\n\n// Feed stream and count detections\n"
+            },
+            "checkpoint": {
+              "prompt": "In an overlapping sequence detector for pattern 1011, why does the FSM transition to state S1 (rather than S0) after a match?",
+              "answer": "The trailing '1' of the completed '1011' sequence can simultaneously serve as the first '1' of the next incoming sequence."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Sequence Detector FSM Visualizer",
+              "description": "Interactive state diagram tracking bit transitions between S0, S1, S2, and S3."
             }
           }
         ]

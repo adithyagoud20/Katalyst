@@ -43,7 +43,7 @@ describe("authored learning catalog", () => {
       publicationStatus: "published",
     });
     expect(cProgrammingPath.learningOutcomes.length).toBeGreaterThan(0);
-    expect(flattenLessons(cProgrammingPath)).toHaveLength(16);
+    expect(flattenLessons(cProgrammingPath)).toHaveLength(22);
     for (const { lesson } of flattenLessons(cProgrammingPath)) {
       expect(lesson.content).toContain("~~~c");
       expect(lesson.objectiveIds).toContain(lesson.exercise.objectiveId);
@@ -88,13 +88,15 @@ describe("authored learning catalog", () => {
       "source-to-output", "variables-and-types", "input-output", "operators", "if-else", "for-loop",
       "functions", "arrays", "strings", "pointers", "structures-unions", "file-handling", "practical-programming",
       "bitwise-registers", "dynamic-memory", "function-pointers",
+      "recursion-callstack", "preprocessor-macros", "structures-padding-alignment", "error-handling-errno",
+      "defensive-programming-assert", "c-foundations-capstone-quiz",
     ]);
   });
 
   it("uses explicit, consecutive module and lesson ordering with earlier prerequisites", () => {
     const entries = flattenLessons(cProgrammingPath);
-    expect(cProgrammingPath.modules.map((module) => module.order)).toEqual([1, 2, 3, 4, 5, 6]);
-    expect(entries.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 16 }, (_, index) => index + 1));
+    expect(cProgrammingPath.modules.map((module) => module.order)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(entries.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 22 }, (_, index) => index + 1));
     for (const [index, { lesson }] of entries.entries()) {
       for (const prerequisiteId of lesson.prerequisiteLessonIds) {
         expect(entries.findIndex(({ lesson: candidate }) => candidate.id === prerequisiteId)).toBeLessThan(index);
@@ -182,7 +184,7 @@ describe("authored learning catalog", () => {
       }
     }
 
-    expect(starterCount).toBe(18);
+    expect(starterCount).toBe(hardwareCourses.reduce((acc, c) => acc + flattenLessons(c).length, 0));
   });
 
   it("supports all lesson types, theory sections, code examples, demos, and progressive hints", () => {
@@ -283,15 +285,15 @@ describe("Python Programming Foundations course", () => {
     const validation = safeValidateCourse(pythonProgrammingPath);
     expect(validation.success).toBe(true);
     if (validation.success) {
-      expect(validation.data.modules).toHaveLength(7);
+      expect(validation.data.modules).toHaveLength(8);
     }
   });
 
-  it("validates all 19 Python lessons, module ordering, and prerequisite DAG constraints", () => {
+  it("validates all 25 Python lessons, module ordering, and prerequisite DAG constraints", () => {
     const pythonLessons = flattenLessons(pythonProgrammingPath);
-    expect(pythonLessons).toHaveLength(19);
-    expect(pythonProgrammingPath.modules.map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7]);
-    expect(pythonLessons.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 19 }, (_, i) => i + 1));
+    expect(pythonLessons).toHaveLength(25);
+    expect(pythonProgrammingPath.modules.map((m) => m.order)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(pythonLessons.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 25 }, (_, i) => i + 1));
 
     for (const [index, { lesson }] of pythonLessons.entries()) {
       const lessonValidation = safeValidateLesson(lesson);
@@ -325,11 +327,11 @@ describe("Python Programming Foundations course", () => {
       const validation = safeValidateCourse(javascriptProgrammingPath);
       expect(validation.success).toBe(true);
       if (validation.success) {
-        expect(validation.data.modules).toHaveLength(4);
+        expect(validation.data.modules).toHaveLength(5);
       }
       const lessons = flattenLessons(javascriptProgrammingPath);
-      expect(lessons).toHaveLength(10);
-      expect(lessons.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 10 }, (_, i) => i + 1));
+      expect(lessons).toHaveLength(14);
+      expect(lessons.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
 
       for (const [index, { lesson }] of lessons.entries()) {
         const lessonValidation = safeValidateLesson(lesson);
@@ -350,11 +352,11 @@ describe("Python Programming Foundations course", () => {
       const validation = safeValidateCourse(digitalCircuitsPath);
       expect(validation.success).toBe(true);
       if (validation.success) {
-        expect(validation.data.modules).toHaveLength(3);
+        expect(validation.data.modules).toHaveLength(5);
       }
       const lessons = flattenLessons(digitalCircuitsPath);
-      expect(lessons).toHaveLength(8);
-      expect(lessons.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 8 }, (_, i) => i + 1));
+      expect(lessons).toHaveLength(14);
+      expect(lessons.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
 
       for (const [index, { lesson }] of lessons.entries()) {
         const lessonValidation = safeValidateLesson(lesson);
@@ -371,21 +373,43 @@ describe("Python Programming Foundations course", () => {
       }
     });
 
-    it("registers SQL Databases course and validates 8 relational lessons", () => {
+    it("registers SQL Databases course and validates 12 relational lessons", () => {
       const validation = safeValidateCourse(sqlDatabasesPath);
       expect(validation.success).toBe(true);
       const lessons = flattenLessons(sqlDatabasesPath);
-      expect(lessons).toHaveLength(8);
+      expect(lessons).toHaveLength(12);
       for (const { lesson } of lessons) {
         expect(safeValidateLesson(lesson).success).toBe(true);
         expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
       }
     });
 
-    it("registers HTML5 & CSS Architecture course and validates 8 web lessons", () => {
+    it("registers HTML5 & CSS Architecture course and validates 12 web lessons", () => {
       const validation = safeValidateCourse(htmlCssWebPath);
       expect(validation.success).toBe(true);
       const lessons = flattenLessons(htmlCssWebPath);
+      expect(lessons).toHaveLength(12);
+      for (const { lesson } of lessons) {
+        expect(safeValidateLesson(lesson).success).toBe(true);
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("registers DSA Mastery course and validates 16 algorithmic lessons", () => {
+      const validation = safeValidateCourse(dsaMasteryPath);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(dsaMasteryPath);
+      expect(lessons).toHaveLength(16);
+      for (const { lesson } of lessons) {
+        expect(safeValidateLesson(lesson).success).toBe(true);
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("registers Prompt Engineering course and validates 8 LLM system lessons", () => {
+      const validation = safeValidateCourse(promptEngineeringPath);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(promptEngineeringPath);
       expect(lessons).toHaveLength(8);
       for (const { lesson } of lessons) {
         expect(safeValidateLesson(lesson).success).toBe(true);
@@ -393,33 +417,11 @@ describe("Python Programming Foundations course", () => {
       }
     });
 
-    it("registers DSA Mastery course and validates 10 algorithmic lessons", () => {
-      const validation = safeValidateCourse(dsaMasteryPath);
-      expect(validation.success).toBe(true);
-      const lessons = flattenLessons(dsaMasteryPath);
-      expect(lessons).toHaveLength(10);
-      for (const { lesson } of lessons) {
-        expect(safeValidateLesson(lesson).success).toBe(true);
-        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
-      }
-    });
-
-    it("registers Prompt Engineering course and validates 6 LLM system lessons", () => {
-      const validation = safeValidateCourse(promptEngineeringPath);
-      expect(validation.success).toBe(true);
-      const lessons = flattenLessons(promptEngineeringPath);
-      expect(lessons).toHaveLength(6);
-      for (const { lesson } of lessons) {
-        expect(safeValidateLesson(lesson).success).toBe(true);
-        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
-      }
-    });
-
-    it("registers Computational Photography course and validates 6 media DSP lessons with Image Lab", () => {
+    it("registers Computational Photography course and validates 8 media DSP lessons with Image Lab", () => {
       const validation = safeValidateCourse(photoEditingMediaPath);
       expect(validation.success).toBe(true);
       const lessons = flattenLessons(photoEditingMediaPath);
-      expect(lessons).toHaveLength(6);
+      expect(lessons).toHaveLength(8);
       for (const { lesson } of lessons) {
         expect(safeValidateLesson(lesson).success).toBe(true);
         expect(lesson.interactiveDemo?.kind).toBe("image-lab");
@@ -427,44 +429,44 @@ describe("Python Programming Foundations course", () => {
       }
     });
 
-    it("registers C++ Systems & Object-Oriented Programming and validates 8 C++17 lessons", () => {
+    it("registers C++ Systems & Object-Oriented Programming and validates 12 C++17 lessons", () => {
       const validation = safeValidateCourse(cppProgrammingCourse);
       expect(validation.success).toBe(true);
       const lessons = flattenLessons(cppProgrammingCourse);
-      expect(lessons).toHaveLength(8);
+      expect(lessons).toHaveLength(12);
       for (const { lesson } of lessons) {
         expect(safeValidateLesson(lesson).success).toBe(true);
         expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
       }
     });
 
-    it("registers Arduino Uno Embedded Systems course and validates 6 AVR lessons", () => {
+    it("registers Arduino Uno Embedded Systems course and validates 12 AVR lessons", () => {
       const validation = safeValidateCourse(arduinoEmbeddedCourse);
       expect(validation.success).toBe(true);
       const lessons = flattenLessons(arduinoEmbeddedCourse);
-      expect(lessons).toHaveLength(6);
+      expect(lessons).toHaveLength(12);
       for (const { lesson } of lessons) {
         expect(safeValidateLesson(lesson).success).toBe(true);
         expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
       }
     });
 
-    it("registers ESP32 Dual-Core IoT Systems course and validates 6 FreeRTOS lessons", () => {
+    it("registers ESP32 Dual-Core IoT Systems course and validates 12 FreeRTOS lessons", () => {
       const validation = safeValidateCourse(esp32IotCourse);
       expect(validation.success).toBe(true);
       const lessons = flattenLessons(esp32IotCourse);
-      expect(lessons).toHaveLength(6);
+      expect(lessons).toHaveLength(12);
       for (const { lesson } of lessons) {
         expect(safeValidateLesson(lesson).success).toBe(true);
         expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);
       }
     });
 
-    it("registers Practical Breadboard Prototyping course and validates 6 electronics lessons", () => {
+    it("registers Practical Breadboard Prototyping course and validates 10 electronics lessons", () => {
       const validation = safeValidateCourse(breadboardElectronicsCourse);
       expect(validation.success).toBe(true);
       const lessons = flattenLessons(breadboardElectronicsCourse);
-      expect(lessons).toHaveLength(6);
+      expect(lessons).toHaveLength(10);
       for (const { lesson } of lessons) {
         expect(safeValidateLesson(lesson).success).toBe(true);
         expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(1);

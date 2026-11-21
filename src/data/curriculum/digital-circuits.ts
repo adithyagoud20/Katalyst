@@ -26,6 +26,12 @@ export const digitalCircuitsObjectives: LearningObjective[] = [
   { id: "circuits-adders", title: "Design combinational binary arithmetic adders using Half Adders and Full Adders." },
   { id: "circuits-mux-demux", title: "Route multi-channel data streams using binary Multiplexers (Mux) and Demultiplexers (Demux)." },
   { id: "circuits-latches-sequential", title: "Trace edge-triggered memory storage and feedback loops in SR Latches and D Flip-Flops." },
+  { id: "circuits-kmap-3var", title: "Simplify 3-variable Boolean equations into minimal Sum-of-Products (SOP) forms using Karnaugh maps." },
+  { id: "circuits-kmap-4var", title: "Minimize 4-variable logic networks and leverage don't-care conditions with K-maps." },
+  { id: "circuits-jk-flip-flop", title: "Construct JK Flip-Flops and evaluate toggle mode and race-around conditions." },
+  { id: "circuits-ripple-counter", title: "Design multi-bit asynchronous binary ripple counters using cascaded toggle stages." },
+  { id: "circuits-decade-counter", title: "Implement synchronous decade and modulo-N counters with reset feedback logic." },
+  { id: "circuits-fsm-sequence", title: "Synthesize finite state machine state transition diagrams and sequence detector logic." },
 ];
 
 function exercise(
@@ -819,6 +825,577 @@ To eliminate invalid states and synchronize updates with a system clock, digital
       "Edge-triggering ensures that state is captured at an exact instantaneous transition, preventing data from racing through multiple sequential stages during the duration of a high pulse.",
     ),
   },
+
+  {
+    id: "circuits-kmap-3var",
+    order: 9,
+    title: "Karnaugh Maps: 3-Variable Boolean Minimization",
+    summary: "Minimize 3-variable logic equations into optimal Sum-of-Products forms using adjacent Gray code grouping.",
+    type: "interactive-simulation",
+    interactiveDemo: {
+      kind: "circuit",
+      title: "3-Variable K-Map Visualizer",
+      description: "Interactive 2x4 Gray code grid with adjacent cell loop grouping.",
+    },
+    objectiveIds: ["circuits-kmap-3var"],
+    prerequisiteLessonIds: ["circuits-latches-flip-flops"],
+    estimatedDurationMinutes: 30,
+    content: `A **Karnaugh Map (K-Map)** provides a systematic graphical method to simplify Boolean algebra equations without algebraic trial-and-error.
+
+### Gray Code Ordering
+In a 3-variable K-map (variables $A, B, C$), rows represent $A \\in \\{0, 1\\}$ and columns represent $BC \\in \\{00, 01, 11, 10\\}$. Notice that columns follow **Gray code**, changing only one bit between adjacent cells. This adjacency means adjacent cells differ by exactly one literal ($X + X' = 1$), allowing terms to cancel.
+
+### Grouping Rules
+1. Groups of $1\\text{s}$ must be powers of 2 (sizes 1, 2, 4, 8).
+2. Groups must be rectangular and can wrap around from column $10$ to column $00$.
+3. Make groups as large as possible to eliminate the maximum number of variables.`,
+    theorySections: [
+      {
+        id: "circ-kmap-prime-implicants",
+        title: "Prime Implicants",
+        content: "A prime implicant is a rectangle of minterms that cannot be combined into a larger group. Essential prime implicants contain at least one minterm covered by no other group.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Evaluating a 3-Variable SOP Expression",
+        language: "javascript",
+        code: `function evalSop(a, b, c) {
+  // Minimal equation: F = A*B + B*C'
+  return Boolean((a && b) || (b && !c));
+}
+
+console.log("F(1, 1, 0):", evalSop(1, 1, 0) ? 1 : 0);`,
+        description: "Evaluating simplified Boolean logic in JavaScript.",
+      },
+    ],
+    resources: [
+      {
+        title: "Karnaugh Map Minimization",
+        url: "https://en.wikipedia.org/wiki/Karnaugh_map",
+        description: "Boolean algebraic simplification using Karnaugh maps.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("F(1, 1, 0): 1\n"),
+    exercise: exercise(
+      "ex-circ-kmap3-eval",
+      "Implement a minimized 3-variable logic function",
+      "Given minterms m(3, 5, 7) for inputs A, B, C (where m = A*4 + B*2 + C), simplification yields F = A*C + B*C. Write a function solveKMap(a, b, c) that returns 1 when F is true and 0 otherwise. Evaluate and print solveKMap(1, 0, 1) and solveKMap(0, 1, 0) in format 'F(1,0,1)=X, F(0,1,0)=Y'.",
+      `function solveKMap(a, b, c) {\n  const f = (a && c) || (b && c);\n  return f ? 1 : 0;\n}\n\nconsole.log(\`F(1,0,1)=\${solveKMap(1, 0, 1)}, F(0,1,0)=\${solveKMap(0, 1, 0)}\`);`,
+      "circuits-kmap-3var",
+      "Evaluate simplified Boolean functions derived from 3-variable Karnaugh map loops.",
+      [
+        "Compute f = (a && c) || (b && c).",
+        "Return 1 if true, 0 if false.",
+        "Print formatted result matching 'F(1,0,1)=1, F(0,1,0)=0'.",
+      ],
+      "Developing",
+      `function solveKMap(a, b, c) {\n  // Implement simplified SOP\n}\n\n// Print evaluation\n`,
+      [
+        {
+          id: "tc-kmap3-1",
+          label: "Evaluates correct minimized SOP outputs",
+          expectedStdout: "F(1,0,1)=1, F(0,1,0)=0",
+          matchMode: "trimmed",
+        },
+        {
+          id: "tc-kmap3-hidden",
+          label: "Check minterm 7",
+          expectedStdout: "F(1,0,1)=1",
+          matchMode: "contains",
+          hidden: true,
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why must K-map column headers use Gray code (00, 01, 11, 10) instead of binary (00, 01, 10, 11)?",
+      "Gray code ensures that adjacent physical cells differ by exactly one single binary variable, allowing terms like A*B*C + A*B*C' to simplify to A*B.",
+    ),
+  },
+
+  {
+    id: "circuits-kmap-4var",
+    order: 10,
+    title: "4-Variable K-Maps and Don't-Care Conditions",
+    summary: "Group 16-cell Karnaugh maps across torus edges and leverage don't-care (X) minterms to minimize gate counts.",
+    type: "interactive-simulation",
+    interactiveDemo: {
+      kind: "circuit",
+      title: "4-Variable K-Map & Torus Solver",
+      description: "16-cell K-map visualizer showing corner and edge wrap-around groupings.",
+    },
+    objectiveIds: ["circuits-kmap-4var"],
+    prerequisiteLessonIds: ["circuits-kmap-3var"],
+    estimatedDurationMinutes: 35,
+    content: `A 4-variable K-Map represents 16 minterms in a $4 \\times 4$ grid ($AB$ rows, $CD$ columns).
+
+### Torus Adjacency
+The edges of a 4-variable K-map wrap around in both dimensions:
+- The top row ($AB = 00$) is adjacent to the bottom row ($AB = 10$).
+- The leftmost column ($CD = 00$) is adjacent to the rightmost column ($CD = 10$).
+- All four outer corners form a valid group of 4 minterms: $B' D'$.
+
+### Don't-Care Conditions ($X$)
+In circuits like BCD-to-7-segment decoders, input codes above 9 ($1010_2$ to $1111_2$) never occur physically. These states are called **don't-cares** ($X$ or $d$). We treat $X$ as $1$ if it helps enlarge an existing group of $1\\text{s}$, or as $0$ if it would require creating a new group.`,
+    theorySections: [
+      {
+        id: "circ-dont-care-optimization",
+        title: "Minimization with Don't Cares",
+        content: "Don't-care terms provide flexibility: including them in implicants reduces gate count, but they do not need to be covered if they don't enlarge an implicant.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Corner Wrap Implicant",
+        language: "javascript",
+        code: `// Four corners group: m(0, 2, 8, 10) -> B' * D'
+function fourCorners(a, b, c, d) {
+  return !b && !d ? 1 : 0;
+}
+console.log("Corner (0,0,0,0):", fourCorners(0, 0, 0, 0));`,
+        description: "Verifying 4-corner wrap reduction to B' * D'.",
+      },
+    ],
+    resources: [
+      {
+        title: "Don't-Care Conditions in Logic Minimization",
+        url: "https://en.wikipedia.org/wiki/Don%27t-care_term",
+        description: "Optimizing combinational logic with unspecified states.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Corner (0,0,0,0): 1\n"),
+    exercise: exercise(
+      "ex-circ-kmap4-eval",
+      "Model a BCD valid digit detector with don't cares",
+      "A BCD valid detector outputs 1 for inputs 0..9 and 0 for invalid inputs 10..15. Using inputs a, b, c, d representing 4-bit numbers (weight 8, 4, 2, 1), write isValidBcd(a, b, c, d) returning 1 if value <= 9, else 0. Evaluate with (1, 0, 0, 1) [9] and (1, 1, 0, 0) [12] and print 'BCD(9)=X, BCD(12)=Y'.",
+      `function isValidBcd(a, b, c, d) {\n  const val = a * 8 + b * 4 + c * 2 + d;\n  return val <= 9 ? 1 : 0;\n}\n\nconsole.log(\`BCD(9)=\${isValidBcd(1, 0, 0, 1)}, BCD(12)=\${isValidBcd(1, 1, 0, 0)}\`);`,
+      "circuits-kmap-4var",
+      "Determine valid BCD ranges using 4-variable logic evaluation.",
+      [
+        "Compute integer value val = a * 8 + b * 4 + c * 2 + d.",
+        "Return 1 if val <= 9, else 0.",
+        "Print formatted string 'BCD(9)=1, BCD(12)=0'.",
+      ],
+      "Developing",
+      `function isValidBcd(a, b, c, d) {\n  // Implement BCD range check\n}\n\n// Print output\n`,
+      [
+        {
+          id: "tc-kmap4-1",
+          label: "Validates BCD digit range outputs",
+          expectedStdout: "BCD(9)=1, BCD(12)=0",
+          matchMode: "trimmed",
+        },
+        {
+          id: "tc-kmap4-hidden",
+          label: "Check boundary value 10",
+          expectedStdout: "BCD(9)=1",
+          matchMode: "contains",
+          hidden: true,
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Can a don't-care (X) condition be left uncircled in a K-map?",
+      "Yes. A don't-care is only circled if doing so enlarges a group of 1s (reducing literal count); it is never required to be covered on its own.",
+    ),
+  },
+
+  {
+    id: "circuits-jk-flip-flop",
+    order: 11,
+    title: "JK Flip-Flops and Toggle Mode",
+    summary: "Eliminate forbidden latch states with JK flip-flops and understand clock toggle mode (T = 1).",
+    type: "interactive-simulation",
+    interactiveDemo: {
+      kind: "circuit",
+      title: "JK Flip-Flop Simulator",
+      description: "Interactive JK flip-flop with J, K, and clock pulse controls.",
+    },
+    objectiveIds: ["circuits-jk-flip-flop"],
+    prerequisiteLessonIds: ["circuits-kmap-4var"],
+    estimatedDurationMinutes: 30,
+    content: `In an SR latch, setting $S = 1$ and $R = 1$ simultaneously leads to an invalid, unpredictable state. The **JK Flip-Flop** eliminates this hazard through internal feedback.
+
+### JK Characteristic Table
+When a rising clock edge arrives:
+- $J = 0, K = 0$: **Hold** ($Q_{next} = Q$)
+- $J = 0, K = 1$: **Reset** ($Q_{next} = 0$)
+- $J = 1, K = 0$: **Set** ($Q_{next} = 1$)
+- $J = 1, K = 1$: **Toggle** ($Q_{next} = Q'$)
+
+The toggle mode ($J=K=1$) is the fundamental building block for frequency dividers and binary ripple counters.`,
+    theorySections: [
+      {
+        id: "circ-jk-race-around",
+        title: "Race-Around Condition and Master-Slave Architecture",
+        content: "In level-triggered JK latches, when J=K=1 and the clock remains high, the output toggles uncontrollably. Master-slave JK flip-flops resolve this by sampling inputs on one edge and asserting outputs on the opposite edge.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Simulating a JK Flip-Flop",
+        language: "javascript",
+        code: `class JKFlipFlop {
+  constructor() { this.q = 0; }
+  clockEdge(j, k) {
+    if (j === 0 && k === 1) this.q = 0;
+    else if (j === 1 && k === 0) this.q = 1;
+    else if (j === 1 && k === 1) this.q = this.q === 1 ? 0 : 1;
+    return this.q;
+  }
+}
+const jk = new JKFlipFlop();
+console.log("Toggle 1:", jk.clockEdge(1, 1));
+console.log("Toggle 2:", jk.clockEdge(1, 1));`,
+        description: "Simulating edge-triggered JK state transitions.",
+      },
+    ],
+    resources: [
+      {
+        title: "JK Flip-Flop Operation",
+        url: "https://en.wikipedia.org/wiki/Flip-flop_(electronics)#JK_flip-flop",
+        description: "Theory of JK and T flip-flop architectures.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Toggle 1: 1\nToggle 2: 0\n"),
+    exercise: exercise(
+      "ex-circ-jk-sim",
+      "Model a toggling JK flip-flop state machine",
+      "Implement a class JKFlipFlop with initial state this.q = 0. Add method tick(j, k) that executes on a clock pulse: if j=0,k=1 q=0; if j=1,k=0 q=1; if j=1,k=1 q=1-q; if j=0,k=0 q stays unchanged. Initialize jk = new JKFlipFlop(), call tick(1, 0) [set], tick(1, 1) [toggle], and tick(1, 1) [toggle]. Print 'Q states: ' followed by the 3 output values joined by comma.",
+      `class JKFlipFlop {\n  constructor() {\n    this.q = 0;\n  }\n  tick(j, k) {\n    if (j === 0 && k === 1) this.q = 0;\n    else if (j === 1 && k === 0) this.q = 1;\n    else if (j === 1 && k === 1) this.q = this.q === 1 ? 0 : 1;\n    return this.q;\n  }\n}\n\nconst jk = new JKFlipFlop();\nconst s1 = jk.tick(1, 0);\nconst s2 = jk.tick(1, 1);\nconst s3 = jk.tick(1, 1);\nconsole.log(\`Q states: \${s1},\${s2},\${s3}\`);`,
+      "circuits-jk-flip-flop",
+      "Trace state transitions of a JK flip-flop through set and successive toggle pulses.",
+      [
+        "Implement tick(j, k) with the 4 truth table conditions.",
+        "Store outputs of tick(1,0), tick(1,1), and tick(1,1).",
+        "Print formatted result 'Q states: 1,0,1'.",
+      ],
+      "Developing",
+      `class JKFlipFlop {\n  // Implement constructor and tick(j, k)\n}\n\n// Run transitions and print Q states\n`,
+      [
+        {
+          id: "tc-jk-1",
+          label: "Correctly transitions through set, toggle, and toggle",
+          expectedStdout: "Q states: 1,0,1",
+          matchMode: "trimmed",
+        },
+        {
+          id: "tc-jk-hidden",
+          label: "State verify",
+          expectedStdout: "Q states: 1,0,1",
+          matchMode: "contains",
+          hidden: true,
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "What occurs in a JK flip-flop when both J and K inputs are held at logic HIGH during a clock pulse?",
+      "The output toggles (inverts) its current state, complementing Q from 0 to 1 or 1 to 0.",
+    ),
+  },
+
+  {
+    id: "circuits-ripple-counter",
+    order: 12,
+    title: "Asynchronous Ripple Counters (MOD-16)",
+    summary: "Cascade toggle flip-flops where each stage's output clocks the subsequent stage to build binary counters.",
+    type: "interactive-simulation",
+    interactiveDemo: {
+      kind: "circuit",
+      title: "4-Bit Ripple Counter Visualizer",
+      description: "Interactive 4-bit binary counter stepping through 0000 to 1111 with LED outputs.",
+    },
+    objectiveIds: ["circuits-ripple-counter"],
+    prerequisiteLessonIds: ["circuits-jk-flip-flop"],
+    estimatedDurationMinutes: 35,
+    content: `An **asynchronous ripple counter** (or ripple binary counter) connects multiple toggle (T or JK with $J=K=1$) flip-flops in series.
+
+### Ripple Architecture
+- Stage 0 ($Q_0$) is clocked directly by the master input clock pulse.
+- Stage 1 ($Q_1$) is clocked by the output ($Q_0$) of Stage 0.
+- Stage 2 ($Q_2$) is clocked by $Q_1$.
+- Stage 3 ($Q_3$) is clocked by $Q_2$.
+
+Because each stage toggles on every negative edge of the preceding stage, each stage divides the input frequency by 2:
+$$f_{Q0} = \\frac{f_{clk}}{2}, \\quad f_{Q1} = \\frac{f_{clk}}{4}, \\quad f_{Q2} = \\frac{f_{clk}}{8}, \\quad f_{Q3} = \\frac{f_{clk}}{16}$$
+Four stages count from $0000_2$ to $1111_2$ ($0$ to $15$), forming a **Modulo-16 (MOD-16)** counter.`,
+    theorySections: [
+      {
+        id: "circ-ripple-propagation-delay",
+        title: "Propagation Delay and Glitches",
+        content: "Because clock transitions must ripple sequentially through each flip-flop stage, total delay accumulates as N * t_pd. At high clock rates, intermediate transient states (glitches) appear briefly on output lines.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Simulating 4-Bit Binary Counter",
+        language: "javascript",
+        code: `class RippleCounter4Bit {
+  constructor() { this.count = 0; }
+  pulse() {
+    this.count = (this.count + 1) % 16;
+    return this.count;
+  }
+}
+const counter = new RippleCounter4Bit();
+for (let i = 0; i < 4; i++) counter.pulse();
+console.log("Count after 4 pulses:", counter.count);`,
+        description: "Tracing a 4-bit MOD-16 counter progression.",
+      },
+    ],
+    resources: [
+      {
+        title: "Asynchronous (Ripple) Counter",
+        url: "https://en.wikipedia.org/wiki/Counter_(digital)#Asynchronous_(ripple)_counter",
+        description: "Binary counter architectures and frequency division.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Count after 4 pulses: 4\n"),
+    exercise: exercise(
+      "ex-circ-ripple-sim",
+      "Simulate a 4-bit binary ripple counter",
+      "Create a class RippleCounter with property count = 0. Each call to pulse() increments count by 1 modulo 16 and returns its 4-bit binary representation padded with zeros (e.g. '0101'). Instantiate counter, pulse it 10 times, and print 'Binary at 10: ' followed by the 10th pulse output.",
+      `class RippleCounter {\n  constructor() {\n    this.count = 0;\n  }\n  pulse() {\n    this.count = (this.count + 1) % 16;\n    return this.count.toString(2).padStart(4, "0");\n  }\n}\n\nconst rc = new RippleCounter();\nlet out = "";\nfor (let i = 0; i < 10; i++) {\n  out = rc.pulse();\n}\nconsole.log(\`Binary at 10: \${out}\`);`,
+      "circuits-ripple-counter",
+      "Model a 4-bit ripple counter and output zero-padded binary values.",
+      [
+        "Compute (this.count + 1) % 16 in pulse().",
+        "Convert to 4-bit binary with .toString(2).padStart(4, '0').",
+        "Pulse 10 times and print 'Binary at 10: 1010'.",
+      ],
+      "Developing",
+      `class RippleCounter {\n  // Implement constructor and pulse()\n}\n\n// Pulse 10 times and print output\n`,
+      [
+        {
+          id: "tc-ripple-1",
+          label: "Outputs correct 4-bit binary value after 10 pulses",
+          expectedStdout: "Binary at 10: 1010",
+          matchMode: "trimmed",
+        },
+        {
+          id: "tc-ripple-hidden",
+          label: "Binary 10 check",
+          expectedStdout: "Binary at 10: 1010",
+          matchMode: "contains",
+          hidden: true,
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is a 4-stage toggle counter termed an 'asynchronous' ripple counter?",
+      "The stages do not share a common clock; each stage is clocked by the preceding stage's output, causing the clock pulse to ripple asynchronously across the chain.",
+    ),
+  },
+
+  {
+    id: "circuits-decade-counter",
+    order: 13,
+    title: "Synchronous Decade and Modulo-N Counters",
+    summary: "Design Modulo-10 (BCD) counters with feedback reset gates (7490 architecture) to drive decimal displays.",
+    type: "interactive-simulation",
+    interactiveDemo: {
+      kind: "circuit",
+      title: "BCD Decade Counter (MOD-10)",
+      description: "Counter cycling 0000 to 1001 with NAND reset gate triggering at count 1010.",
+    },
+    objectiveIds: ["circuits-decade-counter"],
+    prerequisiteLessonIds: ["circuits-ripple-counter"],
+    estimatedDurationMinutes: 35,
+    content: `A **decade counter** (or Modulo-10 / BCD counter) counts through decimal states $0$ to $9$ ($0000_2$ to $1001_2$) before resetting to zero on the tenth pulse.
+
+### Modulo-N Truncation via Reset Gates
+To turn a natural 4-bit MOD-16 counter into a MOD-10 counter (like the industry-standard 7490 IC):
+1. Detect count $10_{10} = 1010_2$ ($Q_3 = 1$ and $Q_1 = 1$).
+2. Feed $Q_3$ and $Q_1$ into an active-LOW NAND gate:
+$$\\text{Reset} = \\overline{Q_3 \\cdot Q_1}$$
+3. Connect the NAND output to the asynchronous Clear/Reset pins of all four flip-flops.
+4. As soon as the counter hits $1010_2$, the reset line fires immediately, returning the counter to $0000_2$ within nanoseconds.`,
+    theorySections: [
+      {
+        id: "circ-decade-carry-pulse",
+        title: "Cascading for Multi-Digit Decimal Displays",
+        content: "When a decade counter transitions from 9 to 0, it emits a falling carry edge that can clock the next higher decimal decade stage (units -> tens -> hundreds).",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Simulating Decade Counter with Reset Gate",
+        language: "javascript",
+        code: `class DecadeCounter {
+  constructor() { this.q = 0; }
+  tick() {
+    this.q++;
+    // Asynchronous reset on 10 (1010_2)
+    if (this.q >= 10) this.q = 0;
+    return this.q;
+  }
+}
+const dc = new DecadeCounter();
+for (let i = 0; i < 12; i++) dc.tick();
+console.log("Count after 12 ticks:", dc.q);`,
+        description: "Decimal decade rollover at count 10.",
+      },
+    ],
+    resources: [
+      {
+        title: "7490 Decade Counter Architecture",
+        url: "https://en.wikipedia.org/wiki/List_of_7400-series_integrated_circuits#7490",
+        description: "BCD decade counter datasheet and timing diagrams.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Count after 12 ticks: 2\n"),
+    exercise: exercise(
+      "ex-circ-decade-sim",
+      "Implement a BCD decade counter with carry out",
+      "Create a class BcdCounter with properties count = 0 and carry = 0. On each step(), increment count. If count reaches 10, set count = 0 and carry = 1, otherwise set carry = 0. Step the counter 25 times and print 'Count: {count}, Carry: {carry}'.",
+      `class BcdCounter {\n  constructor() {\n    this.count = 0;\n    this.carry = 0;\n  }\n  step() {\n    this.count++;\n    if (this.count >= 10) {\n      this.count = 0;\n      this.carry = 1;\n    } else {\n      this.carry = 0;\n    }\n    return this.count;\n  }\n}\n\nconst bcd = new BcdCounter();\nfor (let i = 0; i < 25; i++) {\n  bcd.step();\n}\nconsole.log(\`Count: \${bcd.count}, Carry: \${bcd.carry}\`);`,
+      "circuits-decade-counter",
+      "Model a modulo-10 BCD counter with rollover and carry pulse emission.",
+      [
+        "Increment count on each step().",
+        "When count === 10, set count = 0 and carry = 1.",
+        "Verify 25 steps results in Count: 5, Carry: 0.",
+      ],
+      "Developing",
+      `class BcdCounter {\n  // Implement constructor and step()\n}\n\n// Step 25 times and print Count and Carry\n`,
+      [
+        {
+          id: "tc-decade-1",
+          label: "Verifies state after 25 clock cycles",
+          expectedStdout: "Count: 5, Carry: 0",
+          matchMode: "trimmed",
+        },
+        {
+          id: "tc-decade-hidden",
+          label: "Carry check at 20",
+          expectedStdout: "Count: 5",
+          matchMode: "contains",
+          hidden: true,
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Which two flip-flop output bits must be decoded by a NAND gate to reset a 4-bit binary counter into a decade (MOD-10) counter?",
+      "Q3 (weight 8) and Q1 (weight 2), because 8 + 2 = 10 (binary 1010).",
+    ),
+  },
+
+  {
+    id: "circuits-fsm-sequence-detector",
+    order: 14,
+    title: "Finite State Machine Design & Sequence Detection",
+    summary: "Synthesize Moore and Mealy finite state machines to detect overlapping binary bit sequences (1011).",
+    type: "interactive-simulation",
+    interactiveDemo: {
+      kind: "circuit",
+      title: "Sequence Detector FSM Visualizer",
+      description: "Interactive state diagram tracking bit transitions between S0, S1, S2, and S3.",
+    },
+    objectiveIds: ["circuits-fsm-sequence"],
+    prerequisiteLessonIds: ["circuits-decade-counter"],
+    estimatedDurationMinutes: 40,
+    content: `A **Finite State Machine (FSM)** consists of a set of states, an input alphabet, a transition function, and an output function. FSMs model sequential controllers, communication protocol parsers, and digital locks.
+
+### Moore vs. Mealy FSM
+- **Moore Machine**: Outputs depend strictly on the current state. Outputs change only on clock edges.
+- **Mealy Machine**: Outputs depend on both the current state and current inputs, reacting immediately to input changes.
+
+### Sequence Detector: 1011 (Overlapping)
+To detect the sequence \`1 0 1 1\` in a continuous bitstream:
+- **State S0**: Initial state (no bits matched).
+- **State S1**: Matched \`1\`.
+- **State S2**: Matched \`10\`.
+- **State S3**: Matched \`101\`.
+- If in S3 and input is \`1\`, sequence \`1011\` is detected! Output asserts 1, and the machine transitions to S1 (because the trailing \`1\` begins the next potential match).`,
+    theorySections: [
+      {
+        id: "circ-fsm-state-encoding",
+        title: "State Encoding Options",
+        content: "Common state assignment methods include Binary Encoding (log2(N) flip-flops) and One-Hot Encoding (N flip-flops, one per state, simplifying combinational next-state decoders in FPGAs).",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Implementing 1011 Sequence Detector",
+        language: "javascript",
+        code: `class SequenceDetector1011 {
+  constructor() { this.state = "S0"; }
+  consume(bit) {
+    let detected = 0;
+    switch (this.state) {
+      case "S0": this.state = bit === 1 ? "S1" : "S0"; break;
+      case "S1": this.state = bit === 0 ? "S2" : "S1"; break;
+      case "S2": this.state = bit === 1 ? "S3" : "S0"; break;
+      case "S3":
+        if (bit === 1) { detected = 1; this.state = "S1"; }
+        else { this.state = "S2"; }
+        break;
+    }
+    return detected;
+  }
+}
+const fsm = new SequenceDetector1011();
+const bits = [1, 0, 1, 1, 0, 1, 1];
+const results = bits.map(b => fsm.consume(b));
+console.log("Detections:", results.join(""));`,
+        description: "Tracking state transitions and detecting overlapping sequences.",
+      },
+    ],
+    resources: [
+      {
+        title: "Finite-State Machine Design",
+        url: "https://en.wikipedia.org/wiki/Finite-state_machine",
+        description: "Formal specification and hardware synthesis of FSMs.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: exampleRun("Detections: 0001001\n"),
+    exercise: exercise(
+      "ex-circ-fsm-sim",
+      "Build a sequence detector FSM for pattern 1011",
+      "Implement a class SequenceDetector with consume(bit) returning 1 when the 4-bit sequence 1,0,1,1 has been completed, else 0. Feed bit stream [1, 0, 1, 1, 0, 1, 1] through the detector. Sum the total number of detections and print 'Total detections: ' followed by the sum.",
+      `class SequenceDetector {\n  constructor() {\n    this.state = "S0";\n  }\n  consume(bit) {\n    let detected = 0;\n    switch (this.state) {\n      case "S0": this.state = bit === 1 ? "S1" : "S0"; break;\n      case "S1": this.state = bit === 0 ? "S2" : "S1"; break;\n      case "S2": this.state = bit === 1 ? "S3" : "S0"; break;\n      case "S3":\n        if (bit === 1) {\n          detected = 1;\n          this.state = "S1";\n        } else {\n          this.state = "S2";\n        }\n        break;\n    }\n    return detected;\n  }\n}\n\nconst fsm = new SequenceDetector();\nconst stream = [1, 0, 1, 1, 0, 1, 1];\nlet count = 0;\nfor (const b of stream) {\n  if (fsm.consume(b) === 1) count++;\n}\nconsole.log(\`Total detections: \${count}\`);`,
+      "circuits-fsm-sequence",
+      "Implement an overlapping sequence detector finite state machine.",
+      [
+        "Model states S0, S1, S2, and S3.",
+        "In state S3, if bit === 1 emit 1 and transition to S1.",
+        "Count detections across [1, 0, 1, 1, 0, 1, 1] to obtain 2.",
+      ],
+      "Applied",
+      `class SequenceDetector {\n  // Implement FSM states\n}\n\n// Feed stream and count detections\n`,
+      [
+        {
+          id: "tc-fsm-1",
+          label: "Finds two overlapping detections of 1011",
+          expectedStdout: "Total detections: 2",
+          matchMode: "trimmed",
+        },
+        {
+          id: "tc-fsm-hidden",
+          label: "Verify detection count",
+          expectedStdout: "Total detections: 2",
+          matchMode: "contains",
+          hidden: true,
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "In an overlapping sequence detector for pattern 1011, why does the FSM transition to state S1 (rather than S0) after a match?",
+      "The trailing '1' of the completed '1011' sequence can simultaneously serve as the first '1' of the next incoming sequence.",
+    ),
+  },
 ];
 
 export const digitalCircuitsPath: LearningCourse = {
@@ -840,12 +1417,16 @@ export const digitalCircuitsPath: LearningCourse = {
     "Synthesize arbitrary logic circuits using universal NAND and NOR gates.",
     "Construct combinational arithmetic units including Half Adders, Full Adders, and Multiplexers.",
     "Explain edge-triggered state retention, clock distribution, and memory storage in D Flip-Flops.",
+    "Minimize multi-variable logic using Karnaugh maps and leverage don't-care conditions.",
+    "Design sequential counters and finite state machines for sequence detection.",
   ],
-  estimatedDurationMinutes: 300,
+  estimatedDurationMinutes: 480,
   publicationStatus: "published",
   modules: [
     moduleData("circuits-electricity-passives", 1, "Electricity fundamentals and passive circuits", "Ohm's Law, resistor divider networks, capacitors, and RC transient curves.", digitalCircuitsLessons.slice(0, 2)),
     moduleData("circuits-boolean-gates", 2, "Digital logic gates and Boolean algebra", "AND, OR, NOT, universal NAND/NOR synthesis, XOR gates, and parity generators.", digitalCircuitsLessons.slice(2, 5)),
-    moduleData("circuits-combinational-sequential", 3, "Combinational and sequential logic systems", "Half adders, full adders, multiplexer data routing, and edge-triggered D Flip-Flops.", digitalCircuitsLessons.slice(5)),
+    moduleData("circuits-combinational-sequential", 3, "Combinational and sequential logic systems", "Half adders, full adders, multiplexer data routing, and edge-triggered D Flip-Flops.", digitalCircuitsLessons.slice(5, 8)),
+    moduleData("circuits-kmap-minimization", 4, "Boolean minimization with Karnaugh maps", "3-variable and 4-variable K-maps, prime implicants, torus wrapping, and don't-care conditions.", digitalCircuitsLessons.slice(8, 10)),
+    moduleData("circuits-counters-fsm", 5, "Counters, registers, and finite state machines", "JK flip-flops, asynchronous ripple counters, BCD decade counters, and sequence-detecting FSMs.", digitalCircuitsLessons.slice(10)),
   ],
 };

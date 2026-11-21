@@ -23,6 +23,9 @@ export const aiAppWebDevObjectives: LearningObjective[] = [
   { id: "ai-route-handlers", title: "Build type-safe Next.js Route Handlers with Zod request validation and structured streaming error handling." },
   { id: "ai-supabase-auth-rls", title: "Configure Supabase Google OAuth authentication, relational PostgreSQL tables, and Row Level Security (RLS)." },
   { id: "ai-deploy-checklist", title: "Deploy production web apps to Vercel/Cloudflare with COOP/COEP isolation, secret management, and zero compute costs." },
+  { id: "ai-structured-zod", title: "Extract structured, strictly typed JSON responses from LLM endpoints using Zod schema validation." },
+  { id: "ai-vector-search", title: "Compute cosine similarity over high-dimensional vector embeddings for in-browser semantic retrieval." },
+  { id: "ai-resilient-fallbacks", title: "Implement exponential backoff retry and multi-provider failover routing for production AI availability." },
 ];
 
 function exercise(
@@ -733,6 +736,260 @@ console.log(JSON.stringify(createHealthCheck(true, true)));`,
       "Uptime monitoring tools, load balancers, and container orchestrators rely on lightweight health endpoints to detect cold-start failures, database disconnections, and edge routing faults before routing real traffic to degraded instances.",
     ),
   },
+
+  {
+    id: "ai-structured-outputs-zod",
+    order: 7,
+    title: "Structured JSON Extraction & Zod Validation",
+    summary: "Force models to emit valid JSON conforming to strict schemas and validate payloads using Zod.",
+    type: "guided-coding",
+    objectiveIds: ["ai-structured-zod"],
+    prerequisiteLessonIds: ["ai-production-deployment-checklist"],
+    estimatedDurationMinutes: 30,
+    content: `LLMs naturally produce unstructured conversational text. For production software pipelines, code must consume strictly validated structured JSON objects.
+
+### Structured Output Workflow
+1. Provide the model with a strict JSON schema and \`response_format: { type: "json_object" }\`.
+2. Strip markdown fences (\`\`\`json ... \`\`\`) defensively.
+3. Validate and parse the object with a **Zod** schema.
+4. If validation fails, return an actionable schema error or retry with the parse error injected.
+
+~~~javascript
+const z = require("zod");
+
+const SensorSchema = z.object({
+  stationId: z.string().min(1),
+  temperature: z.number().min(-50).max(100),
+  status: z.enum(["OK", "ALERT"]),
+});
+~~~`,
+    theorySections: [
+      {
+        id: "ai-zod-safeparse",
+        title: "safeParse vs. parse",
+        content: "Always use schema.safeParse(data) rather than schema.parse(data) in web servers so validation errors can be returned cleanly as HTTP 400 responses without crashing the request loop.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Validating AI JSON Payloads",
+        language: "javascript",
+        code: `function sanitizeAndParse(rawText) {
+  const cleaned = rawText.replace(/^\\s*\`\`\`json\\s*|\\s*\`\`\`\\s*$/g, "").trim();
+  return JSON.parse(cleaned);
+}
+console.log(sanitizeAndParse('{\\"score\\": 95}').score);`,
+        description: "Defensively cleaning AI output strings before parsing.",
+      },
+    ],
+    resources: [
+      {
+        title: "Zod Schema Validation",
+        url: "https://zod.dev/",
+        description: "TypeScript-first schema validation with static type inference.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: {
+      sampleInput: "",
+      expectedOutput: "95\n",
+    },
+    exercise: exercise(
+      "ex-ai-validate-json",
+      "Validate AI Output with Manual Schema Checks",
+      "Implement a function `validateTelemetryPayload(jsonStr)`: parse the string, check that `station` is a non-empty string, `temp` is a number between -50 and 100, and `online` is a boolean. If valid, return `{ valid: true, data: { station, temp, online } }`, else `{ valid: false, error: 'Invalid schema' }`. Test with valid payload `{\"station\": \"ST-01\", \"temp\": 24.5, \"online\": true}` and print: `Status: ${result.valid}, Station: ${result.data.station}`.",
+      `function validateTelemetryPayload(jsonStr) {\n  try {\n    const obj = JSON.parse(jsonStr);\n    if (typeof obj.station !== "string" || obj.station.length === 0) return { valid: false, error: "Invalid schema" };\n    if (typeof obj.temp !== "number" || obj.temp < -50 || obj.temp > 100) return { valid: false, error: "Invalid schema" };\n    if (typeof obj.online !== "boolean") return { valid: false, error: "Invalid schema" };\n    return { valid: true, data: obj };\n  } catch (e) {\n    return { valid: false, error: "Invalid JSON" };\n  }\n}\n\nconst raw = '{"station": "ST-01", "temp": 24.5, "online": true}';\nconst res = validateTelemetryPayload(raw);\nconsole.log(\`Status: \${res.valid}, Station: \${res.data.station}\`);`,
+      "ai-structured-zod",
+      "Validate AI response schemas defensively.",
+      [
+        "Parse the JSON string with try/catch.",
+        "Verify property types for station, temp, and online.",
+        "Print 'Status: true, Station: ST-01'.",
+      ],
+      "Developing",
+      `function validateTelemetryPayload(jsonStr) {\n  // Implement validation\n}\n\nconst raw = '{"station": "ST-01", "temp": 24.5, "online": true}';\n// Validate and print Status and Station\n`,
+      [
+        {
+          id: "tc-ai-val-1",
+          label: "Validates schema successfully and extracts station",
+          stdin: "",
+          expectedStdout: "Status: true, Station: ST-01",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why must raw model JSON output be parsed inside a try/catch block?",
+      "Models occasionally truncate tokens at max length, prepend conversational text, or emit malformed commas, which triggers a syntax error in JSON.parse.",
+    ),
+  },
+
+  {
+    id: "ai-client-vector-search",
+    order: 8,
+    title: "Client-Side Vector Embeddings & Cosine Similarity",
+    summary: "Implement in-browser semantic retrieval using normalized dot products over vector embeddings.",
+    type: "practical-exercise",
+    objectiveIds: ["ai-vector-search"],
+    prerequisiteLessonIds: ["ai-structured-outputs-zod"],
+    estimatedDurationMinutes: 35,
+    content: `Vector embeddings represent text as dense numerical arrays (e.g. 384 or 1536 floating-point values) where semantically similar concepts reside close to each other in vector space.
+
+### Cosine Similarity Formula
+For two normalized vectors $\\mathbf{A}$ and $\\mathbf{B}$:
+$$\\text{similarity}(\\mathbf{A}, \\mathbf{B}) = \\frac{\\mathbf{A} \\cdot \\mathbf{B}}{\\|\\mathbf{A}\\| \\|\\mathbf{B}\\|} = \\frac{\\sum_{i} A_i B_i}{\\sqrt{\\sum_i A_i^2} \\sqrt{\\sum_i B_i^2}}$$
+When vectors are pre-normalized to unit length ($\\|\\mathbf{A}\\| = 1$), cosine similarity simplifies to a simple dot product ($\sum_i A_i B_i$).
+
+In local-first and browser-based AI studios, small embedding models run entirely in the browser using WebAssembly and WebGL/WebGPU.`,
+    theorySections: [
+      {
+        id: "ai-embedding-distance-metrics",
+        title: "Cosine vs. Euclidean vs. Dot Product",
+        content: "Cosine similarity measures the angle between vectors regardless of magnitude, making it ideal for text comparison where document length variations should not skew similarity scores.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Cosine Similarity Function",
+        language: "javascript",
+        code: `function cosineSimilarity(a, b) {
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+console.log("Self similarity:", cosineSimilarity([1, 0], [1, 0]));`,
+        description: "Calculating geometric similarity between two numeric arrays.",
+      },
+    ],
+    resources: [
+      {
+        title: "Vector Embeddings Guide",
+        url: "https://en.wikipedia.org/wiki/Cosine_similarity",
+        description: "Mathematical formulation of cosine distance in information retrieval.",
+        type: "reference",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: {
+      sampleInput: "",
+      expectedOutput: "Self similarity: 1\n",
+    },
+    exercise: exercise(
+      "ex-ai-vector-search",
+      "Rank documents by cosine similarity against a query vector",
+      "Implement a function `findBestMatch(queryVec, docVecs)`: calculate cosine similarity between queryVec and each doc vector in docVecs (an array of { id: string, vec: number[] }), and return the id of the highest scoring document. Test with query `[1, 0, 0]` and docs `[{ id: 'doc-A', vec: [0.8, 0.2, 0] }, { id: 'doc-B', vec: [0.1, 0.9, 0] }]`. Print 'Best Match: ' followed by the matched document id.",
+      `function findBestMatch(queryVec, docVecs) {\n  function cosSim(a, b) {\n    let dot = 0, na = 0, nb = 0;\n    for (let i = 0; i < a.length; i++) {\n      dot += a[i] * b[i];\n      na += a[i] * a[i];\n      nb += b[i] * b[i];\n    }\n    return dot / (Math.sqrt(na) * Math.sqrt(nb));\n  }\n  let bestId = null;\n  let maxScore = -Infinity;\n  for (const doc of docVecs) {\n    const score = cosSim(queryVec, doc.vec);\n    if (score > maxScore) {\n      maxScore = score;\n      bestId = doc.id;\n    }\n  }\n  return bestId;\n}\n\nconst query = [1, 0, 0];\nconst docs = [{ id: "doc-A", vec: [0.8, 0.2, 0] }, { id: "doc-B", vec: [0.1, 0.9, 0] }];\nconsole.log(\`Best Match: \${findBestMatch(query, docs)}\`);`,
+      "ai-vector-search",
+      "Rank vector embeddings using geometric cosine similarity.",
+      [
+        "Implement cosine similarity function with dot product and norms.",
+        "Iterate through documents and track the maximum score.",
+        "Print 'Best Match: doc-A'.",
+      ],
+      "Developing",
+      `function findBestMatch(queryVec, docVecs) {\n  // Implement similarity search\n}\n\nconst query = [1, 0, 0];\nconst docs = [{ id: "doc-A", vec: [0.8, 0.2, 0] }, { id: "doc-B", vec: [0.1, 0.9, 0] }];\n// Call and print Best Match\n`,
+      [
+        {
+          id: "tc-ai-vec-1",
+          label: "Identifies doc-A as closest vector match",
+          stdin: "",
+          expectedStdout: "Best Match: doc-A",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is cosine similarity preferred over Euclidean distance for text embeddings?",
+      "Cosine similarity evaluates orientation rather than magnitude, ensuring long and short texts with equivalent meaning remain closely clustered.",
+    ),
+  },
+
+  {
+    id: "ai-resilient-streaming-fallbacks",
+    order: 9,
+    title: "Resilient AI Streaming & Provider Failover Architecture",
+    summary: "Build fault-tolerant AI gateways with timeout aborts, exponential backoff, and multi-provider failover.",
+    type: "assessment",
+    objectiveIds: ["ai-resilient-fallbacks"],
+    prerequisiteLessonIds: ["ai-client-vector-search"],
+    estimatedDurationMinutes: 40,
+    content: `### Provider Outages and Failover Routing
+Public LLM APIs experience rate-limit throttles (HTTP 429), regional outages (HTTP 503), and unpredictable token generation stalls. A production AI application must route requests across redundant providers with automated failover:
+
+1. **Timeout AbortController**: Terminate requests that stall for longer than a specified latency budget (e.g. 8 seconds).
+2. **Provider Cascade**: Attempt Primary Provider (e.g. Gemini Free) $\\to$ Fallback 1 (Cloudflare Workers AI) $\\to$ Fallback 2 (OpenRouter).
+3. **Graceful Degradation**: If all cloud endpoints fail, notify the learner with a non-destructive offline status message rather than a blank screen.`,
+    theorySections: [
+      {
+        id: "ai-circuit-breaker",
+        title: "Circuit Breakers in AI Gateways",
+        content: "If a model provider fails repeatedly within a sliding window, a circuit breaker temporarily trips into an OPEN state, directing immediate traffic to backup providers without wasting time on timeouts.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Multi-Provider Failover Loop",
+        language: "javascript",
+        code: `async function queryWithFailover(providers, prompt) {
+  for (const p of providers) {
+    try {
+      return await p.call(prompt);
+    } catch (err) {
+      console.warn("Provider failed, switching to backup:", p.name);
+    }
+  }
+  throw new Error("All AI providers exhausted");
+}`,
+        description: "Cascade routing across redundant inference backends.",
+      },
+    ],
+    resources: [
+      {
+        title: "Timeout and AbortController",
+        url: "https://developer.mozilla.org/en-US/docs/Web/API/AbortController",
+        description: "Controlling request lifetimes and canceling dead connections.",
+        type: "documentation",
+      },
+    ],
+    execution: { language: "javascript", target: "browser-wasm" },
+    exampleRun: {
+      sampleInput: "",
+      expectedOutput: "All AI providers exhausted\n",
+    },
+    exercise: exercise(
+      "ex-ai-failover-router",
+      "Implement a multi-provider fallback executor",
+      "Implement an async function `executeWithFailover(providers, prompt)`: iterate through array `providers` (each an object `{ name: string, run: async (prompt) => string }`). If a provider succeeds, return `{ provider: p.name, result: text }`. If it throws, log and continue to the next provider. If all fail, return `{ provider: 'none', result: 'Offline fallback response' }`. Test with provider 1 throwing error and provider 2 returning 'Hello from backup'. Print: `Source: ${res.provider}, Message: ${res.result}`.",
+      `async function executeWithFailover(providers, prompt) {\n  for (const p of providers) {\n    try {\n      const text = await p.run(prompt);\n      return { provider: p.name, result: text };\n    } catch (e) {}\n  }\n  return { provider: "none", result: "Offline fallback response" };\n}\n\nasync function main() {\n  const providers = [\n    { name: "Primary-AI", run: async () => { throw new Error("Rate limit 429"); } },\n    { name: "Backup-AI", run: async () => "Hello from backup" }\n  ];\n  const res = await executeWithFailover(providers, "test");\n  console.log(\`Source: \${res.provider}, Message: \${res.result}\`);\n}\nmain();`,
+      "ai-resilient-fallbacks",
+      "Build resilient multi-provider failover routing.",
+      [
+        "Wrap provider.run in try/catch.",
+        "Return upon first successful provider response.",
+        "Print 'Source: Backup-AI, Message: Hello from backup'.",
+      ],
+      "Applied",
+      `async function executeWithFailover(providers, prompt) {\n  // Implement failover cascade\n}\n\n// Run test and print Source and Message\n`,
+      [
+        {
+          id: "tc-ai-failover-1",
+          label: "Recovers using Backup-AI after Primary-AI failure",
+          stdin: "",
+          expectedStdout: "Source: Backup-AI, Message: Hello from backup",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why should AI client applications implement AbortController timeouts on fetch requests?",
+      "Model inference endpoints can stall indefinitely under severe server load; AbortController aborts dead TCP sockets within a fixed latency budget so failovers can trigger.",
+    ),
+  },
 ];
 
 export const aiAppWebDevModules: LearningModule[] = [
@@ -757,13 +1014,20 @@ export const aiAppWebDevModules: LearningModule[] = [
     "Configure Supabase PostgreSQL with Row Level Security, COOP/COEP headers, and edge deployment.",
     aiAppWebDevLessons.slice(4, 6),
   ),
+  moduleData(
+    "ai-module-production-systems",
+    4,
+    "Production AI Systems Engineering",
+    "Structured JSON extraction with Zod schemas, client-side vector search with cosine similarity, and resilient streaming fallbacks.",
+    aiAppWebDevLessons.slice(6),
+  ),
 ];
 
 export const aiAppWebDevCourse: LearningCourse = {
   id: "ai-app-web-dev",
   subjectId: "ai-engineering",
   title: "AI-Powered App & Web Development",
-  description: "Learn to build, architect, and deploy production-grade full-stack web applications using generative AI tools, free-tier cloud backends, and Next.js.",
+  description: "Learn to build, architect, and deploy production-grade full-stack web applications using generative AI tools, free-tier cloud backends, vector embeddings, and Next.js.",
   level: "Applied",
   version: "1.0.0",
   prerequisites: ["Fundamental HTML, CSS & JavaScript concepts", "Basic terminal and Git familiarity"],
@@ -775,8 +1039,10 @@ export const aiAppWebDevCourse: LearningCourse = {
     "Build type-safe Next.js Route Handlers with Zod request validation.",
     "Configure Supabase Google OAuth and write bulletproof PostgreSQL Row Level Security (RLS) policies.",
     "Deploy production applications with security headers and automated health checks.",
+    "Extract strictly validated JSON with Zod and implement client-side vector embeddings search.",
+    "Architect resilient multi-provider failover routing with timeout abort controllers."
   ],
-  estimatedDurationMinutes: 165,
+  estimatedDurationMinutes: 260,
   publicationStatus: "published",
   modules: aiAppWebDevModules,
 };

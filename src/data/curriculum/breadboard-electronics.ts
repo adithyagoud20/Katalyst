@@ -23,6 +23,10 @@ const objectives: LearningObjective[] = [
   { id: "bb-switch-pullups", title: "Wire tactile pushbuttons with external pull-up/pull-down resistor networks to prevent indeterminate floating CMOS states." },
   { id: "bb-voltage-dividers", title: "Construct two-resistor voltage dividers, read potentiometers, and scale analog sensor voltages to microcontroller limits." },
   { id: "bb-troubleshooting", title: "Systematically debug breadboard faults using digital multimeters (voltage, continuity buzzer, and resistance modes)." },
+  { id: "bb-diodes", title: "Analyze diode forward voltage drops (0.7V silicon), reverse breakdown, and bridge rectification circuits." },
+  { id: "bb-bjt-switches", title: "Design NPN BJT transistor driver switches with base resistors to drive loads exceeding microcontroller GPIO current limits." },
+  { id: "bb-555-astable", title: "Calculate frequency and duty cycle for 555 timer astable multivibrator pulse generator circuits." },
+  { id: "bb-capstone-proto", title: "Synthesize breadboard layout rules, active semiconductors, and fault diagnosis in a prototyping assessment." },
 ];
 
 function testCase(
@@ -782,6 +786,400 @@ console.log(diagnoseFault(5.0, true, true) + "," + diagnoseFault(3.2, true, true
         "Continuity mode sends a small internal test current through the probes. Applying external circuit voltage can damage the meter's internal measurement circuit or blow its protection fuse.",
       ),
   },
+
+  {
+    id: "bb-diode-rectification-clipping",
+    order: 7,
+    title: "Diodes, Forward Voltage Drop & Rectification",
+    summary: "Understand PN junction diodes, 0.7V forward threshold, reverse polarity protection, and half-wave rectification.",
+    type: "interactive-simulation",
+    objectiveIds: ["bb-diodes"],
+    prerequisiteLessonIds: ["breadboard-troubleshooting"],
+    estimatedDurationMinutes: 30,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "Diode Rectification & Clipping Lab",
+      description: "Interactive diode IV curve, forward bias voltage drop, and half-wave rectifier waveform with smoothing capacitor.",
+    },
+    content: `# Diodes, Forward Voltage Drop & Rectification
+
+A **diode** is a semiconductor one-way valve for electric current. It permits current to flow from **Anode** to **Cathode** when forward-biased, but blocks current in reverse bias.
+
+## Forward Voltage Drop ($V_f$)
+- Standard Silicon PN Junction (e.g. 1N4001, 1N4148): $V_f \\approx 0.7\\,\\text{V}$.
+- Schottky Diode (e.g. 1N5819): $V_f \\approx 0.3\\,\\text{V}$ (preferred for solar and battery power paths due to lower power loss).
+
+## Flyback Diode Protection
+When inductive loads (solenoids, DC motors, relays) are turned off, the collapsing magnetic field generates a massive reverse voltage spike ($V = -L \\frac{di}{dt}$) that can exceed hundreds of volts, destroying driving transistors. Placing a reverse-biased **flyback diode** across the coil safely circulates and clamps the inductive energy.`,
+    theorySections: [
+      {
+        id: "bb-rectifier-ripple",
+        title: "Half-Wave vs. Full-Wave Rectification",
+        content: "A single diode half-wave rectifier passes only the positive half-cycle of an AC waveform. A reservoir capacitor across the output smooths the pulsing DC, with ripple voltage inversely proportional to capacitance and load resistance (V_ripple ≈ I / (f * C)).",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Microcontroller Reverse Polarity & Flyback Monitor in C",
+        language: "c",
+        code: `// C routine simulating diode voltage drop and inductive clamp check
+#include <stdio.h>
+
+float calculateDeliveredVoltage(float vSupply, float vForwardDrop) {
+    if (vSupply < vForwardDrop) return 0.0f;
+    return vSupply - vForwardDrop;
+}
+
+int main(void) {
+    float vIn = 5.0f;
+    float vDelivered = calculateDeliveredVoltage(vIn, 0.7f);
+    printf("Supply: %.1fV, Delivered after diode: %.1fV\\n", vIn, vDelivered);
+    return 0;
+}`,
+        description: "Modeling silicon diode forward voltage drop on a 5V breadboard rail.",
+      },
+    ],
+    exercise: exercise(
+      "ex-bb-diode-calc",
+      "Calculate Delivered Voltage after Reverse Polarity Diode",
+      "Write a function `deliveredVoltage(vIn, diodeType)`: if diodeType is 'silicon', subtract 0.7V; if 'schottky', subtract 0.3V. If vIn is negative (reverse polarity) or less than the drop, return 0.0. Calculate for (5.0, 'silicon') and (5.0, 'schottky') rounded to 1 decimal place. Print: `Silicon: ${res1.toFixed(1)}V, Schottky: ${res2.toFixed(1)}V`.",
+      `function deliveredVoltage(vIn, diodeType) {
+  if (vIn <= 0) return 0.0;
+  const drop = diodeType === 'schottky' ? 0.3 : 0.7;
+  return vIn < drop ? 0.0 : vIn - drop;
+}
+
+const v1 = deliveredVoltage(5.0, 'silicon');
+const v2 = deliveredVoltage(5.0, 'schottky');
+console.log(\`Silicon: \${v1.toFixed(1)}V, Schottky: \${v2.toFixed(1)}V\`);`,
+      "bb-diodes",
+      "Model diode forward voltage drops in DC circuits.",
+      [
+        "Subtract 0.7 for silicon and 0.3 for schottky.",
+        "Handle reverse polarity by returning 0.0 when vIn <= 0.",
+        "Print 'Silicon: 4.3V, Schottky: 4.7V'.",
+      ],
+      "Developing",
+      `function deliveredVoltage(vIn, diodeType) {
+  // Implement diode voltage drop calculation
+}
+
+// Calculate and print Silicon: 4.3V, Schottky: 4.7V
+`,
+      [
+        {
+          id: "tc-diode-1",
+          label: "Correctly computes silicon and schottky voltage drops",
+          stdin: "",
+          expectedStdout: "Silicon: 4.3V, Schottky: 4.7V",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is a Schottky diode preferred over a silicon diode for battery reverse-polarity protection in low-voltage circuits?",
+      "Schottky diodes have a significantly lower forward voltage drop (0.3V vs 0.7V), wasting far less power as heat and delivering more voltage to the system.",
+    ),
+  },
+
+  {
+    id: "bb-bjt-transistor-switch",
+    order: 8,
+    title: "NPN BJT Transistors as Digital Switches",
+    summary: "Control high-current loads (motors, relays, LED strips) from low-current microcontroller GPIO pins using 2N2222 / 2N3904 NPN transistors.",
+    type: "interactive-simulation",
+    objectiveIds: ["bb-bjt-switches"],
+    prerequisiteLessonIds: ["bb-diode-rectification-clipping"],
+    estimatedDurationMinutes: 35,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "BJT Transistor Switch Simulator",
+      description: "Interactive NPN transistor circuit showing base drive current, collector load current, and cutoff vs. saturation modes.",
+    },
+    content: `# NPN BJT Transistors as Digital Switches
+
+A microcontroller GPIO pin can only safely supply $20\\text{ to }40\\,\\text{mA}$ of current at $3.3\\,\\text{V}$ or $5\\,\\text{V}$. Driving a $200\\,\\text{mA}$ DC motor, solenoid, or high-power LED array directly from a GPIO will permanently destroy the microcontroller chip.
+
+## The NPN BJT Switch Topology
+A Bipolar Junction Transistor (e.g. 2N2222, 2N3904, BC547) acts as a current-controlled digital switch:
+- **Base ($B$)**: Connected to the microcontroller GPIO through a current-limiting base resistor $R_b$.
+- **Collector ($C$)**: Connected to the low side of the load (load connects between $+V_{cc}$ and Collector).
+- **Emitter ($E$)**: Connected directly to the common ground (**GND**) rail.
+
+## Sizing the Base Resistor ($R_b$)
+To ensure the transistor enters full **saturation** (turned fully ON with minimum voltage drop $V_{CE(sat)} \\approx 0.2\\,\\text{V}$), designers use a forced beta of $\\beta_{forced} = 10$:
+$$I_b = \\frac{I_c}{10}, \\quad R_b = \\frac{V_{GPIO} - V_{BE}}{I_b} = \\frac{V_{GPIO} - 0.7\\,\\text{V}}{I_b}$$`,
+    theorySections: [
+      {
+        id: "bb-bjt-saturation-mode",
+        title: "Cutoff vs. Saturation vs. Active Region",
+        content: "In digital switching, transistors operate strictly in Cutoff (V_be < 0.7V, I_c = 0, switch OPEN) or Saturation (I_b > I_c / beta, V_ce ≈ 0.2V, switch CLOSED). Operating in the active linear region causes excessive heat dissipation in the transistor (P = V_ce * I_c).",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Microcontroller Transistor Base Pulse Driver in C",
+        language: "c",
+        code: `// C sketch controlling an NPN transistor switch on Arduino Pin 9
+#define MOTOR_SWITCH_PIN 9
+
+void setup() {
+  pinMode(MOTOR_SWITCH_PIN, OUTPUT);
+}
+
+void loop() {
+  digitalWrite(MOTOR_SWITCH_PIN, HIGH); // Saturate transistor: Motor ON
+  delay(1000);
+  digitalWrite(MOTOR_SWITCH_PIN, LOW);  // Cutoff transistor: Motor OFF
+  delay(1000);
+}`,
+        description: "Pulsing an NPN transistor base to switch high-current loads safely.",
+      },
+    ],
+    exercise: exercise(
+      "ex-bb-bjt-base-calc",
+      "Size the Base Resistor for a 100mA Load",
+      "A microcontroller with 5V GPIO drives a 100mA motor via an NPN transistor. Using forced beta = 10: Ib = 100mA / 10 = 10mA (0.01A). Base-emitter drop Vbe = 0.7V. Compute Rb in Ohms: (5.0 - 0.7) / 0.01. Write a function calculateBaseResistor(vGpio, iLoad, betaForced) and print 'Rb: ' followed by the integer ohm value.",
+      `function calculateBaseResistor(vGpio, iLoad, betaForced) {
+  const iBase = iLoad / betaForced;
+  const vDrop = vGpio - 0.7;
+  return Math.round(vDrop / iBase);
+}
+
+const rb = calculateBaseResistor(5.0, 0.10, 10);
+console.log(\`Rb: \${rb} ohms\`);`,
+      "bb-bjt-switches",
+      "Calculate transistor base resistance for saturated switching.",
+      [
+        "Compute iBase = iLoad / betaForced.",
+        "Calculate (vGpio - 0.7) / iBase.",
+        "Print 'Rb: 430 ohms'.",
+      ],
+      "Developing",
+      `function calculateBaseResistor(vGpio, iLoad, betaForced) {
+  // Implement base resistor calculation
+}
+
+// Calculate for 5.0V, 0.10A, beta 10 and print Rb: 430 ohms
+`,
+      [
+        {
+          id: "tc-bjt-1",
+          label: "Calculates correct base resistance for 100mA load",
+          stdin: "",
+          expectedStdout: "Rb: 430 ohms",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why is a base resistor mandatory when connecting a microcontroller GPIO to an NPN transistor base?",
+      "The base-emitter junction acts like a forward-biased silicon diode to ground (0.7V). Without a resistor, the GPIO pin would short into ground through the junction, destroying the microcontroller pin.",
+    ),
+  },
+
+  {
+    id: "bb-555-timer-astable",
+    order: 9,
+    title: "555 Timer Astable Multivibrator Pulse Generator",
+    summary: "Wire the classic 555 IC in astable mode with two resistors and a capacitor to generate continuous square-wave clock pulses.",
+    type: "interactive-simulation",
+    objectiveIds: ["bb-555-astable"],
+    prerequisiteLessonIds: ["bb-bjt-transistor-switch"],
+    estimatedDurationMinutes: 35,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "555 Timer Astable Circuit Lab",
+      description: "Interactive 555 timer breadboard wiring showing capacitor charge/discharge between 1/3 Vcc and 2/3 Vcc.",
+    },
+    content: `# 555 Timer Astable Multivibrator Pulse Generator
+
+The **NE555 Timer** is the most widely produced integrated circuit in electronics history. In **Astable mode**, it continuously oscillates without external triggering, serving as an autonomous hardware clock generator for LEDs, buzzers, and counters.
+
+## Astable Wiring & Timing Components
+- $R_1$: Connected between $V_{cc}$ (Pin 8/4) and Discharge (Pin 7).
+- $R_2$: Connected between Discharge (Pin 7) and Threshold/Trigger (Pins 6 and 2 tied together).
+- $C_1$: Connected between Pins 6/2 and ground (GND).
+
+## Frequency and Duty Cycle Formulas
+The capacitor charges through $(R_1 + R_2)$ and discharges strictly through $R_2$:
+- **High Time ($t_{high}$)**: $0.693 \\times (R_1 + R_2) \\times C$
+- **Low Time ($t_{low}$)**: $0.693 \\times R_2 \\times C$
+- **Total Period ($T$)**: $t_{high} + t_{low} = 0.693 \\times (R_1 + 2 R_2) \\times C$
+- **Frequency ($f$)**: $\\frac{1.44}{(R_1 + 2 R_2) \\times C}$`,
+    theorySections: [
+      {
+        id: "bb-555-internal-comparators",
+        title: "Internal Voltage Divider and Flip-Flop",
+        content: "Inside the 555 IC, three 5kΩ resistors divide Vcc into 1/3 Vcc and 2/3 Vcc reference thresholds. Two analog comparators monitor these points to set and reset an internal SR latch, cycling the discharge transistor.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Microcontroller Frequency Measurement of 555 Clock in C",
+        language: "c",
+        code: `// C sketch measuring external 555 timer clock pulses on Arduino Pin 2
+#include <stdio.h>
+
+float calculate555Frequency(float r1, float r2, float cFarads) {
+    return 1.44f / ((r1 + 2.0f * r2) * cFarads);
+}
+
+int main(void) {
+    float r1 = 1000.0f;    // 1k ohm
+    float r2 = 10000.0f;   // 10k ohm
+    float c = 0.000010f;   // 10 uF
+    printf("Clock frequency: %.2f Hz\\n", calculate555Frequency(r1, r2, c));
+    return 0;
+}`,
+        description: "Calculating theoretical oscillation frequency for a breadboard 555 timer.",
+      },
+    ],
+    exercise: exercise(
+      "ex-bb-555-freq-calc",
+      "Calculate 555 Astable Frequency and Period",
+      "Write a function `calculate555Timer(r1, r2, cFarads)`: calculate total period T = 0.693 * (r1 + 2 * r2) * cFarads, and frequency f = 1 / T. For r1 = 10000 (10k), r2 = 47000 (47k), cFarads = 0.000010 (10uF): return { t: T.toFixed(2), f: f.toFixed(2) }. Print: `Period: ${res.t}s, Frequency: ${res.f}Hz`.",
+      `function calculate555Timer(r1, r2, cFarads) {
+  const T = 0.693 * (r1 + 2 * r2) * cFarads;
+  const f = 1 / T;
+  return { t: T.toFixed(2), f: f.toFixed(2) };
+}
+
+const res = calculate555Timer(10000, 47000, 0.000010);
+console.log(\`Period: \${res.t}s, Frequency: \${res.f}Hz\`);`,
+      "bb-555-astable",
+      "Calculate timing characteristics of a 555 astable multivibrator.",
+      [
+        "Compute T = 0.693 * (r1 + 2 * r2) * cFarads.",
+        "Calculate frequency f = 1 / T.",
+        "Print 'Period: 0.72s, Frequency: 1.39Hz'.",
+      ],
+      "Developing",
+      `function calculate555Timer(r1, r2, cFarads) {
+  // Implement 555 timer math
+}
+
+// Calculate for 10k, 47k, 10uF and print Period: 0.72s, Frequency: 1.39Hz
+`,
+      [
+        {
+          id: "tc-555-1",
+          label: "Calculates correct period and frequency for 555 timer",
+          stdin: "",
+          expectedStdout: "Period: 0.72s, Frequency: 1.39Hz",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "Why can a standard 555 timer astable circuit never achieve a duty cycle under 50% without an added steering diode?",
+      "Because the capacitor charges through both R1 and R2, but discharges strictly through R2, meaning charge time (thigh) is always strictly greater than discharge time (tlow).",
+    ),
+  },
+
+  {
+    id: "bb-capstone-hardware-prototype",
+    order: 10,
+    title: "Comprehensive Breadboard Prototyping Assessment",
+    summary: "Synthesize bus power distribution, pull-up/pull-down switching, voltage dividers, active semiconductors, and multimeter fault diagnosis.",
+    type: "assessment",
+    objectiveIds: ["bb-capstone-proto"],
+    prerequisiteLessonIds: ["bb-555-timer-astable"],
+    estimatedDurationMinutes: 40,
+    interactiveDemo: {
+      kind: "circuit",
+      title: "Interactive Complete Hardware Prototyping Studio",
+      description: "Full virtual breadboard laboratory with voltage regulators, active semiconductors, pushbuttons, LEDs, and virtual test equipment.",
+    },
+    content: `# Comprehensive Breadboard Prototyping Assessment
+
+This capstone assessment validates your mastery across the complete spectrum of solderless breadboard prototyping and circuit diagnosis:
+1. **Physical Bus Continuity**: Power rail bridging, common ground bonding, and decoupling.
+2. **Component Protection**: Sizing resistors for LEDs and inductive clamp flyback diodes.
+3. **Digital & Analog Interfacing**: Noise-immune pull resistors and two-resistor voltage dividers.
+4. **Active Control**: NPN BJT digital switches and autonomous 555 clock generators.
+5. **Systematic Troubleshooting**: Using digital multimeter voltage and continuity modes to locate faults.`,
+    theorySections: [
+      {
+        id: "bb-capstone-rubric",
+        title: "Hardware Engineering Assessment Rubric",
+        content: "Prototypes are evaluated for common ground continuity, appropriate thermal and current derating, neat color-coded jumper wiring, and zero short-circuit power hazards.",
+      },
+    ],
+    codeExamples: [
+      {
+        title: "Complete Hardware Verification Routine in C",
+        language: "c",
+        code: `// C sketch validating power rails, button input, and transistor driver
+#include <stdio.h>
+#include <stdbool.h>
+
+struct CircuitStatus {
+    bool commonGndVerified;
+    float vRail5V;
+    bool switchDebounced;
+};
+
+void printAudit(struct CircuitStatus s) {
+    if (s.commonGndVerified && s.vRail5V >= 4.8f && s.switchDebounced) {
+        printf("PROTOTYPE VERIFIED: Circuit is safe for deployment.\\n");
+    } else {
+        printf("PROTOTYPE FAULT: Check power rails and ground bonding.\\n");
+    }
+}
+
+int main(void) {
+    struct CircuitStatus ok = { true, 4.95f, true };
+    printAudit(ok);
+    return 0;
+}`,
+        description: "Checking hardware prototype health parameters before energizing.",
+      },
+    ],
+    exercise: exercise(
+      "ex-bb-capstone-audit",
+      "Run Complete Hardware Prototype Design Audit",
+      "Write a function `auditBreadboardPrototype(vRail, gndContinuity, hasFlybackDiode, rBaseSized)` that returns `{ pass: boolean, issues: string[] }`. Check: 1) gndContinuity must be true (else add 'MISSING_GND'). 2) vRail must be between 4.75 and 5.25 (else add 'OUT_OF_SPEC_VOLTAGE'). 3) hasFlybackDiode must be true (else add 'UNPROTECTED_INDUCTOR'). 4) rBaseSized must be true (else add 'UNSAFE_BASE_DRIVE'). pass is true if issues.length === 0. Test with a valid circuit `(5.0, true, true, true)` and print `Audit: ${res.pass ? 'PASS' : 'FAIL'}, Issues: ${res.issues.length}`.",
+      `function auditBreadboardPrototype(vRail, gndContinuity, hasFlybackDiode, rBaseSized) {
+  const issues = [];
+  if (!gndContinuity) issues.push('MISSING_GND');
+  if (vRail < 4.75 || vRail > 5.25) issues.push('OUT_OF_SPEC_VOLTAGE');
+  if (!hasFlybackDiode) issues.push('UNPROTECTED_INDUCTOR');
+  if (!rBaseSized) issues.push('UNSAFE_BASE_DRIVE');
+  return { pass: issues.length === 0, issues };
+}
+
+const res = auditBreadboardPrototype(5.0, true, true, true);
+console.log(\`Audit: \${res.pass ? 'PASS' : 'FAIL'}, Issues: \${res.issues.length}\`);`,
+      "bb-capstone-proto",
+      "Validate circuit prototype safety and electrical design criteria.",
+      [
+        "Verify all 4 safety criteria.",
+        "Ensure pass is true and issues.length is 0 for nominal input.",
+        "Print 'Audit: PASS, Issues: 0'.",
+      ],
+      "Applied",
+      `function auditBreadboardPrototype(vRail, gndContinuity, hasFlybackDiode, rBaseSized) {
+  // Implement prototype design audit
+}
+
+// Audit healthy circuit and print Audit: PASS, Issues: 0
+`,
+      [
+        {
+          id: "tc-bb-cap-1",
+          label: "Verifies healthy prototype passes audit with 0 issues",
+          stdin: "",
+          expectedStdout: "Audit: PASS, Issues: 0",
+          matchMode: "trimmed",
+        },
+      ],
+    ),
+    checkpoint: checkpoint(
+      "What is the single most common cause of erratic, intermittent behavior in breadboard circuits interfacing multiple modules?",
+      "A missing or unbonded common ground (GND) wire between separate boards or power supplies, leaving signals without a shared 0V reference.",
+    ),
+  },
 ];
 
 export const breadboardElectronicsModules: LearningModule[] = [
@@ -806,13 +1204,20 @@ export const breadboardElectronicsModules: LearningModule[] = [
     "Construct two-resistor voltage dividers, interface sensors, and troubleshoot circuits with digital multimeters.",
     breadboardElectronicsLessons.slice(4, 6),
   ),
+  moduleData(
+    "bb-module-active-semiconductors",
+    4,
+    "Active Semiconductors & Prototyping Projects",
+    "Diode rectifiers, BJT transistor switches, 555 timer pulse generators, and hardware prototyping assessment.",
+    breadboardElectronicsLessons.slice(6),
+  ),
 ];
 
 export const breadboardElectronicsCourse: LearningCourse = {
   id: "breadboard-electronics",
   subjectId: "breadboard-electronics-subject",
   title: "Practical Breadboard Prototyping & Circuits",
-  description: "Master physical circuit prototyping on solderless breadboards, terminal bus architectures, current limiting, voltage dividers, and multimeter troubleshooting.",
+  description: "Master physical circuit prototyping on solderless breadboards, terminal bus architectures, current limiting, voltage dividers, active semiconductors, and multimeter troubleshooting.",
   level: "Beginner",
   version: "1.0.0",
   prerequisites: ["Elementary algebra", "Basic curiosity about physical computing"],
@@ -824,8 +1229,10 @@ export const breadboardElectronicsCourse: LearningCourse = {
     "Wire tactile momentary pushbuttons with pull-up and pull-down resistor networks.",
     "Design two-resistor voltage divider circuits and interface resistive analog sensors.",
     "Systematically troubleshoot faulty hardware prototypes using digital multimeters.",
+    "Integrate silicon/Schottky diodes for reverse polarity and inductive flyback protection.",
+    "Drive high-current DC loads safely using NPN BJT transistor switches and 555 timer clocks."
   ],
-  estimatedDurationMinutes: 150,
+  estimatedDurationMinutes: 240,
   publicationStatus: "published",
   modules: breadboardElectronicsModules,
 };
