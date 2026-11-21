@@ -2,6 +2,7 @@
 
 ## Unreleased — MVP operations, announcement scheduling, and launch media
 
+- Completed Stage 0 content audit and plan (`docs/CONTENT_PLAN.md`): cataloged baseline 14 courses and 123 lessons, mapped out hardware interpreter and circuit simulator capability matrix, and established technical architecture for multi-track engineering expansion (advanced embedded, circuits/EEE core, DSA in C, control systems, and career practice).
 - Implemented autonomous in-browser C compilation and execution using client-side WebAssembly (`binji/wasm-clang` + `wasm-ld` + in-memory MemFS with custom WASI preview-1 shim), enabled by default (`NEXT_PUBLIC_C_RUN_ENABLED` defaults to enabled). Runs with zero external server/API calls and zero `eval`/`new Function` under strict nonce Content Security Policy.
 - Resolved CodeMirror single-letter focus loss across all workbench and lesson editors, ensuring uninterrupted typing.
 - Kept Git repository clean and under 5 MB by untracking compiled binaries from Git and downloading pinned artifacts with SHA-256 integrity checks at prebuild time (`scripts/download-c-toolchain.mjs`).
