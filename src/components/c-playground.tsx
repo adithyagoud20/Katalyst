@@ -7,7 +7,7 @@ import { cpp } from "@codemirror/lang-cpp";
 import { bracketMatching, foldGutter, HighlightStyle, indentOnInput, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import { EditorView, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
-import { ArrowLeft, ArrowRight, Check, Code2, Copy, Cpu, Database, Globe, Laptop, LayoutGrid, LoaderCircle, Play, RotateCcw, RotateCw, Smartphone, Sparkles, Square, Terminal } from "lucide-react";
+import { Activity, ArrowLeft, ArrowRight, Check, Code2, Compass, Copy, Cpu, Database, Globe, Laptop, LayoutGrid, LoaderCircle, Play, Radio, RotateCcw, RotateCw, Smartphone, Sparkles, Square, Terminal } from "lucide-react";
 import { CircuitSimulator, type CircuitSimulatorMode } from "@/components/simulators/circuit-simulator";
 import { SimulatorErrorBoundary } from "@/components/simulators/simulator-error-boundary";
 import { defaultCppProgram } from "@/lib/playground-templates";
@@ -967,6 +967,12 @@ export function CPlayground({
                   ? "8-Bit Simple CPU"
                   : circuitInitialMode === "analog"
                   ? "Analog Circuits & EEE"
+                  : circuitInitialMode === "pid"
+                  ? "PID Controller Studio"
+                  : circuitInitialMode === "fft"
+                  ? "FFT & Sampling Analyzer"
+                  : circuitInitialMode === "dsa"
+                  ? "Interactive DSA Visualizer"
                   : "Digital Logic Gates"
                 : langDetails.title}
             </span>
@@ -1018,6 +1024,9 @@ export function CPlayground({
                 <option value="circuit:fsm">FSM State Machine</option>
                 <option value="circuit:toycpu">8-Bit Simple CPU</option>
                 <option value="circuit:analog">Analog Circuits &amp; EEE</option>
+                <option value="circuit:pid">PID Controller Studio</option>
+                <option value="circuit:fft">FFT &amp; Sampling Analyzer</option>
+                <option value="circuit:dsa">Interactive DSA Visualizer</option>
               </optgroup>
             </select>
             <span className="ide-file-status" title={status}>
@@ -1393,6 +1402,81 @@ export function CPlayground({
               </div>
               <div className="launcher-card-action">
                 <span>Launch Analog Studio</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "pid")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "pid")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-blue-500">
+                    <Activity size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">Feedback Control</span>
+                </div>
+                <h3>PID Controller Studio</h3>
+                <p>
+                  Tune proportional, integral, and derivative gains with real-time Euler step response, disturbance rejection, and overshoot analysis.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch PID Studio</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "fft")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "fft")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-cyan-500">
+                    <Radio size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">DSP &amp; Signals</span>
+                </div>
+                <h3>FFT &amp; Sampling Analyzer</h3>
+                <p>
+                  Explore the Nyquist-Shannon sampling theorem, visualize aliasing folding frequencies, and compute live 32-bin DFT spectral peaks.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch FFT Analyzer</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "dsa")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "dsa")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-purple-500">
+                    <Compass size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">DSA Visualizer</span>
+                </div>
+                <h3>Data Structures Studio</h3>
+                <p>
+                  Inspect arrays, binary search pointer steps, singly linked list traversal, binary search tree nodes, and animated sorting.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch DSA Studio</span>
                 <ArrowRight size={14} />
               </div>
             </div>

@@ -161,6 +161,7 @@ export function getCourseBadgeText(courseId: string): string {
   if (courseId.includes("prompt")) return "PROMPTS";
   if (courseId.includes("photo")) return "COLOR LAB";
   if (courseId === "circuits-eee-core") return "CIRCUITS & EEE";
+  if (courseId === "control-and-signals" || courseId.includes("control")) return "CONTROL & SIGNALS";
   if (courseId.includes("circuits") || courseId.includes("digital")) return "DIGITAL LOGIC";
   return "SYSTEMS";
 }
@@ -171,6 +172,7 @@ function getCourseRuntimeText(courseId: string): string {
   if (courseId.includes("python")) return "Python 3.12 · Pyodide";
   if (courseId.includes("arduino") || courseId.includes("esp32")) return "Embedded simulator · browser";
   if (courseId === "circuits-eee-core") return "Analog & EEE simulator · browser";
+  if (courseId === "control-and-signals" || courseId.includes("control")) return "Control & signals simulator · browser";
   if (courseId.includes("breadboard") || courseId.includes("digital")) return "Circuit simulator · browser";
   if (courseId.includes("sql")) return "SQL.js · browser database";
   if (courseId.includes("media") || courseId.includes("photo")) return "Canvas image lab · browser";
@@ -243,12 +245,12 @@ type CourseCategory = "All" | "Systems" | "Web" | "Algorithms" | "Databases" | "
 
 function matchesCourseCategory(courseId: string, category: Exclude<CourseCategory, "All">) {
   switch (category) {
-    case "Systems": return courseId.includes("c-programming") || courseId.includes("cpp") || courseId.includes("python-programming") || courseId.includes("arduino") || courseId.includes("esp32");
+    case "Systems": return courseId.includes("c-programming") || courseId.includes("cpp") || courseId.includes("python-programming") || courseId.includes("arduino") || courseId.includes("esp32") || courseId.includes("control");
     case "Web": return courseId.includes("html") || courseId.includes("js-systems") || courseId.includes("ai-app");
     case "Algorithms": return courseId.includes("dsa") || courseId.includes("js-systems");
     case "Databases": return courseId.includes("sql");
     case "AI & Media": return courseId.includes("prompt") || courseId.includes("photo") || courseId.includes("ai-app");
-    case "Hardware": return courseId.includes("circuits") || courseId.includes("arduino") || courseId.includes("esp32") || courseId.includes("breadboard");
+    case "Hardware": return courseId.includes("circuits") || courseId.includes("arduino") || courseId.includes("esp32") || courseId.includes("breadboard") || courseId.includes("control");
   }
 }
 
@@ -1982,6 +1984,12 @@ export function LearningExperience({
                           initialMode={
                             lesson.interactiveDemo.config?.mode === "analog"
                               ? "analog"
+                              : lesson.interactiveDemo.config?.mode === "pid"
+                              ? "pid"
+                              : lesson.interactiveDemo.config?.mode === "fft"
+                              ? "fft"
+                              : lesson.interactiveDemo.config?.mode === "dsa"
+                              ? "dsa"
                               : lesson.interactiveDemo.config?.mode === "kmap"
                               ? "kmap"
                               : lesson.interactiveDemo.config?.mode === "fsm"

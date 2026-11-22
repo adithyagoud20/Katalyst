@@ -80,6 +80,11 @@ export const learningSubjects: LearningSubject[] = [
     "id": "circuits-eee-core-subject",
     "title": "Analog Circuits, Network Theory & Core EEE",
     "description": "Master Kirchhoff's laws, Thevenin/Norton theorems, AC phasors, RLC resonance, diodes, BJT amplifiers, operational amplifiers, and active filters."
+  },
+  {
+    "id": "control-and-signals-subject",
+    "title": "Control Systems & Signal Processing",
+    "description": "Master feedback control loops, PID tuning, Bode stability, state-space representations, Nyquist-Shannon sampling, DFT/FFT spectrum analysis, and Kalman filtering."
   }
 ];
 
@@ -7838,6 +7843,384 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "kind": "circuit",
               "title": "Three-Phase Star/Delta & Transformers",
               "description": "Interactive line vs phase voltage waveforms with 120° phase displacements."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "control-and-signals",
+    "subjectId": "control-and-signals-subject",
+    "title": "Control Systems & Signal Processing Mastery",
+    "description": "From open-loop and closed-loop transfer functions to PID tuning, Bode stability margins, Nyquist-Shannon sampling, FFT analysis, digital filters, and Kalman sensor fusion.",
+    "level": "Applied",
+    "version": "1.0.0",
+    "prerequisites": [
+      "Differential equations, Laplace transforms, and complex numbers.",
+      "Circuit theory fundamentals (RLC transients and AC phasors)."
+    ],
+    "objectives": [
+      {
+        "id": "ctrl-open-closed-obj",
+        "title": "Calculate open-loop and closed-loop transfer functions, tracking error, and disturbance rejection."
+      },
+      {
+        "id": "ctrl-pid-tune-obj",
+        "title": "Synthesize continuous and discrete PID controllers using the Ziegler-Nichols tuning method."
+      },
+      {
+        "id": "ctrl-bode-margin-obj",
+        "title": "Determine Gain Margin, Phase Margin, and closed-loop stability from open-loop frequency response."
+      },
+      {
+        "id": "ctrl-state-space-obj",
+        "title": "Formulate state-space matrix models (A, B, C, D) and evaluate the Kalman controllability matrix."
+      },
+      {
+        "id": "sig-nyquist-sample-obj",
+        "title": "Apply the Nyquist-Shannon sampling theorem, calculate folding frequencies, and prevent aliasing."
+      },
+      {
+        "id": "sig-dft-fft-obj",
+        "title": "Compute Discrete Fourier Transform frequency bin magnitudes and apply Cooley-Tukey radix-2 FFT."
+      },
+      {
+        "id": "sig-digital-filter-obj",
+        "title": "Map continuous s-plane poles to the discrete z-plane and implement FIR/IIR difference equations."
+      },
+      {
+        "id": "sig-kalman-filter-obj",
+        "title": "Implement discrete Kalman filter prediction and measurement update equations for sensor fusion."
+      }
+    ],
+    "learningOutcomes": [
+      "Analyze open-loop and closed-loop block diagrams, error transfer functions, and disturbance sensitivity.",
+      "Synthesize and tune PID controllers using the Ziegler-Nichols oscillation method with anti-windup clamping.",
+      "Evaluate frequency response Bode diagrams, Gain Margin, and Phase Margin for feedback stability.",
+      "Formulate continuous-time state-space matrix models and test the Kalman controllability criterion.",
+      "Apply the Nyquist-Shannon sampling theorem, calculate folding frequencies, and prevent aliasing.",
+      "Compute Discrete Fourier Transform (DFT) frequency bin magnitudes and explain radix-2 FFT complexity.",
+      "Synthesize discrete-time FIR and IIR digital filters and evaluate unit-circle pole-zero stability.",
+      "Implement discrete Kalman filter prediction and measurement correction equations for noisy sensor fusion."
+    ],
+    "estimatedDurationMinutes": 480,
+    "publicationStatus": "published",
+    "modules": [
+      {
+        "id": "mod-ctrl-feedback-pid",
+        "order": 1,
+        "title": "Feedback Control & PID Synthesis",
+        "summary": "Open-loop vs closed-loop transfer functions, sensitivity functions, and Ziegler-Nichols PID tuning.",
+        "lessons": [
+          {
+            "id": "ctrl-open-closed-loop",
+            "order": 1,
+            "title": "Open-Loop vs. Closed-Loop Transfer Functions & Block Diagrams",
+            "summary": "Formulate open-loop and closed-loop transfer functions, sensitivity functions, and steady-state tracking error.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "ctrl-open-closed-obj"
+            ],
+            "prerequisiteLessonIds": [],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-ctrl-closed-loop-gain",
+              "title": "Calculate Closed-Loop Gain and Steady-State Error",
+              "difficulty": "Applied",
+              "expectedOutcome": "Determine closed-loop steady-state tracking performance.",
+              "prompt": "For a plant with DC gain G = 10.0, unity feedback H = 1.0, and a step input R = 5.0, compute loop gain L, closed-loop gain T, steady-state output Yss, tracking error Ess, and sensitivity S. Print: 'Loop Gain: {l}, Closed-Loop Gain: {t}, Yss: {yss}, Ess: {ess}, Sensitivity: {s}' with Loop Gain to 1 decimal, Closed-Loop Gain and Sensitivity to 4 decimals, and Yss and Ess to 2 decimals.",
+              "objectiveId": "ctrl-open-closed-obj",
+              "starterCode": "// Closed-loop control solver\nconst g = 10.0, h = 1.0, r = 5.0;\n\n// TODO: Compute l, t, yss, ess, and s and log formatted output\n"
+            },
+            "checkpoint": {
+              "prompt": "Why does increasing open-loop gain reduce steady-state tracking error in a Type 0 system?",
+              "answer": "Because steady-state error is given by Ess = R / (1 + Kp). As open-loop gain Kp approaches infinity, Ess asymptotically approaches zero."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Closed-Loop Step Response",
+              "description": "Interactive feedback control loop demonstrating tracking error and disturbance attenuation."
+            }
+          },
+          {
+            "id": "ctrl-pid-controller-tuning",
+            "order": 2,
+            "title": "PID Controller Synthesis & Ziegler-Nichols Tuning",
+            "summary": "Synthesize Proportional-Integral-Derivative controllers and derive optimal gains using Ziegler-Nichols oscillations.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "ctrl-pid-tune-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "ctrl-open-closed-loop"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-ctrl-ziegler-nichols",
+              "title": "Compute Ziegler-Nichols PID Controller Gains",
+              "difficulty": "Applied",
+              "expectedOutcome": "Apply Ziegler-Nichols closed-loop tuning formulas.",
+              "prompt": "A thermal plant oscillates with sustained oscillation at ultimate gain Ku = 8.0 with period Tu = 1.4 seconds. Compute the Ziegler-Nichols Classic PID parameters: Kp, Ti, Td, Ki (Kp / Ti), and Kd (Kp * Td). Print: 'Kp: {kp}, Ki: {ki}, Kd: {kd}, Ti: {ti} s, Td: {td} s' with Kp, Ki, Kd to 2 decimals, and Ti, Td to 3 decimals.",
+              "objectiveId": "ctrl-pid-tune-obj",
+              "starterCode": "// Ziegler-Nichols PID tuner\nconst ku = 8.0, tu = 1.4;\n\n// TODO: Calculate kp, ki, kd, ti, and td and log result\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is derivative action usually computed based on the negative derivative of process measurement (-dy/dt) rather than error (de/dt)?",
+              "answer": "To avoid 'derivative kick'—a massive instantaneous spike in actuator output when setpoint changes discontinuously in a step."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "PID Closed-Loop Simulator",
+              "description": "Interactive PID tuner with real-time response curves, overshoot percentage, and settling time."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-ctrl-margins-statespace",
+        "order": 2,
+        "title": "Stability Margins & State-Space Systems",
+        "summary": "Bode plot Gain/Phase margins, Nyquist criterion, and state-space matrix controllability.",
+        "lessons": [
+          {
+            "id": "ctrl-bode-nyquist-stability",
+            "order": 3,
+            "title": "Bode Plot Stability Margins & Nyquist Criterion",
+            "summary": "Determine Gain Margin, Phase Margin, and closed-loop stability from open-loop frequency response.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "ctrl-bode-margin-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "ctrl-pid-controller-tuning"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-ctrl-gain-margin",
+              "title": "Compute Phase Crossover Frequency and Gain Margin",
+              "difficulty": "Applied",
+              "expectedOutcome": "Calculate open-loop magnitude and Gain Margin at phase crossover.",
+              "prompt": "For loop transfer function L(s) = 20 / [s(s+2)(s+4)], phase reaches -180 deg at omega_pc = sqrt(8) rad/s (approx 2.828 rad/s). Calculate magnitude at omega_pc, and Gain Margin in dB (GM = -20 * log10(mag)). Print: 'Omega_pc: {w} rad/s, Mag: {m}, Gain Margin: {gm} dB' with w to 3 decimals, m to 4 decimals, and gm to 2 decimals.",
+              "objectiveId": "ctrl-bode-margin-obj",
+              "starterCode": "// Gain margin solver\nconst w = Math.sqrt(8.0);\nconst k = 20.0;\n\n// TODO: Calculate m and gm and print formatted output\n"
+            },
+            "checkpoint": {
+              "prompt": "What does a negative Gain Margin in decibels signify for an open-loop stable minimum-phase system?",
+              "answer": "It signifies that closed-loop gain exceeds 0 dB at the -180° phase crossover, meaning the closed-loop system is unstable and will exhibit growing oscillations."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Bode Plot Stability Margins",
+              "description": "Interactive frequency response showing gain and phase margins for a 3rd-order system."
+            }
+          },
+          {
+            "id": "ctrl-state-space-representation",
+            "order": 4,
+            "title": "State-Space Matrix Formulation & Controllability",
+            "summary": "Formulate state-space matrix models (A, B, C, D) and evaluate the Kalman controllability matrix.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "ctrl-state-space-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "ctrl-bode-nyquist-stability"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-ctrl-controllability",
+              "title": "Compute Controllability Matrix Determinant",
+              "difficulty": "Applied",
+              "expectedOutcome": "Evaluate controllability matrix rank for 2nd-order state system.",
+              "prompt": "For system A = [[0, 1], [-2, -3]] and B = [[0], [1]], calculate vector AB, controllability matrix determinant det(C), and confirm controllability status. Print: 'AB = [{ab0}, {ab1}]^T | det(C) = {det} -> {status}' with ab values to 1 decimal, det to 2 decimals, and status as 'Controllable'.",
+              "objectiveId": "ctrl-state-space-obj",
+              "starterCode": "// State-space controllability solver\nconst a00 = 0.0, a01 = 1.0, a10 = -2.0, a11 = -3.0;\nconst b0 = 0.0, b1 = 1.0;\n\n// TODO: Calculate ab0, ab1, det, status and log formatted output\n"
+            },
+            "checkpoint": {
+              "prompt": "What are the eigenvalues of matrix A, and what physical property do they dictate?",
+              "answer": "The eigenvalues of A (roots of det(sI - A) = 0) are the open-loop poles of the dynamic system, dictating natural frequency, damping, and unforced stability."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "State-Space Model & Controllability",
+              "description": "Interactive state matrix editor evaluating eigenvalues and Kalman rank."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-sig-sampling-fourier",
+        "order": 3,
+        "title": "Sampling, Aliasing & Frequency Transforms",
+        "summary": "Continuous-to-discrete conversion, Nyquist-Shannon theorem, aliasing prevention, and Discrete Fourier Transforms.",
+        "lessons": [
+          {
+            "id": "sig-sampling-nyquist-shannon",
+            "order": 5,
+            "title": "Continuous to Discrete Sampling & Nyquist-Shannon Theorem",
+            "summary": "Apply the Nyquist-Shannon sampling theorem, calculate folding frequencies, and prevent aliasing.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "sig-nyquist-sample-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "ctrl-state-space-representation"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-sig-nyquist-alias",
+              "title": "Calculate Nyquist Frequency and Aliased Tone",
+              "difficulty": "Applied",
+              "expectedOutcome": "Determine Nyquist folding frequency and calculate aliased harmonic components.",
+              "prompt": "For a sampling rate fs = 100 Hz and input signal fin = 75 Hz, compute the Nyquist folding frequency f_nyquist, whether it is aliased ('ALIASED' or 'CLEAN'), and the apparent aliased frequency f_apparent. Print: 'fs: {fs} Hz, fin: {fin} Hz | Nyquist: {f_nyquist} Hz | Status: {status} (f_apparent: {f_app} Hz)' with all frequencies formatted with 0 decimals.",
+              "objectiveId": "sig-nyquist-sample-obj",
+              "starterCode": "// Nyquist sampling and aliasing solver\nconst fs = 100.0, fin = 75.0;\n\n// TODO: Compute f_nyquist, status, f_app and print formatted output\n"
+            },
+            "checkpoint": {
+              "prompt": "Why does a CD audio format utilize a 44.1 kHz sampling frequency when human hearing tops out at 20 kHz?",
+              "answer": "To satisfy Nyquist (> 40 kHz) while providing a 4.1 kHz guard band (20 kHz to 22.05 kHz) allowing practical analog anti-aliasing filters to roll off without attenuating audible treble."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Nyquist Sampling & Aliasing Visualizer",
+              "description": "Interactive continuous wave with discrete sampling dots and real-time aliasing alert."
+            }
+          },
+          {
+            "id": "sig-fourier-dft-fft",
+            "order": 6,
+            "title": "Discrete Fourier Transform (DFT) and Fast Fourier Transform (FFT)",
+            "summary": "Compute Discrete Fourier Transform frequency bin magnitudes and apply Cooley-Tukey radix-2 FFT.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "sig-dft-fft-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "sig-sampling-nyquist-shannon"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-sig-fft-resolution",
+              "title": "Calculate FFT Bin Resolution and Peak Bin Index",
+              "difficulty": "Applied",
+              "expectedOutcome": "Calculate FFT frequency bin spacing and spectral peak alignment.",
+              "prompt": "An audio ADC samples at fs = 48000 Hz using an N = 1024 point FFT. Compute frequency bin resolution delta_f in Hz, and the bin index k closest to a 1000 Hz tone. Print: 'Sampling: {fs} Hz, N: {n} | Delta_f: {df} Hz | Peak Bin for 1000 Hz: Bin {k}' with df to 2 decimals.",
+              "objectiveId": "sig-dft-fft-obj",
+              "starterCode": "// FFT resolution calculator\nconst fs = 48000, n = 1024, f_tone = 1000;\n\n// TODO: Calculate df and k and print formatted output\n"
+            },
+            "checkpoint": {
+              "prompt": "How many complex multiplications are saved by using a 1024-point FFT instead of direct DFT?",
+              "answer": "Direct DFT requires N^2 = 1,048,576 operations. A radix-2 FFT requires (N/2) * log2(N) = 512 * 10 = 5,120 operations—a 99.5% reduction in compute."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Real-Time DFT Spectrum Display",
+              "description": "Interactive DFT magnitude bar spectrum showing harmonic frequency components."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-sig-filters-kalman",
+        "order": 4,
+        "title": "Digital Filters & Stochastic Estimation",
+        "summary": "Z-transform pole-zero stability, FIR/IIR recursive difference equations, and discrete Kalman sensor fusion.",
+        "lessons": [
+          {
+            "id": "sig-z-transform-digital-filters",
+            "order": 7,
+            "title": "Z-Transform, Pole-Zero Placement, and FIR / IIR Digital Filters",
+            "summary": "Map continuous s-plane poles to the discrete z-plane and implement FIR/IIR difference equations.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "sig-digital-filter-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "sig-fourier-dft-fft"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-sig-iir-filter",
+              "title": "Run Exponential Moving Average Digital Filter",
+              "difficulty": "Applied",
+              "expectedOutcome": "Compute discrete recursive IIR filter output over sample stream.",
+              "prompt": "Implement a 1st-order IIR filter y[n] = alpha * x[n] + (1 - alpha) * y[n-1] with alpha = 0.25 on the sample array [10, 12, 18, 25, 22, 20, 19, 20] starting with y[-1] = 10.0. Compute final output y[7]. Print: 'Final filtered value y[7] = {val}' formatted to 2 decimal places.",
+              "objectiveId": "sig-digital-filter-obj",
+              "starterCode": "// IIR digital filter solver\nconst alpha = 0.25;\nconst x = [10.0, 12.0, 18.0, 25.0, 22.0, 20.0, 19.0, 20.0];\n\n// TODO: Compute final filtered y and log output\n"
+            },
+            "checkpoint": {
+              "prompt": "Why does moving an IIR filter pole closer to z = 1 lower the cut-off frequency?",
+              "answer": "In the z-plane, z = 1 corresponds to 0 Hz (DC). Placing a pole near z = 1 increases low-frequency gain while attenuating higher frequencies along the unit circle."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Digital Filter Pole-Zero Plane",
+              "description": "Inspect unit circle pole locations and frequency response roll-off."
+            }
+          },
+          {
+            "id": "sig-kalman-filter-sensor-fusion",
+            "order": 8,
+            "title": "Discrete Kalman Filtering & IMU Sensor Fusion",
+            "summary": "Implement discrete Kalman filter prediction and measurement update equations for sensor fusion.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "sig-kalman-filter-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "sig-z-transform-digital-filters"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-sig-kalman-1d",
+              "title": "Execute 1D Kalman Filter Updates",
+              "difficulty": "Applied",
+              "expectedOutcome": "Implement discrete Kalman gain computation and covariance updates.",
+              "prompt": "Run the 1D Kalman filter with initial x = 0.0, P = 1.0, Q = 0.01, R = 0.5 over 5 measurements [1.2, 1.9, 3.1, 3.9, 5.1]. Compute the final state estimate x_est and final covariance P after all 5 steps. Print: 'Final State: x = {x_est}, Covariance P = {p}' with x_est to 2 decimals, and P to 4 decimals.",
+              "objectiveId": "sig-kalman-filter-obj",
+              "starterCode": "// 1D Kalman filter solver\nlet x = 0.0, p = 1.0;\nconst q = 0.01, r = 0.5;\nconst z = [1.2, 1.9, 3.1, 3.9, 5.1];\n\n// TODO: Run Kalman iterations and log final state and covariance\n"
+            },
+            "checkpoint": {
+              "prompt": "What happens to the Kalman gain K if sensor measurement variance R approaches zero?",
+              "answer": "Kalman gain K approaches 1, meaning the filter discards the physics prediction and completely accepts the measurement: x_est = z_k."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Kalman Filter Sensor Fusion",
+              "description": "Interactive Kalman state tracker filtering high-frequency sensor noise."
             }
           }
         ]

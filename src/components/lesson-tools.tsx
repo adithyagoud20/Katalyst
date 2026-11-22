@@ -180,7 +180,10 @@ export function LessonTools(props: LessonToolsProps) {
                 : props.interactiveDemo.config?.mode === "kmap" ? "kmap"
                   : props.interactiveDemo.config?.mode === "fsm" ? "fsm"
                     : props.interactiveDemo.config?.mode === "toycpu" ? "toycpu"
-                      : props.interactiveDemo.config?.mode === "analog" || /circuits-eee/.test(props.courseId) ? "analog" : "digital"
+                      : props.interactiveDemo.config?.mode === "analog" || /circuits-eee/.test(props.courseId) ? "analog"
+                        : props.interactiveDemo.config?.mode === "pid" || (/control/.test(props.courseId) && !props.interactiveDemo.config?.mode) ? "pid"
+                          : props.interactiveDemo.config?.mode === "fft" ? "fft"
+                            : props.interactiveDemo.config?.mode === "dsa" ? "dsa" : "digital"
           } />
             : props.interactiveDemo.kind === "memory-diagram" ? <MemoryVisualizer initialScenario={props.interactiveDemo.config?.mode === "heap" ? "heap-lifecycle" : props.interactiveDemo.config?.mode === "pointers" ? "pointers" : "stack-frames"} />
               : props.interactiveDemo.kind === "image-lab" ? <ImageLabVisualizer initialFilter={typeof props.interactiveDemo.config?.filter === "string" ? props.interactiveDemo.config.filter : "none"} />

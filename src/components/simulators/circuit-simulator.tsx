@@ -7,8 +7,11 @@ import { KMapSolver } from "./kmap-solver";
 import { FSMDesigner } from "./fsm-designer";
 import { ToyCpuSimulator } from "./toy-cpu-simulator";
 import { AnalogCircuitsStudio } from "./analog-circuits-studio";
+import { PidTuningSimulator } from "./pid-tuning-simulator";
+import { FftSamplingVisualizer } from "./fft-sampling-visualizer";
+import { DsaVisualizer } from "./dsa-visualizer";
 
-export type CircuitSimulatorMode = "digital" | "analog" | "breadboard" | "arduino" | "esp32" | "kmap" | "fsm" | "toycpu";
+export type CircuitSimulatorMode = "digital" | "analog" | "breadboard" | "arduino" | "esp32" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa";
 
 export interface CircuitSimulatorProps {
   initialMode?: CircuitSimulatorMode;
@@ -23,10 +26,10 @@ export function CircuitSimulator({
   className = "",
   hideModeSwitcher = false,
 }: CircuitSimulatorProps) {
-  const [mode, setMode] = useState<"digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu">(
+  const [mode, setMode] = useState<"digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa">(
     initialMode === "arduino" || initialMode === "esp32"
       ? "breadboard"
-      : (initialMode as "digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu")
+      : (initialMode as "digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa")
   );
   const [mcuTarget, setMcuTarget] = useState<"arduino" | "esp32">(
     initialMode === "esp32" ? "esp32" : "arduino"
@@ -226,6 +229,12 @@ export function CircuitSimulator({
                   ? "Interactive Circuit & Hardware Simulator — 8-Bit Educational CPU"
                   : initialMode === "analog"
                   ? "Interactive Circuit & Hardware Simulator — Analog Circuits & Network Theory"
+                  : initialMode === "pid"
+                  ? "Interactive Circuit & Hardware Simulator — PID Controller Tuning"
+                  : initialMode === "fft"
+                  ? "Interactive Circuit & Hardware Simulator — Nyquist Sampling & FFT"
+                  : initialMode === "dsa"
+                  ? "Interactive Circuit & Hardware Simulator — Data Structures & Algorithms"
                   : "Interactive Circuit & Hardware Simulator — Digital Logic Gates"
                 : "Interactive Circuit & Hardware Simulator"}
             </h3>
@@ -246,8 +255,14 @@ export function CircuitSimulator({
                 ? "Inspect 8-bit registers, 16-byte RAM, micro-instruction timing cycles (T1–T6), and ALU arithmetic step-by-step."
                 : initialMode === "analog"
                 ? "Analyze Kirchhoff's laws (KVL/KCL), Thevenin/Norton equivalents, RLC resonance, op-amps, and dual-trace oscilloscope waveforms."
+                : initialMode === "pid"
+                ? "Tune Proportional, Integral, and Derivative gains; inspect step response, overshoot %OS, settling time, and disturbance rejection."
+                : initialMode === "fft"
+                ? "Explore continuous-to-discrete conversion, aliasing distortion, Nyquist criterion (fs ≥ 2 fin), and real-time DFT frequency spectrum."
+                : initialMode === "dsa"
+                ? "Step through contiguous arrays, linked pointer chains, binary search trees, and in-place sorting routines."
                 : "Explore digital logic gates, interactive truth tables, and Boolean output states."
-              : "Explore digital logic gates, K-maps, FSMs, 8-bit CPU architecture, analog circuits, and virtual Arduino / ESP32 breadboard hardware."}
+              : "Explore digital logic gates, K-maps, FSMs, 8-bit CPU architecture, analog circuits, PID loops, FFT sampling, DSA, and virtual Arduino / ESP32 breadboard hardware."}
           </p>
         </div>
 
@@ -297,6 +312,21 @@ export function CircuitSimulator({
             {initialMode === "analog" && (
               <span className="rounded px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white flex items-center gap-1">
                 Analog Circuits &amp; EEE
+              </span>
+            )}
+            {initialMode === "pid" && (
+              <span className="rounded px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white flex items-center gap-1">
+                PID Controller
+              </span>
+            )}
+            {initialMode === "fft" && (
+              <span className="rounded px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white flex items-center gap-1">
+                FFT &amp; Sampling
+              </span>
+            )}
+            {initialMode === "dsa" && (
+              <span className="rounded px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white flex items-center gap-1">
+                DSA Lab
               </span>
             )}
           </div>
@@ -356,6 +386,39 @@ export function CircuitSimulator({
               }`}
             >
               Analog &amp; EEE
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("pid")}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                mode === "pid"
+                  ? "bg-blue-600 text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              PID Tuning
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("fft")}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                mode === "fft"
+                  ? "bg-blue-600 text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              FFT Sampling
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("dsa")}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                mode === "dsa"
+                  ? "bg-blue-600 text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              DSA Visualizer
             </button>
             <button
               type="button"
@@ -522,6 +585,24 @@ export function CircuitSimulator({
       {mode === "analog" && (
         <div className="mt-4">
           <AnalogCircuitsStudio />
+        </div>
+      )}
+
+      {mode === "pid" && (
+        <div className="mt-4">
+          <PidTuningSimulator />
+        </div>
+      )}
+
+      {mode === "fft" && (
+        <div className="mt-4">
+          <FftSamplingVisualizer />
+        </div>
+      )}
+
+      {mode === "dsa" && (
+        <div className="mt-4">
+          <DsaVisualizer />
         </div>
       )}
 

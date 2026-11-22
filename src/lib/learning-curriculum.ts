@@ -553,6 +553,8 @@ export {
   digitalCircuitsPath,
   circuitsEeeCoreSubject,
   circuitsEeeCorePath,
+  controlAndSignalsSubject,
+  controlAndSignalsPath,
   sqlDatabasesSubject,
   sqlDatabasesPath,
   htmlCssWebSubject,

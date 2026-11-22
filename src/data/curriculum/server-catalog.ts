@@ -21,6 +21,7 @@ import { promptEngineeringSubject, promptEngineeringPath } from "./prompt-engine
 import { photoEditingMediaSubject, photoEditingMediaPath } from "./photo-editing-media";
 import { digitalCircuitsSubject, digitalCircuitsPath } from "./digital-circuits";
 import { circuitsEeeCoreSubject, circuitsEeeCorePath } from "./circuits-eee-core";
+import { controlAndSignalsSubject, controlAndSignalsPath } from "./control-and-signals";
 
 export {
   cProgrammingSubject,
@@ -53,6 +54,8 @@ export {
   digitalCircuitsPath,
   circuitsEeeCoreSubject,
   circuitsEeeCorePath,
+  controlAndSignalsSubject,
+  controlAndSignalsPath,
 };
 
 export const serverSubjects: LearningSubject[] = [
@@ -71,6 +74,7 @@ export const serverSubjects: LearningSubject[] = [
   photoEditingMediaSubject,
   digitalCircuitsSubject,
   circuitsEeeCoreSubject,
+  controlAndSignalsSubject,
 ];
 
 export const serverCourses: LearningCourse[] = [
@@ -89,6 +93,7 @@ export const serverCourses: LearningCourse[] = [
   photoEditingMediaPath,
   digitalCircuitsPath,
   circuitsEeeCorePath,
+  controlAndSignalsPath,
 ];
 
 let _validatedCatalog: LearningCatalog | null = null;
