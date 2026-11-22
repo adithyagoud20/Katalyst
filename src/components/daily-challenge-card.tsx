@@ -64,7 +64,7 @@ export function DailyChallengeCard({ className = "", onNavigatePractice }: Daily
   return (
     <div className={`rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4 shadow-sm text-[var(--text-primary)] ${className}`}>
       {/* Header with Streak Counter */}
-      <div className="flex items-center justify-between border-b border-[var(--border-subtle)] pb-3 mb-3">
+      <div className="flex items-center justify-between flex-wrap gap-2 border-b border-[var(--border-subtle)] pb-3 mb-3">
         <div className="flex items-center gap-2">
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500/20 text-amber-400">
             <Flame size={16} />
@@ -156,7 +156,7 @@ export function DailyChallengeCard({ className = "", onNavigatePractice }: Daily
 
       {/* Footer Navigation Link */}
       {onNavigatePractice && (
-        <div className="mt-3 pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px] text-[var(--text-muted)]">
+        <div className="mt-3 pt-2 border-t border-[var(--border-subtle)] flex items-center justify-between flex-wrap gap-2 text-[11px] text-[var(--text-muted)]">
           <span className="flex items-center gap-1">
             <Award size={12} className="text-amber-400" />
             {alreadyCompletedToday ? "Challenge solved for today" : "Test your daily recall"}

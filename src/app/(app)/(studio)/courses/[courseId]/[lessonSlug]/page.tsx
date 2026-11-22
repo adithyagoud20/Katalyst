@@ -60,7 +60,7 @@ export default async function LessonRoute({
 
   return (
     <>
-      <div className="sr-only" aria-label="Course text for search engines">
+      <div className="sr-only" aria-hidden="true">
         <h1>{lesson.title}</h1>
         <p>{lesson.summary}</p>
         <section aria-labelledby="lesson-objectives-heading">

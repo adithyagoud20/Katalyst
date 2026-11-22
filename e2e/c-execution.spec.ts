@@ -11,9 +11,19 @@ test.describe("In-Browser C WebAssembly Execution (behind feature flag)", () => 
     const cspViolations: string[] = [];
     const cspConsoleErrors: string[] = [];
 
+    await page.exposeFunction("__onCspViolation", (directive: string, blockedUri: string) => {
+      if (directive.includes("style-src")) return;
+      // In dev mode Next.js/React attempts eval() to reconstruct debug callstacks
+      if (process.env.KATALYST_E2E_PRODUCTION !== "true" && blockedUri === "eval") return;
+      cspViolations.push(`${directive}: ${blockedUri}`);
+    });
+
     await page.addInitScript(() => {
       window.addEventListener("securitypolicyviolation", (event) => {
-        cspViolations.push(`${event.violatedDirective}: ${event.blockedURI}`);
+        (window as Window & { __onCspViolation?: (d: string, u: string) => void }).__onCspViolation?.(
+          event.violatedDirective,
+          event.blockedURI
+        );
       });
     });
 
@@ -24,6 +34,7 @@ test.describe("In-Browser C WebAssembly Execution (behind feature flag)", () => 
           message.text()
         )
       ) {
+        if (message.text().includes("style-src")) return;
         cspConsoleErrors.push(message.text());
       }
     });

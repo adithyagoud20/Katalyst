@@ -1871,11 +1871,17 @@ export function LearningExperience({
             </div>
           </header>
           <div className="learning-workspace-mobile-tabs" role="tablist" aria-label="Learning workspace panels">
-              <button type="button" role="tab" aria-selected={effectiveWorkspacePanel === "learn"} aria-controls="learning-panel" onClick={() => setWorkspacePanel("learn")}>
+              <button type="button" role="tab" aria-selected={effectiveWorkspacePanel === "learn"} aria-controls="learning-panel" onClick={() => {
+                setWorkspacePanel("learn");
+                window.dispatchEvent(new CustomEvent("katalyst:reset-header"));
+              }}>
                 <BookOpen size={15} />Learn
               </button>
               {showCodeWorkspace && (
-                <button type="button" role="tab" aria-selected={effectiveWorkspacePanel === "code"} aria-controls="code-panel" onClick={() => setWorkspacePanel("code")}>
+                <button type="button" role="tab" aria-selected={effectiveWorkspacePanel === "code"} aria-controls="code-panel" onClick={() => {
+                  setWorkspacePanel("code");
+                  window.dispatchEvent(new CustomEvent("katalyst:reset-header"));
+                }}>
                   <Code2 size={15} />Code
                 </button>
               )}
@@ -1887,6 +1893,7 @@ export function LearningExperience({
                 onClick={() => {
                   setWorkspacePanel("kat");
                   setKatOpen(true);
+                  window.dispatchEvent(new CustomEvent("katalyst:reset-header"));
                 }}
               >
                 <Bot size={15} />Kat

@@ -680,7 +680,7 @@ button:disabled { cursor: not-allowed; }
 .format-note { display: grid; gap: 8px; margin-top: 23px; padding: 13px 15px; border-left: 2px solid var(--border-subtle); background: var(--surface-warning); color: var(--text-secondary); font-size: 10px; }
 .format-note strong { color: var(--text-primary); font-size: 10px; }
 .format-note code { width: fit-content; max-width: 100%; overflow-wrap: anywhere; border-radius: 4px; background: var(--surface-secondary); padding: 5px 7px; color: var(--text-primary); font: 9px ui-monospace, monospace; }
-.visually-hidden, .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.visually-hidden, .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; color: var(--text-primary); }
 .settings-view { width: 100%; max-width: none; min-width: 0; margin: 0; padding: 32px clamp(16px, 3vw, 40px) 54px; box-sizing: border-box; overflow: auto; }
 .settings-view .view-heading { margin-bottom: 25px; }
 .settings-layout-grid { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 22px; align-items: start; margin-top: 10px; width: 100%; }
@@ -1558,7 +1558,7 @@ button:disabled { cursor: not-allowed; }
 .c-run-upgrade-message { margin: 0 0 8px; border: 1px solid var(--border-warning); border-radius: 4px; background: var(--surface-warning); padding: 8px 11px; color: var(--text-danger); font-size: 11px; line-height: 1.5; }
 .c-run-upgrading:disabled { cursor: not-allowed; }
 .c-playground-footnote { margin: 9px 0 0; color: var(--text-muted); font-size: 10px; line-height: 1.5; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); color: var(--text-primary); }
 
 @media (max-width: 1120px) {
   .c-playground-grid { grid-template-columns: minmax(0, 1fr) minmax(300px, .9fr); }
@@ -4218,7 +4218,7 @@ body {
   font-feature-settings: "ss01" on;
 }
 button, input, textarea, select { font-family: inherit; }
-h1, h2, h3, h4 { letter-spacing: -0.03em; }
+h1, h2, h3, h4, h5, h6 { color: var(--text-primary); letter-spacing: -0.03em; }
 code, pre, kbd, samp,
 .home-mono-label, .home-track-number, .home-runtime-status,
 .lab-figure, .home-stats-strip .stat-value, .home-stats-strip .stat-label {
@@ -4972,15 +4972,16 @@ html, body { width: 100%; max-width: 100%; overflow-x: clip; }
     transition: max-height .2s ease, min-height .2s ease, flex-basis .2s ease, padding .2s ease, opacity .15s ease, transform .2s ease;
   }
   .topbar.topbar-collapsed {
-    height: 0;
-    min-height: 0;
-    max-height: 0;
-    flex: 0 0 0;
-    border-bottom: 0;
-    padding-block: 0;
-    opacity: 0;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    flex: 0 0 0 !important;
+    border-bottom: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    opacity: 0 !important;
     transform: translateY(-100%);
-    pointer-events: none;
+    pointer-events: none !important;
   }
   .app-shell-ide .c-playground > .mt-4 > .circuit-simulator-root {
     height: 100%;
@@ -5149,6 +5150,9 @@ html, body { width: 100%; max-width: 100%; overflow-x: clip; }
 @media (max-width: 767px) {
   .learning-view.learning-lesson .learning-workspace-header { height: 44px; min-height: 44px; }
   .learning-view.learning-lesson .lesson-topbar-actions { display: none; }
+  .learning-view.learning-lesson .lesson-path-crumb,
+  .learning-view.learning-lesson .lesson-crumb-separator,
+  .learning-view.learning-lesson .lesson-topline > span:last-child { display: none; }
   .learning-view.learning-lesson .learning-panel .lesson-objectives > span { font-size: 11px; }
   .learning-view.learning-lesson .learning-panel .lesson-objectives li { font-size: 13px; line-height: 1.55; }
   .learning-view.learning-lesson .c-run-button,

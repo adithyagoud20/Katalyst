@@ -1294,7 +1294,17 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
       const target = event.target;
       if (!(target instanceof HTMLElement) || target.closest(".sidebar")) return;
 
-      const isPageScroll = target.matches(".learning-view") && !target.classList.contains("learning-playground");
+      const isLessonPanelScroll = Boolean(
+        target.id === "learning-panel" ||
+        target.classList.contains("learning-panel") ||
+        target.closest("#learning-panel, .learning-panel")
+      );
+      const isPageScroll =
+        (target.matches(".learning-view") || isLessonPanelScroll) &&
+        !target.classList.contains("learning-playground") &&
+        !target.closest(".learning-playground") &&
+        !target.closest(".cm-scroller") &&
+        !target.closest(".cm-editor");
       const isPlaygroundPageScroll = target.id === "main-content" && target.classList.contains("main-panel-playground");
       if (!isPageScroll && !isPlaygroundPageScroll) return;
 
@@ -1339,6 +1349,12 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
   }, [smallScreen]);
 
   useEffect(() => setMobileHeaderCollapsed(false), [view]);
+
+  useEffect(() => {
+    const handleResetHeader = () => setMobileHeaderCollapsed(false);
+    window.addEventListener("katalyst:reset-header", handleResetHeader);
+    return () => window.removeEventListener("katalyst:reset-header", handleResetHeader);
+  }, []);
 
   useEffect(() => {
     if (!mobileNav) return;
@@ -1948,7 +1964,7 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
       </aside>
 
       <main className={`main-panel${view === "playground" ? " main-panel-playground" : ""}`} id="main-content" data-view={view} tabIndex={-1}>
-        <header className={`topbar${mobileHeaderCollapsed ? " topbar-collapsed" : ""}`} aria-hidden={mobileHeaderCollapsed} inert={mobileHeaderCollapsed}>
+        <header className={`topbar${mobileHeaderCollapsed ? " topbar-collapsed" : ""}`} aria-hidden={mobileHeaderCollapsed ? true : undefined} inert={mobileHeaderCollapsed ? true : undefined}>
           <button className="icon-button mobile-menu" aria-label="Open navigation" aria-expanded={mobileNav} aria-controls="sidebar-nav" onClick={() => setMobileNav(true)}><Menu size={20} /></button>
           <div className="breadcrumbs"><Link className="breadcrumb-root" role="button" href="/">KATALYST</Link>{view === "workspace" && <><span className="crumb-sep">/</span><span>{activeProject?.name ?? "Workspace"}</span></>}<span className="crumb-sep">/</span><strong>{view === "workspace" ? (activeChat?.title ?? "New conversation") : view === "skills" ? "Skill library" : view === "settings" ? "Settings" : view === "home" ? "Learning Home" : view === "paths" ? "Learning Paths" : view === "my-learning" ? "My Learning" : view === "playground" ? "Playground" : view === "practice" ? "Practice Lab" : view === "progress" ? "Progress" : view === "tutor" ? "AI Tutor" : "Lesson"}</strong></div>
           <div className="topbar-actions">

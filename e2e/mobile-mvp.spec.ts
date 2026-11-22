@@ -57,6 +57,14 @@ test.describe("390px mobile MVP", () => {
       await expectMinimumTargetHeight(page.getByRole("tab", { name }));
     }
     await expectNoHorizontalOverflow(page, "Lesson");
+
+    const learningPanel = page.locator("#learning-panel");
+    await expect.poll(() => learningPanel.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
+    await learningPanel.evaluate((element) => { element.scrollTop = 320; });
+    await expect(page.locator(".topbar")).toHaveClass(/topbar-collapsed/);
+    await learningPanel.evaluate((element) => { element.scrollTop = 0; });
+    await expect(page.locator(".topbar")).not.toHaveClass(/topbar-collapsed/);
+    await page.waitForTimeout(250);
     await expect(page).not.toHaveURL(/\/login/);
 
     await selectSidebarView(page, "Playground");

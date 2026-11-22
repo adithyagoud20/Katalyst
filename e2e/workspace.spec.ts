@@ -503,6 +503,7 @@ test("verifies dark mode contrast, readability, and absence of legacy green tone
   await checkContrastAndLegibility("Lesson Workspace");
 
   await page.getByRole("button", { name: "Playground", exact: true }).click();
+  await expect(page.locator(".main-panel-playground")).toBeVisible();
   await checkContrastAndLegibility("Playground");
 });
 
