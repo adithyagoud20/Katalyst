@@ -15,38 +15,38 @@ test.describe("Milestone M19 Features & Architecture E2E Suite", () => {
     await expect(page.getByRole("heading", { name: "Build a foundation" })).toBeVisible();
 
     const courseCards = page.locator(".course-card-unified");
-    await expect(courseCards).toHaveCount(14);
+    await expect(courseCards).toHaveCount(19);
 
     // Verify C Foundations card
     const cCard = courseCards.filter({ hasText: "C Programming Foundations" });
     await expect(cCard).toBeVisible();
-    await expect(cCard).toContainText("16 lessons");
-    await expect(cCard).toContainText("6 modules");
+    await expect(cCard).toContainText("22 lessons");
+    await expect(cCard).toContainText("7 modules");
 
     // Verify Python Foundations card
     const pyCard = courseCards.filter({ hasText: "Python Programming Foundations" });
     await expect(pyCard).toBeVisible();
-    await expect(pyCard).toContainText("19 lessons");
-    await expect(pyCard).toContainText("7 modules");
+    await expect(pyCard).toContainText("25 lessons");
+    await expect(pyCard).toContainText("8 modules");
 
     // Verify JavaScript & Algorithmic Systems card
     const jsCard = courseCards.filter({ hasText: "JavaScript & Algorithmic Systems" });
     await expect(jsCard).toBeVisible();
-    await expect(jsCard).toContainText("10 lessons");
-    await expect(jsCard).toContainText("4 modules");
+    await expect(jsCard).toContainText("14 lessons");
+    await expect(jsCard).toContainText("5 modules");
     await expect(jsCard).toContainText("JAVASCRIPT (ES2024)");
 
     // Verify Digital Logic & Circuit Foundations card
     const circuitsCard = courseCards.filter({ hasText: "Digital Logic & Circuit Foundations" });
     await expect(circuitsCard).toBeVisible();
-    await expect(circuitsCard).toContainText("8 lessons");
-    await expect(circuitsCard).toContainText("3 modules");
+    await expect(circuitsCard).toContainText("14 lessons");
+    await expect(circuitsCard).toContainText("5 modules");
     await expect(circuitsCard).toContainText("DIGITAL LOGIC");
 
     // Select JavaScript course and start learning
     await page.getByRole("button", { name: /JavaScript & Algorithmic Systems/i }).click();
     await expect(page.getByRole("heading", { name: "JavaScript & Algorithmic Systems" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "10 lessons. 4 modules." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "14 lessons. 5 modules." })).toBeVisible();
 
     await ensureCourseDetails(page);
     await page.getByRole("button", { name: /start learning|continue this course/i }).click();
@@ -194,22 +194,23 @@ test.describe("Milestone M19 Features & Architecture E2E Suite", () => {
 
     // Filter by All Courses (all published lessons across courses)
     await page.getByRole("button", { name: "All Courses", exact: true }).click();
+    await expect(practiceCards.first()).toBeVisible();
     expect(await practiceCards.count()).toBeGreaterThanOrEqual(123);
 
-    // Filter by JavaScript (10 lessons)
+    // Filter by JavaScript (14 lessons)
     await page.getByRole("button", { name: "JavaScript", exact: true }).click();
-    await expect(practiceCards).toHaveCount(10);
+    await expect(practiceCards).toHaveCount(14);
 
-    // Filter by Circuits (8 lessons)
+    // Filter by Circuits (14 lessons)
     await page.getByRole("button", { name: "Circuits", exact: true }).click();
-    await expect(practiceCards).toHaveCount(8);
+    await expect(practiceCards).toHaveCount(14);
 
-    // Filter by Python (19 lessons)
+    // Filter by Python (25 lessons)
     await page.getByRole("button", { name: "Python", exact: true }).click();
-    await expect(practiceCards).toHaveCount(19);
+    await expect(practiceCards).toHaveCount(25);
 
-    // Filter by C (16 lessons)
+    // Filter by C (22 lessons)
     await page.getByRole("button", { name: "C", exact: true }).click();
-    await expect(practiceCards).toHaveCount(16);
+    await expect(practiceCards).toHaveCount(22);
   });
 });

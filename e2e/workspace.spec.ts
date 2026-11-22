@@ -550,13 +550,11 @@ test("keeps the C Playground usable on a phone viewport", async ({ page }) => {
   await expect(page.locator(".app-shell")).toHaveClass(/app-shell-ide/);
   await expect(page.locator(".playground-runtime-header")).toBeVisible();
   await expect(page.getByLabel("C source code")).toBeVisible();
-  await expect(page.locator("#c-playground-stdin")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Unavailable" })).toBeDisabled();
-  await expect(page.getByRole("status").filter({ hasText: /C(\+\+)? run is being upgraded/ })).toBeVisible();
+  await expect(page.locator("#c-playground-stdin")).toBeHidden();
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
   await expect(page.locator(".c-output-pane")).toBeHidden();
   await page.getByRole("button", { name: "Output", exact: true }).click();
   await expect(page.locator(".c-output-pane")).toBeVisible();
-  await expect(page.locator(".c-output-pane")).toContainText("C run is being upgraded");
   const dimensions = await page.evaluate(() => ({ body: document.documentElement.scrollWidth, viewport: window.innerWidth }));
   expect(dimensions.body).toBeLessThanOrEqual(dimensions.viewport);
   await page.screenshot({ path: "work/katalyst-mobile-playground.png", fullPage: true });
@@ -571,7 +569,7 @@ test("fits the full-screen C IDE at desktop, laptop, tablet, and mobile widths",
     await page.getByText("Launch C Workbench").click();
     await expect(page.locator(".c-editor-pane")).toBeVisible();
     await expect(page.locator(".c-output-pane")).toBeHidden();
-    await expect(page.getByRole("button", { name: "Unavailable" })).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Output", exact: true }).click();
     await expect(page.locator(".c-output-pane")).toBeVisible();
     const layout = await page.evaluate(() => {
@@ -722,7 +720,7 @@ test("starts the C learning path and records progress independently of the works
 
   await page.reload();
   await page.getByRole("button", { name: "My Learning", exact: true }).click();
-  await expect(page.locator(".my-learning-row")).toContainText("1 of 16 lessons complete");
+  await expect(page.locator(".my-learning-row")).toContainText("1 of 22 lessons complete");
 });
 
 test("keeps the integrated lesson workspace and Practice Lab within a phone viewport", async ({ page }) => {
@@ -731,8 +729,8 @@ test("keeps the integrated lesson workspace and Practice Lab within a phone view
   await page.getByRole("button", { name: "Open navigation" }).click();
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
   await ensureCourseDetails(page);
-  await expect(page.getByText("16 LESSONS", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "16 lessons. 6 modules." })).toBeVisible();
+  await expect(page.getByText("22 LESSONS", { exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "22 lessons. 7 modules." })).toBeVisible();
   const courseDimensions = await page.evaluate(() => ({ document: document.documentElement.scrollWidth, viewport: window.innerWidth }));
   expect(courseDimensions.document).toBeLessThanOrEqual(courseDimensions.viewport);
   await page.getByRole("button", { name: /start learning/i }).click();
@@ -787,7 +785,7 @@ test("navigates the expanded course and renders exercise metadata and starter co
   await page.goto("/");
   await page.getByRole("button", { name: "Explore Learning Paths" }).click();
   await ensureCourseDetails(page);
-  await expect(page.getByRole("heading", { name: "16 lessons. 6 modules." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "22 lessons. 7 modules." })).toBeVisible();
   await page.getByRole("button", { name: /start learning/i }).click();
   const pagination = page.getByRole("navigation", { name: "Lesson navigation" });
   for (let index = 0; index < 4; index += 1) await pagination.getByRole("button").last().click();
@@ -797,7 +795,7 @@ test("navigates the expanded course and renders exercise metadata and starter co
   await expect(page.getByRole("heading", { name: "Work with C strings" })).toBeVisible();
   await expect(page.locator(".lesson-checkpoint")).toContainText("What marks the end of a C string");
   await page.getByRole("button", { name: "Practice Lab", exact: true }).click();
-  await expect(page.locator(".practice-card")).toHaveCount(16);
+  await expect(page.locator(".practice-card")).toHaveCount(22);
   await expect(page.locator(".practice-card").filter({ hasText: "Read and report a value" })).toContainText("Practice goal:");
   await expect(page.locator(".practice-card").filter({ hasText: "Read and report a value" }).getByText("View starter code")).toBeVisible();
 });
@@ -1022,15 +1020,14 @@ test("keeps C and C++ editors available while execution is retired", async ({ pa
   await expect(cSource).toBeVisible();
   await cSource.fill("#include <stdio.h>\nint main(void) { puts(\"editable\"); return 0; }\n");
   await expect(cSource).toContainText("editable");
-  await expect(page.getByRole("status").filter({ hasText: /C(\+\+)? run is being upgraded/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Unavailable" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Run", exact: true })).toBeVisible();
 
   await page.locator("#runtime-switcher-select").selectOption("code:cpp");
   const cppSource = page.getByLabel("C++ source code");
   await expect(cppSource).toBeVisible();
   await cppSource.fill("int main() { return 0; }\n");
   await expect(cppSource).toContainText("int main");
-  await expect(page.getByRole("status").filter({ hasText: /C(\+\+)? run is being upgraded/ })).toBeVisible();
+  await expect(page.getByRole("status").filter({ hasText: /C\+\+ compiler coming soon/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Unavailable" })).toBeDisabled();
 });
 
@@ -1387,7 +1384,7 @@ test("navigates Python Programming Foundations course and verifies 2-panel layou
   // Select Python course from the choice grid
   await page.getByRole("button", { name: /Python Programming Foundations/i }).click();
   await expect(page.getByRole("heading", { name: "Python Programming Foundations" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "19 lessons. 7 modules." })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "25 lessons. 8 modules." })).toBeVisible();
 
   await ensureCourseDetails(page);
   await page.getByRole("button", { name: /start learning/i }).click();

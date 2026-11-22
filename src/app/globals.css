@@ -1896,7 +1896,8 @@ button:disabled { cursor: not-allowed; }
   .learning-workspace-panel { display: none; height: calc(100dvh - 166px); min-height: 420px; border-right: 0; }
   .learning-workspace-panel.panel-active { display: block; }
   .learning-code-panel.panel-active { display: flex; flex-direction: column; overflow: auto; }
-  .learning-kat-panel.panel-active { display: flex; overflow: hidden; }
+  .learning-workspace-grid .learning-kat-panel.panel-active,
+  .learning-kat-panel.panel-active { display: flex !important; overflow: hidden; }
   .learning-kat-panel .integrated-tutor-panel { min-height: 0; }
   .c-playground-compact { flex: 1; }
   .c-playground-compact .c-playground-grid { grid-template-columns: minmax(0, 1fr); }
@@ -3031,13 +3032,15 @@ button:disabled { cursor: not-allowed; }
 }
 
 @media (max-width: 1200px) {
+  .learning-view.learning-lesson { overflow-y: auto !important; }
   .learning-view.learning-lesson .learning-workspace-mobile-tabs { display: flex; }
   .learning-view.learning-lesson .workspace-splitter { display: none; }
   .learning-view.learning-lesson .learning-workspace-grid { display: block; flex: 1 1 0%; min-height: 0; overflow-y: hidden; }
   .learning-view.learning-lesson .learning-workspace-panel { display: none; width: 100% !important; height: 100% !important; border-right: 0; }
   .learning-view.learning-lesson .learning-workspace-panel.panel-active { display: block; }
   .learning-view.learning-lesson .learning-code-panel.panel-active { display: flex; min-height: 0; flex-direction: column; }
-  .learning-view.learning-lesson .learning-kat-panel.panel-active { display: flex; }
+  .learning-view.learning-lesson .learning-workspace-grid .learning-kat-panel.panel-active,
+  .learning-view.learning-lesson .learning-kat-panel.panel-active { display: flex !important; }
   .learning-view.learning-lesson .learning-kat-panel .integrated-tutor-panel { height: 100% !important; }
 }
 
@@ -4962,6 +4965,7 @@ html, body { width: 100%; max-width: 100%; overflow-x: clip; }
 .main-panel[data-view="lesson"] > .topbar .topbar-actions .ai-quota-pill { display: none; }
 
 @media (max-width: 767px) {
+  .learning-view.learning-lesson { overflow-y: auto !important; }
   .topbar {
     max-height: 160px;
     overflow: hidden;

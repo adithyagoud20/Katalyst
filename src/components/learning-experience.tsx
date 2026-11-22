@@ -1462,8 +1462,18 @@ export function LearningExperience({
                     ? "Arduino/ESP32"
                     : c.id.includes("js")
                     ? "JavaScript"
-                    : c.id.includes("circuit")
+                    : c.id === "digital-logic-circuits"
                     ? "Circuits"
+                    : c.id === "circuits-eee-core"
+                    ? "Circuit Theory"
+                    : c.id === "control-and-signals"
+                    ? "Control & Signals"
+                    : c.id === "embedded-capstone-projects"
+                    ? "Capstones"
+                    : c.id === "creative-engineering-lab"
+                    ? "Creative Lab"
+                    : c.id === "engineering-career-prep"
+                    ? "Career Prep"
                     : c.id.includes("sql")
                     ? "SQL"
                     : c.id.includes("html")
@@ -1869,7 +1879,16 @@ export function LearningExperience({
                   <Code2 size={15} />Code
                 </button>
               )}
-              <button type="button" role="tab" aria-selected={effectiveWorkspacePanel === "kat"} aria-controls="kat-panel" onClick={() => setWorkspacePanel("kat")}>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={effectiveWorkspacePanel === "kat"}
+                aria-controls="kat-panel"
+                onClick={() => {
+                  setWorkspacePanel("kat");
+                  setKatOpen(true);
+                }}
+              >
                 <Bot size={15} />Kat
               </button>
           </div>
@@ -1888,8 +1907,8 @@ export function LearningExperience({
               className={`learning-workspace-panel learning-panel${effectiveWorkspacePanel === "learn" ? " panel-active" : ""}`}
               role="tabpanel"
               aria-label="Lesson and course content"
-              aria-hidden={smallWorkspace && effectiveWorkspacePanel !== "learn"}
-              inert={smallWorkspace && effectiveWorkspacePanel !== "learn"}
+              aria-hidden={smallWorkspace && effectiveWorkspacePanel !== "learn" ? true : undefined}
+              inert={smallWorkspace && effectiveWorkspacePanel !== "learn" ? true : undefined}
             >
               <div className="workspace-panel-heading">
                 <div className="lesson-badge-row">
@@ -2432,8 +2451,8 @@ export function LearningExperience({
                   className={`learning-workspace-panel learning-code-panel${effectiveWorkspacePanel === "code" ? " panel-active" : ""}`}
                   role="tabpanel"
                   aria-label={`${activeLanguage === "python" ? "Python 3.12" : activeLanguage === "cpp" ? "C++17" : activeLanguage === "javascript" ? "JavaScript" : "C11"} coding workspace`}
-                  aria-hidden={smallWorkspace ? effectiveWorkspacePanel !== "code" : !compilerOpen}
-                  inert={smallWorkspace ? effectiveWorkspacePanel !== "code" : !compilerOpen}
+                  aria-hidden={(smallWorkspace ? effectiveWorkspacePanel !== "code" : !compilerOpen) ? true : undefined}
+                  inert={(smallWorkspace ? effectiveWorkspacePanel !== "code" : !compilerOpen) ? true : undefined}
                 >
                   {activeLanguage === "python" || activeLanguage === "javascript" ? (
                     <CodeWorkspace
@@ -2454,19 +2473,12 @@ export function LearningExperience({
                         <p>Edit, compile, and inspect output without leaving this lesson.</p>
                       </div>
                       <CPlayground
-                        key={`c-playground-${lesson.id}`}
+                        key={`c-playground-${activeLanguage}`}
                         initialLanguage={activeLanguage === "cpp" ? "cpp" : "c"}
                         pendingExample={
                           pendingExample && pendingExample.lessonId === lesson.id
                             ? pendingExample
-                            : {
-                                code: lessonCode,
-                                lessonId: lesson.id,
-                                lessonTitle: lesson.title,
-                                requestId: 1,
-                                sampleInput: lessonSampleInput,
-                                language: activeLanguage === "cpp" ? "cpp" : "c",
-                              }
+                            : null
                         }
                         autoInitialize
                         compact
@@ -2510,8 +2522,8 @@ export function LearningExperience({
               className={`learning-workspace-panel learning-kat-panel${effectiveWorkspacePanel === "kat" ? " panel-active" : ""}`}
               role="tabpanel"
               aria-label="Kat AI tutor"
-              aria-hidden={smallWorkspace ? effectiveWorkspacePanel !== "kat" : !katOpen}
-              inert={smallWorkspace ? effectiveWorkspacePanel !== "kat" : !katOpen}
+              aria-hidden={(smallWorkspace ? effectiveWorkspacePanel !== "kat" : !katOpen) ? true : undefined}
+              inert={(smallWorkspace ? effectiveWorkspacePanel !== "kat" : !katOpen) ? true : undefined}
             >
               {!smallWorkspace && (
                 <div className="kat-panel-header-bar">

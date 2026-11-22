@@ -17,7 +17,7 @@ import type { CreditStatus } from "@/lib/ai-gateway/types";
 import { LearningExperience } from "@/components/learning-experience";
 import { publishedLearningCourses } from "@/data/curriculum/learning-index";
 import type { LearningSection } from "@/lib/learning-model";
-import { applicationViewFromPathname, findCourseSlugForLesson, makeApplicationPath, type ApplicationView } from "@/lib/learning-navigation";
+import { applicationViewFromPathname, findCourseSlugForLesson, makeApplicationPath, readApplicationHash, type ApplicationView } from "@/lib/learning-navigation";
 import { composeWorkspaceContext, exportSkillMarkdown, MAX_SKILL_CONTEXT_CHARS, parseSkillMarkdown, skillCompatibilityLabels, starterSkills, type WorkspaceSkill } from "@/lib/skills";
 import { getDefaultModel, providerCatalog, providerIds, type ModelDiscoveryDiagnostic, type ModelMetadata, type ProviderId } from "@/lib/providers/catalog";
 import { DEFAULT_OLLAMA_BASE_URL, MAX_OLLAMA_URL_LENGTH } from "@/lib/providers/constants";
@@ -175,6 +175,21 @@ function emptyModelState(provider: ProviderId): ModelCatalogState {
 
 function playgroundSelectionFromSearch(search: string): PlaygroundRuntimeSelection | null {
   const params = new URLSearchParams(search);
+  const lang = params.get("lang")?.toLowerCase();
+  const circuitModes: Record<string, PlaygroundRuntimeSelection["circuitMode"]> = {
+    arduino: "arduino", esp32: "esp32", breadboard: "breadboard", digital: "digital",
+  };
+  if (lang && circuitModes[lang]) return { language: "circuit", mode: "circuits", circuitMode: circuitModes[lang], launcherOpen: false };
+  const languages: Record<string, PlaygroundRuntimeSelection["language"]> = {
+    c: "c", cpp: "cpp", python: "python", js: "javascript", javascript: "javascript", sql: "sql", html: "html",
+  };
+  const language = lang ? languages[lang] : undefined;
+  return language ? { language, mode: "code", circuitMode: "digital", launcherOpen: false } : null;
+}
+
+function playgroundSelectionFromHash(hash: string): PlaygroundRuntimeSelection | null {
+  const params = new URLSearchParams(hash.replace(/^#/, ""));
+  if (params.get("katalyst") !== "playground") return null;
   const lang = params.get("lang")?.toLowerCase();
   const circuitModes: Record<string, PlaygroundRuntimeSelection["circuitMode"]> = {
     arduino: "arduino", esp32: "esp32", breadboard: "breadboard", digital: "digital",
@@ -365,25 +380,32 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
 
   useEffect(() => {
     const restoreRoute = () => {
-      const nextView = applicationViewFromPathname(window.location.pathname);
+      const hashLocation = typeof window !== "undefined" ? readApplicationHash(window.location.hash) : null;
+      const nextView = hashLocation?.view ?? applicationViewFromPathname(window.location.pathname);
       if (!nextView) return;
       setViewState(nextView);
       const search = new URLSearchParams(window.location.search);
-      let nextLessonId = search.get("lesson") ?? "";
+      let nextLessonId = hashLocation?.lessonId ?? search.get("lesson") ?? "";
       if (nextView === "lesson" && !nextLessonId) {
         const match = window.location.pathname.match(/^\/courses\/[^/]+\/([^/]+)$/);
         if (match) nextLessonId = match[1];
       }
       setRouteLessonId(nextLessonId);
       const directPlaygroundSelection = nextView === "playground"
-        ? playgroundSelectionFromSearch(window.location.search)
+        ? (playgroundSelectionFromSearch(window.location.search) ?? (typeof window !== "undefined" ? playgroundSelectionFromHash(window.location.hash) : null))
         : null;
-      setPlaygroundSelection(directPlaygroundSelection);
+      if (directPlaygroundSelection) {
+        setPlaygroundSelection(directPlaygroundSelection);
+      }
       setMobileNav(false);
     };
     restoreRoute();
     window.addEventListener("popstate", restoreRoute);
-    return () => window.removeEventListener("popstate", restoreRoute);
+    window.addEventListener("hashchange", restoreRoute);
+    return () => {
+      window.removeEventListener("popstate", restoreRoute);
+      window.removeEventListener("hashchange", restoreRoute);
+    };
   }, [pathname]);
 
   const loadModels = useCallback(async (provider: ProviderId, refresh = false, sessionKey = "", ollamaBaseUrl = "", cloudflareAccountId = "") => {
@@ -1884,7 +1906,7 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
     <div className={`app-shell${view === "playground" && playgroundSelection && !playgroundSelection.launcherOpen ? " app-shell-ide" : ""}`} data-ready={ready ? "true" : "false"} data-theme={preferences.theme} data-density={preferences.textDensity}>
       <a className="skip-link" href="#main-content">Skip to main content</a>
       {mobileNav && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setMobileNav(false)} />}
-      <aside id="sidebar-nav" className={`sidebar ${mobileNav ? "sidebar-open" : ""} ${sidebarCollapsed && !smallScreen ? "sidebar-collapsed" : ""}`} aria-hidden={smallScreen && !mobileNav} inert={smallScreen && !mobileNav}>
+      <aside id="sidebar-nav" className={`sidebar ${mobileNav ? "sidebar-open" : ""} ${sidebarCollapsed && !smallScreen ? "sidebar-collapsed" : ""}`} aria-hidden={smallScreen && !mobileNav ? true : undefined} inert={smallScreen && !mobileNav ? true : undefined}>
         <div className="brand-row">
           <BrandMark className="brand-mark" />
           <span className="brand-name">KATALYST</span>
@@ -1892,20 +1914,20 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
           <button className="icon-button collapse-nav" aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!sidebarCollapsed} aria-controls="sidebar-nav" onClick={() => setSidebarCollapsed((current) => !current)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
         </div>
         <nav className="primary-nav learning-nav" aria-label="Main navigation">
-          <Link href="/" className={`nav-item ${view === "home" ? "selected" : ""}`} aria-label="Learning Home" title="Learning Home" aria-current={view === "home" ? "page" : undefined} onClick={() => setMobileNav(false)}><House size={17} /> Learning Home</Link>
-          <Link href="/paths" className={`nav-item ${view === "paths" ? "selected" : ""}`} aria-label="Explore Learning Paths" title="Explore Learning Paths" aria-current={view === "paths" ? "page" : undefined} onClick={() => setMobileNav(false)}><Compass size={17} /> Explore Learning Paths</Link>
-          <Link href="/my-learning" className={`nav-item ${view === "my-learning" ? "selected" : ""}`} aria-label="My Learning" title="My Learning" aria-current={view === "my-learning" ? "page" : undefined} onClick={() => setMobileNav(false)}><GraduationCap size={17} /> My Learning</Link>
-          <Link href={makeApplicationPath("playground", { lessonId: routeLessonId || undefined, lang: playgroundRouteLanguage(playgroundSelection) })} className={`nav-item ${view === "playground" ? "selected" : ""}`} aria-label="Playground" title="Playground" aria-current={view === "playground" ? "page" : undefined} onClick={() => setMobileNav(false)}><Terminal size={17} /> Playground</Link>
-          <Link href="/practice" className={`nav-item ${view === "practice" ? "selected" : ""}`} aria-label="Practice Lab" title="Practice Lab" aria-current={view === "practice" ? "page" : undefined} onClick={() => setMobileNav(false)}><FlaskConical size={17} /> Practice Lab</Link>
-          <Link href="/progress" className={`nav-item ${view === "progress" ? "selected" : ""}`} aria-label="Progress" title="Progress" aria-current={view === "progress" ? "page" : undefined} onClick={() => setMobileNav(false)}><ChartNoAxesColumnIncreasing size={17} /> Progress</Link>
-          <Link href={makeApplicationPath("tutor", { lessonId: routeLessonId || undefined })} className={`nav-item ${view === "tutor" ? "selected" : ""}`} aria-label="AI Tutor" title="AI Tutor" aria-current={view === "tutor" ? "page" : undefined} onClick={() => setMobileNav(false)}><Bot size={17} /> AI Tutor <span className="nav-kat">KAT</span></Link>
-          <Link href="/settings" className={`nav-item ${view === "settings" ? "selected" : ""}`} aria-label="Settings" title="Settings" aria-current={view === "settings" ? "page" : undefined} onClick={() => setMobileNav(false)}><Settings2 size={17} /> Settings</Link>
+          <Link href="/" role="button" className={`nav-item ${view === "home" ? "selected" : ""}`} aria-label="Learning Home" title="Learning Home" aria-current={view === "home" ? "page" : undefined} onClick={() => { setView("home"); setMobileNav(false); }}><House size={17} /> Learning Home</Link>
+          <Link href="/paths" role="button" className={`nav-item ${view === "paths" ? "selected" : ""}`} aria-label="Explore Learning Paths" title="Explore Learning Paths" aria-current={view === "paths" ? "page" : undefined} onClick={() => { setView("paths"); setMobileNav(false); }}><Compass size={17} /> Explore Learning Paths</Link>
+          <Link href="/my-learning" role="button" className={`nav-item ${view === "my-learning" ? "selected" : ""}`} aria-label="My Learning" title="My Learning" aria-current={view === "my-learning" ? "page" : undefined} onClick={() => { setView("my-learning"); setMobileNav(false); }}><GraduationCap size={17} /> My Learning</Link>
+          <Link href={makeApplicationPath("playground", { lessonId: routeLessonId || undefined, lang: playgroundRouteLanguage(playgroundSelection) })} role="button" className={`nav-item ${view === "playground" ? "selected" : ""}`} aria-label="Playground" title="Playground" aria-current={view === "playground" ? "page" : undefined} onClick={() => { setView("playground"); setMobileNav(false); }}><Terminal size={17} /> Playground</Link>
+          <Link href="/practice" role="button" className={`nav-item ${view === "practice" ? "selected" : ""}`} aria-label="Practice Lab" title="Practice Lab" aria-current={view === "practice" ? "page" : undefined} onClick={() => { setView("practice"); setMobileNav(false); }}><FlaskConical size={17} /> Practice Lab</Link>
+          <Link href="/progress" role="button" className={`nav-item ${view === "progress" ? "selected" : ""}`} aria-label="Progress" title="Progress" aria-current={view === "progress" ? "page" : undefined} onClick={() => { setView("progress"); setMobileNav(false); }}><ChartNoAxesColumnIncreasing size={17} /> Progress</Link>
+          <Link href={makeApplicationPath("tutor", { lessonId: routeLessonId || undefined })} role="button" className={`nav-item ${view === "tutor" ? "selected" : ""}`} aria-label="AI Tutor" title="AI Tutor" aria-current={view === "tutor" ? "page" : undefined} onClick={() => { setView("tutor"); setMobileNav(false); }}><Bot size={17} /> AI Tutor <span className="nav-kat">KAT</span></Link>
+          <Link href="/settings" role="button" className={`nav-item ${view === "settings" ? "selected" : ""}`} aria-label="Settings" title="Settings" aria-current={view === "settings" ? "page" : undefined} onClick={() => { setView("settings"); setMobileNav(false); }}><Settings2 size={17} /> Settings</Link>
         </nav>
         <div className="sidebar-tools">
           <div className="section-heading"><span>Workspace tools</span></div>
           <nav className="secondary-nav" aria-label="Workspace tools">
-            <Link href="/workspace" className={`nav-item ${view === "workspace" ? "selected" : ""}`} aria-label="Workspace" title="Workspace" aria-current={view === "workspace" ? "page" : undefined} onClick={() => setMobileNav(false)}><MessageSquare size={16} /> Workspace</Link>
-            <Link href="/skills" className={`nav-item ${view === "skills" ? "selected" : ""}`} aria-label="Skill library" title="Skill library" aria-current={view === "skills" ? "page" : undefined} onClick={() => setMobileNav(false)}><Sparkles size={16} /> Skill library <span className="nav-count">{data.skills.length}</span></Link>
+            <Link href="/workspace" role="button" className={`nav-item ${view === "workspace" ? "selected" : ""}`} aria-label="Workspace" title="Workspace" aria-current={view === "workspace" ? "page" : undefined} onClick={() => { setView("workspace"); setMobileNav(false); }}><MessageSquare size={16} /> Workspace</Link>
+            <Link href="/skills" role="button" className={`nav-item ${view === "skills" ? "selected" : ""}`} aria-label="Skill library" title="Skill library" aria-current={view === "skills" ? "page" : undefined} onClick={() => { setView("skills"); setMobileNav(false); }}><Sparkles size={16} /> Skill library <span className="nav-count">{data.skills.length}</span></Link>
           </nav>
         </div>
         {view === "workspace" && <button className="new-chat-button" onClick={() => createChat()} aria-keyshortcuts="Control+K Meta+K"><SquarePen size={16} /> New conversation <span className="shortcut">⌘&nbsp;K</span></button>}
@@ -1928,7 +1950,7 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
       <main className={`main-panel${view === "playground" ? " main-panel-playground" : ""}`} id="main-content" data-view={view} tabIndex={-1}>
         <header className={`topbar${mobileHeaderCollapsed ? " topbar-collapsed" : ""}`} aria-hidden={mobileHeaderCollapsed} inert={mobileHeaderCollapsed}>
           <button className="icon-button mobile-menu" aria-label="Open navigation" aria-expanded={mobileNav} aria-controls="sidebar-nav" onClick={() => setMobileNav(true)}><Menu size={20} /></button>
-          <div className="breadcrumbs"><Link className="breadcrumb-root" href="/">KATALYST</Link>{view === "workspace" && <><span className="crumb-sep">/</span><span>{activeProject?.name ?? "Workspace"}</span></>}<span className="crumb-sep">/</span><strong>{view === "workspace" ? (activeChat?.title ?? "New conversation") : view === "skills" ? "Skill library" : view === "settings" ? "Settings" : view === "home" ? "Learning Home" : view === "paths" ? "Learning Paths" : view === "my-learning" ? "My Learning" : view === "playground" ? "Playground" : view === "practice" ? "Practice Lab" : view === "progress" ? "Progress" : view === "tutor" ? "AI Tutor" : "Lesson"}</strong></div>
+          <div className="breadcrumbs"><Link className="breadcrumb-root" role="button" href="/">KATALYST</Link>{view === "workspace" && <><span className="crumb-sep">/</span><span>{activeProject?.name ?? "Workspace"}</span></>}<span className="crumb-sep">/</span><strong>{view === "workspace" ? (activeChat?.title ?? "New conversation") : view === "skills" ? "Skill library" : view === "settings" ? "Settings" : view === "home" ? "Learning Home" : view === "paths" ? "Learning Paths" : view === "my-learning" ? "My Learning" : view === "playground" ? "Playground" : view === "practice" ? "Practice Lab" : view === "progress" ? "Progress" : view === "tutor" ? "AI Tutor" : "Lesson"}</strong></div>
           <div className="topbar-actions">
             {view === "home" && <button
               type="button"

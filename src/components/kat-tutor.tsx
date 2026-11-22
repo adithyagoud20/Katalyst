@@ -310,7 +310,7 @@ export function KatTutor({
           : requires === "output" ? hasOutput
             : Boolean(context && hasEditorCode));
 
-  return <section className="tutor-panel integrated-tutor-panel" aria-label="AI Tutor Kat">
+  return <section className="tutor-panel integrated-tutor-panel" role="region" aria-label="AI Tutor Kat">
     <div className="tutor-heading">
       <div className="tutor-avatar"><Bot size={19} /></div>
       <div className="tutor-heading-info">

@@ -24,7 +24,7 @@ test.describe("Milestone M21 Architecture & Platform Expansion E2E Suite", () =>
     // Filter by Hardware
     await page.getByRole("tab", { name: "Hardware" }).click();
     const hwCards = page.locator(".course-card-unified");
-    await expect(hwCards).toHaveCount(7); // digital-logic-circuits, arduino-embedded, esp32-iot-systems, breadboard-electronics, circuits-eee-core, embedded-capstones & creative-engineering
+    await expect(hwCards).toHaveCount(8); // digital-logic-circuits, arduino-embedded, esp32-iot-systems, breadboard-electronics, circuits-eee-core, control-and-signals, embedded-capstones & creative-engineering
 
     // Filter by AI & Media
     await page.getByRole("tab", { name: "AI & Media" }).click();

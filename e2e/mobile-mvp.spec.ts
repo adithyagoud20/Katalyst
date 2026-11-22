@@ -68,7 +68,7 @@ test.describe("390px mobile MVP", () => {
 
     const editor = await page.locator(".c-source-editor-host").boundingBox();
     expect(editor?.height).toBeGreaterThan(380);
-    await expect(page.locator(".c-stdin-editor")).toHaveCount(0);
+    await expect(page.locator(".c-stdin-editor")).toBeHidden();
     await expect(page.locator(".c-output-pane")).toBeHidden();
     await expect(page.locator(".c-console-output")).toHaveCSS("overflow-y", "auto");
 
@@ -77,7 +77,7 @@ test.describe("390px mobile MVP", () => {
     expect(scrollable).toBe(false);
     await page.getByRole("button", { name: "Run", exact: true }).click();
     await expect(page.locator(".c-output-pane")).toBeVisible();
-    await expect(page.getByLabel("Terminal standard input")).toBeVisible();
+    await expect(page.locator(".c-console-output")).toBeVisible();
     await expect(page).not.toHaveURL(/\/login/);
 
     await page.getByRole("button", { name: "All Labs" }).click();
@@ -133,7 +133,7 @@ test.describe("390px mobile MVP", () => {
     expect(healthResponse.ok()).toBe(true);
     const health = await healthResponse.json();
     expect(health.ok).toBe(true);
-    expect(health.coursesCount).toBe(14);
+    expect(health.coursesCount).toBe(19);
     expect(typeof health.services.cloudflareConfigured).toBe("boolean");
     expect(typeof health.services.supabaseConfigured).toBe("boolean");
     expect(JSON.stringify(health)).not.toMatch(/(?:api[_-]?key|secret|token)\s*[:=]\s*[^\s,}]+/i);

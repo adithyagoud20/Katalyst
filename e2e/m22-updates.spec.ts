@@ -58,11 +58,11 @@ document.body.textContent = "Mock C runtime ready.";`,
     const heading = page.getByRole("heading", { name: "Runtime & Lab Launcher" });
     await expect(heading).toBeVisible();
 
-    // Verify all 10 runtime cards are visible
+    // Verify all 18 runtime cards are visible
     const cards = page.locator(".launcher-card");
-    await expect(cards).toHaveCount(10);
+    await expect(cards).toHaveCount(18);
     await expect(page.getByText("C (C11 · WebAssembly)")).toBeVisible();
-    await expect(page.getByText("C++ (C++17 · WebAssembly)")).toBeVisible();
+    await expect(page.getByText("C++ (C++17 · Coming soon)")).toBeVisible();
     await expect(page.getByText("Python (3.12 · WebAssembly)")).toBeVisible();
     await expect(page.getByText("JavaScript (ES2024 · Worker)")).toBeVisible();
     await expect(page.getByText("SQL (SQLite · WebAssembly)")).toBeVisible();
@@ -154,29 +154,30 @@ document.body.textContent = "Mock C runtime ready.";`,
     await expect(page.getByRole("heading", { name: "Build a foundation" })).toBeVisible();
 
     const courseCards = page.locator(".course-card-unified");
-    await expect(courseCards).toHaveCount(14);
+    await expect(courseCards).toHaveCount(19);
 
     // Course #1: C
     await expect(courseCards.nth(0)).toContainText("C Programming Foundations");
-    // Course #2: C++
-    await expect(courseCards.nth(1)).toContainText("C++17 Systems & Object-Oriented Programming");
-    // Course #3: Python
-    await expect(courseCards.nth(2)).toContainText("Python Programming Foundations");
-    // Course #4: AI App Web Dev
-    await expect(courseCards.nth(3)).toContainText("AI-Powered App & Web Development");
-    // Course #5: Arduino
-    await expect(courseCards.nth(4)).toContainText("Arduino Uno Embedded Systems & ATmega328P");
+    // Course #2: Python (working track)
+    await expect(courseCards.nth(1)).toContainText("Python Programming Foundations");
+    // Course #3: AI App Web Dev (working track)
+    await expect(courseCards.nth(2)).toContainText("AI-Powered App & Web Development");
+    // Course #4: Arduino (working track)
+    await expect(courseCards.nth(3)).toContainText("Arduino Uno Embedded Systems & ATmega328P");
+    // Last Course: C++ (repositioned with coming soon status)
+    await expect(courseCards.nth(18)).toContainText("C++17 Systems & Object-Oriented Programming");
+    await expect(courseCards.nth(18)).toContainText("Coming soon");
 
-    // Open Course #4 (AI App Dev)
-    await courseCards.nth(3).click();
+    // Open Course #3 (AI App Dev)
+    await courseCards.nth(2).click();
     await expect(page.getByRole("heading", { name: "AI-Powered App & Web Development" })).toBeVisible();
     await expect(page.getByText("AI-Assisted Engineering Workflow & Scaffolding")).toBeVisible();
 
-    // Return to Explore and open Course #5 (Arduino)
+    // Return to Explore and open Course #4 (Arduino)
     await page.goto("/#katalyst=paths");
     await expect(page.getByRole("heading", { name: "Build a foundation" })).toBeVisible();
-    const course5 = page.locator(".course-card-unified").nth(4);
-    await course5.click();
+    const course4 = page.locator(".course-card-unified").nth(3);
+    await course4.click();
     await expect(page.getByRole("heading", { name: "Arduino Uno Embedded Systems & ATmega328P" })).toBeVisible();
     await expect(page.getByText("Arduino Sketch Lifecycle, Setup/Loop & Pin Mapping")).toBeVisible();
   });
@@ -259,21 +260,15 @@ document.body.textContent = "Mock C runtime ready.";`,
     await expect(page.locator(".c-output-pane")).toBeVisible();
   });
 
-  test("accepts C++ stdin in the interactive terminal while the program is running", async ({ page }) => {
+  test("previews C++ workbench and verifies coming soon status when execution is paused", async ({ page }) => {
     await page.goto("/#katalyst=playground");
-    await page.getByText("Launch C++ Workbench").click();
-    expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(true);
+    await page.getByText("Preview C++ Workbench").click();
 
     const editor = page.locator(".cm-content").first();
+    await expect(editor).toBeVisible();
     await editor.fill("#include <iostream>\nint main() { int value; std::cin >> value; std::cout << value; }");
-    await expect(page.locator(".c-stdin-label")).toHaveCount(0);
-    await expect(page.locator("#c-playground-stdin")).toHaveCount(0);
-    await page.getByRole("button", { name: "Run", exact: true }).click();
-    const terminalInput = page.getByLabel("Terminal standard input");
-    await expect(terminalInput).toBeEnabled();
-    await terminalInput.fill("42");
-    await terminalInput.press("Enter");
-    await expect(page.locator(".c-console-output")).toContainText("mock interactive output");
+    await expect(page.getByRole("status").filter({ hasText: /C\+\+ compiler coming soon/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Unavailable" })).toBeDisabled();
   });
 
   test("shows dedicated board guides and the selected board pin references", async ({ page }) => {

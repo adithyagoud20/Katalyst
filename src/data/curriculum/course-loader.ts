@@ -18,6 +18,11 @@ const courseLoaders: Record<string, CourseLoader> = {
   "prompt-engineering": async () => (await import("./prompt-engineering")).promptEngineeringPath,
   "photo-editing-media": async () => (await import("./photo-editing-media")).photoEditingMediaPath,
   "digital-logic-circuits": async () => (await import("./digital-circuits")).digitalCircuitsPath,
+  "circuits-eee-core": async () => (await import("./circuits-eee-core")).circuitsEeeCorePath,
+  "control-and-signals": async () => (await import("./control-and-signals")).controlAndSignalsPath,
+  "embedded-capstone-projects": async () => (await import("./embedded-capstones")).embeddedCapstonesPath,
+  "creative-engineering-lab": async () => (await import("./creative-engineering")).creativeEngineeringPath,
+  "engineering-career-prep": async () => (await import("./engineering-career-prep")).engineeringCareerPrepPath,
 };
 
 export async function loadCourseDetail(courseId: string): Promise<LearningCourseDetail | undefined> {
