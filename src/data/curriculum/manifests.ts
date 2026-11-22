@@ -85,6 +85,16 @@ export const learningSubjects: LearningSubject[] = [
     "id": "control-and-signals-subject",
     "title": "Control Systems & Signal Processing",
     "description": "Master feedback control loops, PID tuning, Bode stability, state-space representations, Nyquist-Shannon sampling, DFT/FFT spectrum analysis, and Kalman filtering."
+  },
+  {
+    "id": "embedded-capstones-subject",
+    "title": "Hands-on Embedded Engineering",
+    "description": "Architect, wire, and firmware-implement 6 comprehensive industry-standard micro-controller capstones: automated weather station, smart appliance controller, autonomous line follower, digital keyless lock, 4-way traffic junction, and obstacle rover."
+  },
+  {
+    "id": "creative-engineering-subject",
+    "title": "Creative Engineering & Puzzles",
+    "description": "Engage with playful physical computing, chiptune 8-bit sound synthesis, optical Morse communications, terminal games in C, circuit bug hunting, and logic gate puzzles."
   }
 ];
 
@@ -8221,6 +8231,628 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "kind": "circuit",
               "title": "Kalman Filter Sensor Fusion",
               "description": "Interactive Kalman state tracker filtering high-frequency sensor noise."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "embedded-capstone-projects",
+    "subjectId": "embedded-capstones-subject",
+    "title": "Embedded Systems Capstone Projects",
+    "description": "Architect, wire, and firmware-implement 6 comprehensive industry-standard micro-controller capstones: automated weather station, smart appliance controller, autonomous line follower, digital keyless lock, 4-way traffic junction, and obstacle rover.",
+    "level": "Applied",
+    "prerequisites": [
+      "arduino-embedded",
+      "esp32-iot-systems"
+    ],
+    "objectives": [
+      {
+        "id": "capstone-weather-obj",
+        "title": "Build an automated weather station logging sensor telemetry to virtual EEPROM and streaming JSON."
+      },
+      {
+        "id": "capstone-home-obj",
+        "title": "Implement a smart home lighting and appliance controller with PIR interrupts, relay drivers, and MQTT state."
+      },
+      {
+        "id": "capstone-line-obj",
+        "title": "Construct an autonomous line follower robot with dual optical sensors and differential motor steering."
+      },
+      {
+        "id": "capstone-door-lock-obj",
+        "title": "Develop a secure digital combination door lock with 4-digit PIN verification, lockout timer, and solenoid actuation."
+      },
+      {
+        "id": "capstone-traffic-obj",
+        "title": "Engineer a four-way smart traffic light junction with pedestrian crossing request interrupts and yellow clearing intervals."
+      },
+      {
+        "id": "capstone-rover-obj",
+        "title": "Build an autonomous obstacle-avoiding micro-rover using HC-SR04 ultrasonic echo timing and servo radar sweep."
+      }
+    ],
+    "learningOutcomes": [
+      "Wire analog sensor dividers and log calibrated telemetry into non-volatile memory.",
+      "Drive relays safely using NPN low-side transistors and inductive flyback suppression diodes.",
+      "Implement autonomous differential steering algorithms using optical reflectance feedback.",
+      "Design matrix keypad scanning routines and secure brute-force penalty lockouts.",
+      "Build municipal traffic phase state machines with yellow interval dilemma-zone physics.",
+      "Calculate time-of-flight acoustic distances and command reactive obstacle avoidance."
+    ],
+    "estimatedDurationMinutes": 240,
+    "publicationStatus": "published",
+    "modules": [
+      {
+        "id": "mod-capstones-environmental",
+        "order": 1,
+        "title": "Sensor & Environmental Stations",
+        "summary": "Multi-channel analog telemetry acquisition, EEPROM logging, and JSON streaming.",
+        "lessons": [
+          {
+            "id": "capstone-weather-station",
+            "order": 1,
+            "title": "Automated Weather Station & Data Logger",
+            "summary": "Acquire multi-sensor analog readings, store ring-buffer records, and stream serial JSON telemetry.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "capstone-weather-obj"
+            ],
+            "prerequisiteLessonIds": [],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-capstone-weather-station",
+              "title": "Format Weather Station Telemetry",
+              "difficulty": "Applied",
+              "expectedOutcome": "Computes calibrated temperature and light percentages.",
+              "prompt": "For raw sensor readings tempRaw = 512 and lightRaw = 512 on a 10-bit ADC (Vref = 5.0V, 10 mV = 1 deg C), compute tempC = ((tempRaw * 5000 / 1024) / 10) and lightPct = (lightRaw / 1023 * 100). Log: 'TEMP: {tempC} C, LIGHT: {lightPct}%' with both values formatted to 1 decimal place.",
+              "objectiveId": "capstone-weather-obj",
+              "starterCode": "// Weather station telemetry serializer\nconst tempRaw = 512, lightRaw = 512;\n\n// TODO: Compute tempC and lightPct and log formatted string\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is a flyback diode required when controlling an electromagnetic relay from a microcontroller transistor?",
+              "answer": "To clamp inductive kickback voltage (V = -L di/dt) that occurs when relay coil current is suddenly interrupted."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Weather Station Telemetry Rig",
+              "description": "Inspect simulated environmental analog sensors, ADC conversion, and telemetry streaming."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-capstones-home-automation",
+        "order": 2,
+        "title": "Connected Automation & IoT",
+        "summary": "PIR motion interrupts, relay drivers, flyback protection, and PWM mood lighting.",
+        "lessons": [
+          {
+            "id": "capstone-smart-home",
+            "order": 2,
+            "title": "Smart Home Lighting & Appliance Controller",
+            "summary": "Coordinate PIR presence interrupts, PWM mood dimming, and relay switching.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "capstone-home-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "capstone-weather-station"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-capstone-smart-home",
+              "title": "Smart Home Automation Logic",
+              "difficulty": "Applied",
+              "expectedOutcome": "Outputs appropriate relay and PWM levels based on occupancy and ambient light.",
+              "prompt": "Given motion = true and lux = 50: if !motion or lux >= 400, output 'RELAY: OFF, PWM: 0'. If motion and lux < 100, output 'RELAY: ON, PWM: 255'. If motion and lux between 100 and 399, output 'RELAY: ON, PWM: 128'. Write code to evaluate and log the result.",
+              "objectiveId": "capstone-home-obj",
+              "starterCode": "// Smart home lighting controller\nconst motion = true, lux = 50;\n\n// TODO: Implement lighting decision logic and log string\n"
+            },
+            "checkpoint": {
+              "prompt": "What is the function of a snubber circuit or flyback diode across an inductive AC or DC relay load?",
+              "answer": "To suppress high-voltage transients created by inductive energy collapse when switching off."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Smart Home Lighting Controller",
+              "description": "Simulate PIR presence trigger, relay switching, and PWM dimming control."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-capstones-robotics",
+        "order": 3,
+        "title": "Robotics & Motion Control",
+        "summary": "Dual-sensor optical reflectance tracking and H-bridge differential steering.",
+        "lessons": [
+          {
+            "id": "capstone-line-follower",
+            "order": 3,
+            "title": "Autonomous Dual-Sensor Line Follower Robot",
+            "summary": "Process infrared reflectance sensors and drive H-bridge differential motors.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "capstone-line-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "capstone-smart-home"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-capstone-line-follower",
+              "title": "Differential Steering Controller",
+              "difficulty": "Applied",
+              "expectedOutcome": "Outputs appropriate differential drive commands based on sensor states.",
+              "prompt": "Given leftBlack = false and rightBlack = false: if both black, log 'ACTION: STOP, LEFT: 0, RIGHT: 0'. If leftBlack, log 'ACTION: TURN_LEFT, LEFT: 0, RIGHT: 220'. If rightBlack, log 'ACTION: TURN_RIGHT, LEFT: 220, RIGHT: 0'. Otherwise, log 'ACTION: FORWARD, LEFT: 200, RIGHT: 200'. Write the evaluation script.",
+              "objectiveId": "capstone-line-obj",
+              "starterCode": "// Line follower steering controller\nconst leftBlack = false, rightBlack = false;\n\n// TODO: Implement steering decision and log string\n"
+            },
+            "checkpoint": {
+              "prompt": "What causes an autonomous line follower to wobble or oscillate violently across the track?",
+              "answer": "Excessive steering correction gain (over-correcting before sensing the centered position), requiring proportional damping."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Line Follower Differential Motor Rig",
+              "description": "Inspect IR sensor thresholding and motor direction control logic."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-capstones-security",
+        "order": 4,
+        "title": "Security & Access Systems",
+        "summary": "Keypad matrix scanning, PIN authentication, and brute-force lockout timers.",
+        "lessons": [
+          {
+            "id": "capstone-digital-door-lock",
+            "order": 4,
+            "title": "Digital Combination Keypad Door Lock",
+            "summary": "Implement keypad entry decoding, PIN authentication, and lock solenoid timing.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "capstone-door-lock-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "capstone-line-follower"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-capstone-door-lock",
+              "title": "PIN Verification State Machine",
+              "difficulty": "Applied",
+              "expectedOutcome": "Returns authentication result with brute-force lockout defense.",
+              "prompt": "Given masterPin = '1234', enteredPin = '1234', and currentAttempts = 0: if entered matches master, log 'ACCESS: GRANTED, LOCKOUT: 0 s'. If not matching and currentAttempts + 1 >= 3, log 'ACCESS: DENIED, LOCKOUT: 30 s'. Otherwise log 'ACCESS: DENIED, LOCKOUT: 0 s'. Implement the logic.",
+              "objectiveId": "capstone-door-lock-obj",
+              "starterCode": "// PIN verification logic\nconst masterPin = \"1234\", enteredPin = \"1234\", currentAttempts = 0;\n\n// TODO: Implement PIN comparison and log status string\n"
+            },
+            "checkpoint": {
+              "prompt": "Why must push-button inputs be debounced either in software or with hardware RC low-pass filters?",
+              "answer": "Mechanical contacts bounce rapidly for 5 to 20 ms upon impact, which can register as dozens of false keypresses."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Keypad & Electronic Lock Rig",
+              "description": "Test PIN entry verification, lockout penalty state, and unlocking pulse."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-capstones-infrastructure",
+        "order": 5,
+        "title": "Infrastructure & State Machines",
+        "summary": "Multi-phase traffic controller timing, yellow clearance intervals, and emergency overrides.",
+        "lessons": [
+          {
+            "id": "capstone-traffic-light",
+            "order": 5,
+            "title": "Four-Way Smart Traffic Light Junction",
+            "summary": "Coordinate state machine timing, yellow clearing intervals, and emergency overrides.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "capstone-traffic-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "capstone-digital-door-lock"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-capstone-traffic-light",
+              "title": "Traffic Junction Next-Phase Decider",
+              "difficulty": "Applied",
+              "expectedOutcome": "Transitions traffic phase accurately according to clearance intervals.",
+              "prompt": "Given currentPhase = 0, secondsInPhase = 31, and emergency = false: if emergency is true, log 'PHASE: 0, NS: GREEN, EW: RED'. If phase 0 and seconds >= 30, log 'PHASE: 1, NS: YELLOW, EW: RED'. If phase 1 and seconds >= 4, log 'PHASE: 2, NS: RED, EW: GREEN'. If phase 2 and seconds >= 25, log 'PHASE: 3, NS: RED, EW: YELLOW'. If phase 3 and seconds >= 4, log 'PHASE: 0, NS: GREEN, EW: RED'. Write code to evaluate.",
+              "objectiveId": "capstone-traffic-obj",
+              "starterCode": "// Traffic light state transition logic\nconst currentPhase = 0, secondsInPhase = 31, emergency = false;\n\n// TODO: Implement transition check and log string\n"
+            },
+            "checkpoint": {
+              "prompt": "Why must an autonomous traffic controller use a hardware watchdog timer (WDT)?",
+              "answer": "If firmware hangs in an unexpected loop, opposing greens could be illuminated simultaneously without automatic reset, causing catastrophic collisions."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Smart Traffic Light Controller",
+              "description": "Simulate North-South and East-West 4-way traffic phases and pedestrian request interrupts."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-capstones-autonomous",
+        "order": 6,
+        "title": "Autonomous Mobile Systems",
+        "summary": "Ultrasonic time-of-flight acoustic ranging and servo-assisted radar obstacle avoidance.",
+        "lessons": [
+          {
+            "id": "capstone-obstacle-rover",
+            "order": 6,
+            "title": "Obstacle-Avoiding Ultrasonic Micro-Rover",
+            "summary": "Calculate ultrasonic time-of-flight distances and command avoidance steering.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "capstone-rover-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "capstone-traffic-light"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-capstone-obstacle-rover",
+              "title": "Ultrasonic Navigation Decider",
+              "difficulty": "Applied",
+              "expectedOutcome": "Calculates distance and commands forward, reverse, or turning evasion.",
+              "prompt": "Given echoPulseUs = 2000, leftClearance = 40, and rightClearance = 20: compute distCm = Math.round(echoPulseUs / 58.2). If distCm > 25, log 'DIST: {distCm} cm, ACTION: FORWARD'. If distCm < 12, log 'DIST: {distCm} cm, ACTION: REVERSE'. If distCm between 12 and 25: log 'DIST: {distCm} cm, ACTION: TURN_LEFT' if leftClearance > rightClearance, else 'TURN_RIGHT'. Write the code.",
+              "objectiveId": "capstone-rover-obj",
+              "starterCode": "// Rover navigation decider\nconst echoPulseUs = 2000, leftClearance = 40, rightClearance = 20;\n\n// TODO: Compute distCm and log navigation decision\n"
+            },
+            "checkpoint": {
+              "prompt": "Why must the HC-SR04 trigger pin be held HIGH for at least 10 microseconds?",
+              "answer": "To signal the module's onboard microcontroller to emit the 8-cycle 40 kHz ultrasonic burst."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Ultrasonic Rover Navigation Rig",
+              "description": "Inspect HC-SR04 sonar ping timing, obstacle distance thresholding, and servo radar sweep."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "creative-engineering-lab",
+    "subjectId": "creative-engineering-subject",
+    "title": "Creative Engineering Lab & Hardware Puzzles",
+    "description": "Engage with playful physical computing, chiptune 8-bit sound synthesis, optical Morse communications, terminal games in C, circuit bug hunting, and logic gate puzzles.",
+    "level": "Developing",
+    "prerequisites": [
+      "digital-logic-circuits",
+      "c-programming-foundations"
+    ],
+    "objectives": [
+      {
+        "id": "creative-piezo-obj",
+        "title": "Synthesize 8-bit square wave musical melodies using microcontroller timers and Web Audio oscillator frequencies."
+      },
+      {
+        "id": "creative-morse-obj",
+        "title": "Translate alphanumeric text into international Morse code time-unit pulses for optical LED transmission."
+      },
+      {
+        "id": "creative-snake-obj",
+        "title": "Implement grid coordinate math, state machine collision detection, and food spawning for terminal snake in C."
+      },
+      {
+        "id": "creative-bug-obj",
+        "title": "Diagnose and fix real-world hardware circuit flaws: floating inputs, missing pull-ups, wrong polarity, and short circuits."
+      },
+      {
+        "id": "creative-asm-obj",
+        "title": "Trace assembly instructions, accumulator registers, and condition flags to decode a simulated firmware puzzle."
+      },
+      {
+        "id": "creative-maze-obj",
+        "title": "Solve a multi-stage combinational logic gate puzzle to discover the binary key unlocking a virtual vault."
+      }
+    ],
+    "learningOutcomes": [
+      "Program square wave frequency timers and play interactive chiptune melodies.",
+      "Modulate optical LED signals using standard Morse code time units.",
+      "Build retro terminal grid movement and state machines in C.",
+      "Diagnose real bench electronic circuit faults: floating gates, polarity, and short circuits.",
+      "Trace low-level assembly instruction sets, accumulator mutations, and status flags.",
+      "Deduce multi-stage combinational boolean vectors to unlock digital security gates."
+    ],
+    "estimatedDurationMinutes": 180,
+    "publicationStatus": "published",
+    "modules": [
+      {
+        "id": "mod-creative-audio",
+        "order": 1,
+        "title": "Audio & Signals",
+        "summary": "8-bit square wave pitch synthesis, melody presets, and Web Audio API user gesture handling.",
+        "lessons": [
+          {
+            "id": "creative-piezo-melody",
+            "order": 1,
+            "title": "Piezoelectric 8-Bit Melody Player",
+            "summary": "Program chiptune audio frequencies, note durations, and Web Audio synthesis.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "creative-piezo-obj"
+            ],
+            "prerequisiteLessonIds": [],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-creative-piezo-melody",
+              "title": "Musical Note to Frequency Converter",
+              "difficulty": "Applied",
+              "expectedOutcome": "Returns exact pitch frequency for musical note identifiers.",
+              "prompt": "Given note = 'A4': lookup frequency in Hz (A4 = 440.00, C4 = 261.63, E5 = 659.25). Log: 'NOTE: {note}, FREQ: {freq.toFixed(2)} Hz'. Write the evaluation script.",
+              "objectiveId": "creative-piezo-obj",
+              "starterCode": "// Note frequency resolver\nconst note = \"A4\";\n\n// TODO: Lookup frequency and log formatted note frequency\n"
+            },
+            "checkpoint": {
+              "prompt": "Why do modern browsers prevent AudioContext.start() before a user gesture like clicking a button?",
+              "answer": "To protect users from unwanted noisy advertisements and audio autoplay fatigue."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Chiptune Audio Synthesizer",
+              "description": "Experiment with note frequencies, square wave timbre, and melodic presets with user-initiated Web Audio playback."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-creative-optical",
+        "order": 2,
+        "title": "Optical Communications",
+        "summary": "International Morse code time-unit pulses, dot-dash encoding, and LED transmission.",
+        "lessons": [
+          {
+            "id": "creative-optical-morse",
+            "order": 2,
+            "title": "Optical Morse Code Transmitter",
+            "summary": "Encode text into standardized international Morse code optical pulses.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "creative-morse-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "creative-piezo-melody"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-creative-optical-morse",
+              "title": "Text to Morse Code String",
+              "difficulty": "Applied",
+              "expectedOutcome": "Accurately translates text characters to spaced Morse code strings.",
+              "prompt": "Given text = 'SOS': map S -> '...', O -> '---'. Join characters in a word with space. Output: 'MORSE: {encoded}'. Write the script.",
+              "objectiveId": "creative-morse-obj",
+              "starterCode": "// Morse code encoder\nconst text = \"SOS\";\n\n// TODO: Encode text and log MORSE: string\n"
+            },
+            "checkpoint": {
+              "prompt": "How many basic time units (T) is a Morse dash relative to a dot?",
+              "answer": "Exactly 3 units (a dash is 3 times the length of a dot)."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Optical Morse Rig",
+              "description": "Convert string text to international Morse timings and observe simulated LED pulse modulation."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-creative-games",
+        "order": 3,
+        "title": "Game Systems in C",
+        "summary": "Grid coordinate math, direction vectors, collision logic, and circular queues.",
+        "lessons": [
+          {
+            "id": "creative-terminal-snake",
+            "order": 3,
+            "title": "In-Browser Terminal Snake in C",
+            "summary": "Architect grid coordinate arithmetic, direction vectors, and body movement.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "creative-snake-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "creative-optical-morse"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-creative-terminal-snake",
+              "title": "Snake Next Head Coordinate",
+              "difficulty": "Applied",
+              "expectedOutcome": "Calculates next head coordinate based on direction vector.",
+              "prompt": "Given headX = 5, headY = 5, and dir = 'RIGHT' (dx = 1, dy = 0): calculate new coordinate nx = headX + dx, ny = headY + dy. Log: 'HEAD: ({nx}, {ny})'. Write the evaluation script.",
+              "objectiveId": "creative-snake-obj",
+              "starterCode": "// Snake coordinate stepper\nconst headX = 5, headY = 5, dir = \"RIGHT\";\n\n// TODO: Compute next coordinate and log formatted string\n"
+            },
+            "checkpoint": {
+              "prompt": "Why does a circular queue improve Snake game performance over a shifting array?",
+              "answer": "Moving head and tail pointers operates in O(1) time complexity, whereas shifting N body elements takes O(N) time per frame."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Terminal Snake Game Loop",
+              "description": "Play and inspect the 2D coordinate grid and state transitions driving the classic Snake game."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-creative-diagnostics",
+        "order": 4,
+        "title": "Diagnostic Engineering",
+        "summary": "Bench troubleshooting: floating inputs, reversed diodes, and current limiter sizing.",
+        "lessons": [
+          {
+            "id": "creative-circuit-bug-hunt",
+            "order": 4,
+            "title": "Reverse-Engineering Circuit Bug Hunt",
+            "summary": "Troubleshoot floating microcontroller inputs, inverted LEDs, and short-circuit faults.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "creative-bug-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "creative-terminal-snake"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-creative-circuit-bug-hunt",
+              "title": "Diagnose Circuit Fault",
+              "difficulty": "Applied",
+              "expectedOutcome": "Identifies root electrical causes from bench symptoms.",
+              "prompt": "Given symptom = 'RANDOM_READINGS': map 'RANDOM_READINGS' to 'FLOATING_INPUT', and 'BURNT_LED' to 'MISSING_SERIES_RESISTOR'. Log: 'SYMPTOM: {symptom}, FAULT: {fault}'. Write code to evaluate.",
+              "objectiveId": "creative-bug-obj",
+              "starterCode": "// Circuit fault diagnosis\nconst symptom = \"RANDOM_READINGS\";\n\n// TODO: Map symptom to electrical fault and log string\n"
+            },
+            "checkpoint": {
+              "prompt": "How do internal pull-up resistors resolve floating digital input instability?",
+              "answer": "They weakly tie the pin to VCC when disconnected, guaranteeing a deterministic HIGH logic state until an external switch pulls it to ground."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Interactive Hardware Diagnostics",
+              "description": "Inspect circuit faults and verify corrective schematic repairs."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-creative-assembly",
+        "order": 5,
+        "title": "Low-Level Instruction Puzzles",
+        "summary": "Accumulator tracing, condition flags, and machine opcode execution.",
+        "lessons": [
+          {
+            "id": "creative-assembly-puzzle",
+            "order": 5,
+            "title": "Microcontroller Assembly Code Puzzle",
+            "summary": "Trace opcodes, accumulator register state, and zero flags to decrypt a value.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "creative-asm-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "creative-circuit-bug-hunt"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-creative-assembly-puzzle",
+              "title": "Trace 8-Bit Assembly Program",
+              "difficulty": "Applied",
+              "expectedOutcome": "Correctly executes sequence of assembly instructions on 8-bit accumulator.",
+              "prompt": "Execute the instruction sequence: LDA 10, ADD 5, SUB 3. Compute final accumulator value acc. Log: 'ACC: {acc}'. Write the evaluation script.",
+              "objectiveId": "creative-asm-obj",
+              "starterCode": "// Assembly trace puzzle\nlet acc = 0;\n\n// TODO: Execute LDA 10, ADD 5, SUB 3 and log final ACC\n"
+            },
+            "checkpoint": {
+              "prompt": "What happens to an 8-bit unsigned accumulator holding 255 if an ADD 1 instruction is executed?",
+              "answer": "It wraps to 0 (overflow) and sets the Carry Flag (C = 1) in the status register."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Toy CPU Instruction Stepper",
+              "description": "Step through machine instructions and observe accumulator register mutations."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-creative-puzzles",
+        "order": 6,
+        "title": "Combinational Puzzles",
+        "summary": "Multi-stage digital logic gates, XOR condition solving, and electronic lock verification.",
+        "lessons": [
+          {
+            "id": "creative-logic-maze",
+            "order": 6,
+            "title": "Combinational Logic Gate Maze",
+            "summary": "Deduce boolean switch inputs that satisfy multi-stage gate conditions.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "creative-maze-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "creative-assembly-puzzle"
+            ],
+            "estimatedDurationMinutes": 30,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-creative-logic-maze",
+              "title": "Verify Maze Vault Key",
+              "difficulty": "Applied",
+              "expectedOutcome": "Returns unlocked status when all 3 combinational maze gates are satisfied.",
+              "prompt": "Given switches a = 0, b = 1, c = 1, d = 0: evaluate d1 = (a ^ b) === 1, d2 = (b === 1 && c === 1) || d === 0, and d3 = !(a === 0 && c === 0). If all three are true, log 'VAULT: UNLOCKED', otherwise log 'VAULT: LOCKED'. Write the code.",
+              "objectiveId": "creative-maze-obj",
+              "starterCode": "// Logic maze validator\nconst a = 0, b = 1, c = 1, d = 0;\n\n// TODO: Check door conditions and log VAULT: UNLOCKED or LOCKED\n"
+            },
+            "checkpoint": {
+              "prompt": "In combinational logic, how fast does the circuit output update when an input switch is toggled?",
+              "answer": "Almost instantaneously, constrained only by the physical propagation delay (nanoseconds) of the logic silicon gates."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Interactive Combinational Maze",
+              "description": "Flip binary switches to open digital security gates and unlock the vault."
             }
           }
         ]

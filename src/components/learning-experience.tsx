@@ -162,6 +162,8 @@ export function getCourseBadgeText(courseId: string): string {
   if (courseId.includes("photo")) return "COLOR LAB";
   if (courseId === "circuits-eee-core") return "CIRCUITS & EEE";
   if (courseId === "control-and-signals" || courseId.includes("control")) return "CONTROL & SIGNALS";
+  if (courseId.includes("capstone")) return "EMBEDDED CAPSTONES";
+  if (courseId.includes("creative")) return "CREATIVE LAB";
   if (courseId.includes("circuits") || courseId.includes("digital")) return "DIGITAL LOGIC";
   return "SYSTEMS";
 }
@@ -173,6 +175,8 @@ function getCourseRuntimeText(courseId: string): string {
   if (courseId.includes("arduino") || courseId.includes("esp32")) return "Embedded simulator · browser";
   if (courseId === "circuits-eee-core") return "Analog & EEE simulator · browser";
   if (courseId === "control-and-signals" || courseId.includes("control")) return "Control & signals simulator · browser";
+  if (courseId.includes("capstone")) return "Embedded capstone simulator · browser";
+  if (courseId.includes("creative")) return "Creative hardware lab · browser";
   if (courseId.includes("breadboard") || courseId.includes("digital")) return "Circuit simulator · browser";
   if (courseId.includes("sql")) return "SQL.js · browser database";
   if (courseId.includes("media") || courseId.includes("photo")) return "Canvas image lab · browser";
@@ -245,12 +249,12 @@ type CourseCategory = "All" | "Systems" | "Web" | "Algorithms" | "Databases" | "
 
 function matchesCourseCategory(courseId: string, category: Exclude<CourseCategory, "All">) {
   switch (category) {
-    case "Systems": return courseId.includes("c-programming") || courseId.includes("cpp") || courseId.includes("python-programming") || courseId.includes("arduino") || courseId.includes("esp32") || courseId.includes("control");
+    case "Systems": return courseId.includes("c-programming") || courseId.includes("cpp") || courseId.includes("python-programming") || courseId.includes("arduino") || courseId.includes("esp32") || courseId.includes("control") || courseId.includes("capstone");
     case "Web": return courseId.includes("html") || courseId.includes("js-systems") || courseId.includes("ai-app");
-    case "Algorithms": return courseId.includes("dsa") || courseId.includes("js-systems");
+    case "Algorithms": return courseId.includes("dsa") || courseId.includes("js-systems") || courseId.includes("creative");
     case "Databases": return courseId.includes("sql");
     case "AI & Media": return courseId.includes("prompt") || courseId.includes("photo") || courseId.includes("ai-app");
-    case "Hardware": return courseId.includes("circuits") || courseId.includes("arduino") || courseId.includes("esp32") || courseId.includes("breadboard") || courseId.includes("control");
+    case "Hardware": return courseId.includes("circuits") || courseId.includes("arduino") || courseId.includes("esp32") || courseId.includes("breadboard") || courseId.includes("control") || courseId.includes("capstone") || courseId.includes("creative");
   }
 }
 
@@ -1990,6 +1994,16 @@ export function LearningExperience({
                               ? "fft"
                               : lesson.interactiveDemo.config?.mode === "dsa"
                               ? "dsa"
+                              : lesson.interactiveDemo.config?.mode === "melody"
+                              ? "melody"
+                              : lesson.interactiveDemo.config?.mode === "morse"
+                              ? "morse"
+                              : lesson.interactiveDemo.config?.mode === "snake"
+                              ? "snake"
+                              : lesson.interactiveDemo.config?.mode === "maze"
+                              ? "maze"
+                              : lesson.interactiveDemo.config?.mode === "creative"
+                              ? "creative"
                               : lesson.interactiveDemo.config?.mode === "kmap"
                               ? "kmap"
                               : lesson.interactiveDemo.config?.mode === "fsm"

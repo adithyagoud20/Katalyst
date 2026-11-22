@@ -973,6 +973,8 @@ export function CPlayground({
                   ? "FFT & Sampling Analyzer"
                   : circuitInitialMode === "dsa"
                   ? "Interactive DSA Visualizer"
+                  : circuitInitialMode === "creative"
+                  ? "Creative Engineering Studio"
                   : "Digital Logic Gates"
                 : langDetails.title}
             </span>
@@ -1027,6 +1029,7 @@ export function CPlayground({
                 <option value="circuit:pid">PID Controller Studio</option>
                 <option value="circuit:fft">FFT &amp; Sampling Analyzer</option>
                 <option value="circuit:dsa">Interactive DSA Visualizer</option>
+                <option value="circuit:creative">Creative Engineering Studio</option>
               </optgroup>
             </select>
             <span className="ide-file-status" title={status}>
@@ -1477,6 +1480,31 @@ export function CPlayground({
               </div>
               <div className="launcher-card-action">
                 <span>Launch DSA Studio</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "creative")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "creative")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-pink-500">
+                    <Sparkles size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">Creative &amp; Games</span>
+                </div>
+                <h3>Creative Engineering Studio</h3>
+                <p>
+                  Synthesize 8-bit chiptune melodies with Web Audio, transmit optical Morse code pulses, play terminal Snake, and solve logic mazes.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch Creative Studio</span>
                 <ArrowRight size={14} />
               </div>
             </div>

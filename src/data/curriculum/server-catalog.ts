@@ -22,6 +22,8 @@ import { photoEditingMediaSubject, photoEditingMediaPath } from "./photo-editing
 import { digitalCircuitsSubject, digitalCircuitsPath } from "./digital-circuits";
 import { circuitsEeeCoreSubject, circuitsEeeCorePath } from "./circuits-eee-core";
 import { controlAndSignalsSubject, controlAndSignalsPath } from "./control-and-signals";
+import { embeddedCapstonesSubject, embeddedCapstonesPath } from "./embedded-capstones";
+import { creativeEngineeringSubject, creativeEngineeringPath } from "./creative-engineering";
 
 export {
   cProgrammingSubject,
@@ -56,6 +58,10 @@ export {
   circuitsEeeCorePath,
   controlAndSignalsSubject,
   controlAndSignalsPath,
+  embeddedCapstonesSubject,
+  embeddedCapstonesPath,
+  creativeEngineeringSubject,
+  creativeEngineeringPath,
 };
 
 export const serverSubjects: LearningSubject[] = [
@@ -75,6 +81,8 @@ export const serverSubjects: LearningSubject[] = [
   digitalCircuitsSubject,
   circuitsEeeCoreSubject,
   controlAndSignalsSubject,
+  embeddedCapstonesSubject,
+  creativeEngineeringSubject,
 ];
 
 export const serverCourses: LearningCourse[] = [
@@ -94,6 +102,8 @@ export const serverCourses: LearningCourse[] = [
   digitalCircuitsPath,
   circuitsEeeCorePath,
   controlAndSignalsPath,
+  embeddedCapstonesPath,
+  creativeEngineeringPath,
 ];
 
 let _validatedCatalog: LearningCatalog | null = null;

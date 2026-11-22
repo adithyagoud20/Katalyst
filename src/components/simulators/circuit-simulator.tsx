@@ -10,8 +10,9 @@ import { AnalogCircuitsStudio } from "./analog-circuits-studio";
 import { PidTuningSimulator } from "./pid-tuning-simulator";
 import { FftSamplingVisualizer } from "./fft-sampling-visualizer";
 import { DsaVisualizer } from "./dsa-visualizer";
+import { CreativeStudio, type CreativeStudioMode } from "./creative-studio";
 
-export type CircuitSimulatorMode = "digital" | "analog" | "breadboard" | "arduino" | "esp32" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa";
+export type CircuitSimulatorMode = "digital" | "analog" | "breadboard" | "arduino" | "esp32" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa" | "creative" | "melody" | "morse" | "snake" | "maze";
 
 export interface CircuitSimulatorProps {
   initialMode?: CircuitSimulatorMode;
@@ -26,10 +27,18 @@ export function CircuitSimulator({
   className = "",
   hideModeSwitcher = false,
 }: CircuitSimulatorProps) {
-  const [mode, setMode] = useState<"digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa">(
+  const isCreativeMode = initialMode === "creative" || initialMode === "melody" || initialMode === "morse" || initialMode === "snake" || initialMode === "maze";
+  const [creativeSubMode] = useState<CreativeStudioMode>(
+    initialMode === "melody" || initialMode === "morse" || initialMode === "snake" || initialMode === "maze"
+      ? initialMode
+      : "melody"
+  );
+  const [mode, setMode] = useState<"digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa" | "creative">(
     initialMode === "arduino" || initialMode === "esp32"
       ? "breadboard"
-      : (initialMode as "digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa")
+      : isCreativeMode
+      ? "creative"
+      : (initialMode as "digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa" | "creative")
   );
   const [mcuTarget, setMcuTarget] = useState<"arduino" | "esp32">(
     initialMode === "esp32" ? "esp32" : "arduino"
@@ -422,6 +431,17 @@ export function CircuitSimulator({
             </button>
             <button
               type="button"
+              onClick={() => setMode("creative")}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                mode === "creative"
+                  ? "bg-pink-600 text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              Creative Lab
+            </button>
+            <button
+              type="button"
               onClick={() => {
                 setMode("breadboard");
                 setMcuTarget("arduino");
@@ -603,6 +623,12 @@ export function CircuitSimulator({
       {mode === "dsa" && (
         <div className="mt-4">
           <DsaVisualizer />
+        </div>
+      )}
+
+      {mode === "creative" && (
+        <div className="mt-4">
+          <CreativeStudio initialMode={creativeSubMode} />
         </div>
       )}
 

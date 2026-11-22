@@ -18,6 +18,8 @@ import {
   digitalCircuitsPath,
   circuitsEeeCorePath,
   controlAndSignalsPath,
+  embeddedCapstonesPath,
+  creativeEngineeringPath,
   sqlDatabasesPath,
   htmlCssWebPath,
   dsaMasteryPath,
@@ -419,6 +421,50 @@ describe("Python Programming Foundations course", () => {
       }
     });
 
+    it("registers Embedded Capstones course and validates 6 capstone project lessons", () => {
+      const validation = safeValidateCourse(embeddedCapstonesPath);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(embeddedCapstonesPath);
+      expect(lessons).toHaveLength(6);
+      expect(lessons.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 6 }, (_, i) => i + 1));
+
+      for (const [index, { lesson }] of lessons.entries()) {
+        const lessonValidation = safeValidateLesson(lesson);
+        expect(lessonValidation.success, `${lesson.id} failed validation`).toBe(true);
+        expect(lesson.type).toBe("interactive-simulation");
+        expect(lesson.interactiveDemo).toBeDefined();
+        expect(lesson.interactiveDemo?.kind).toBe("circuit");
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(2);
+
+        for (const prereqId of lesson.prerequisiteLessonIds) {
+          const prereqIdx = lessons.findIndex(({ lesson: candidate }) => candidate.id === prereqId);
+          expect(prereqIdx, `${lesson.id} prerequisite ${prereqId} must precede it`).toBeLessThan(index);
+        }
+      }
+    });
+
+    it("registers Creative Engineering Lab course and validates 6 creative lessons", () => {
+      const validation = safeValidateCourse(creativeEngineeringPath);
+      expect(validation.success).toBe(true);
+      const lessons = flattenLessons(creativeEngineeringPath);
+      expect(lessons).toHaveLength(6);
+      expect(lessons.map(({ lesson }) => lesson.order)).toEqual(Array.from({ length: 6 }, (_, i) => i + 1));
+
+      for (const [index, { lesson }] of lessons.entries()) {
+        const lessonValidation = safeValidateLesson(lesson);
+        expect(lessonValidation.success, `${lesson.id} failed validation`).toBe(true);
+        expect(lesson.type).toBe("interactive-simulation");
+        expect(lesson.interactiveDemo).toBeDefined();
+        expect(lesson.interactiveDemo?.kind).toBe("circuit");
+        expect(lesson.exercise.testCases?.length).toBeGreaterThanOrEqual(2);
+
+        for (const prereqId of lesson.prerequisiteLessonIds) {
+          const prereqIdx = lessons.findIndex(({ lesson: candidate }) => candidate.id === prereqId);
+          expect(prereqIdx, `${lesson.id} prerequisite ${prereqId} must precede it`).toBeLessThan(index);
+        }
+      }
+    });
+
     it("registers SQL Databases course and validates 12 relational lessons", () => {
       const validation = safeValidateCourse(sqlDatabasesPath);
       expect(validation.success).toBe(true);
@@ -520,7 +566,7 @@ describe("Python Programming Foundations course", () => {
     });
 
     it("enforces pure server-side lessons in published client manifests (Deliverable 3)", () => {
-      expect(publishedLearningCourses).toHaveLength(16);
+      expect(publishedLearningCourses).toHaveLength(18);
       for (const course of publishedLearningCourses) {
         for (const mod of course.modules) {
           for (const lesson of mod.lessons) {
