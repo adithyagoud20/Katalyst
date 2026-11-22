@@ -559,6 +559,8 @@ export {
   embeddedCapstonesPath,
   creativeEngineeringSubject,
   creativeEngineeringPath,
+  engineeringCareerPrepSubject,
+  engineeringCareerPrepPath,
   sqlDatabasesSubject,
   sqlDatabasesPath,
   htmlCssWebSubject,

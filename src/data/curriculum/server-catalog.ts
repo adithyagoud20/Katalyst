@@ -24,6 +24,7 @@ import { circuitsEeeCoreSubject, circuitsEeeCorePath } from "./circuits-eee-core
 import { controlAndSignalsSubject, controlAndSignalsPath } from "./control-and-signals";
 import { embeddedCapstonesSubject, embeddedCapstonesPath } from "./embedded-capstones";
 import { creativeEngineeringSubject, creativeEngineeringPath } from "./creative-engineering";
+import { engineeringCareerPrepSubject, engineeringCareerPrepPath } from "./engineering-career-prep";
 
 export {
   cProgrammingSubject,
@@ -62,6 +63,8 @@ export {
   embeddedCapstonesPath,
   creativeEngineeringSubject,
   creativeEngineeringPath,
+  engineeringCareerPrepSubject,
+  engineeringCareerPrepPath,
 };
 
 export const serverSubjects: LearningSubject[] = [
@@ -83,6 +86,7 @@ export const serverSubjects: LearningSubject[] = [
   controlAndSignalsSubject,
   embeddedCapstonesSubject,
   creativeEngineeringSubject,
+  engineeringCareerPrepSubject,
 ];
 
 export const serverCourses: LearningCourse[] = [
@@ -104,6 +108,7 @@ export const serverCourses: LearningCourse[] = [
   controlAndSignalsPath,
   embeddedCapstonesPath,
   creativeEngineeringPath,
+  engineeringCareerPrepPath,
 ];
 
 let _validatedCatalog: LearningCatalog | null = null;

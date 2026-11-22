@@ -32,6 +32,7 @@ import { AssistantMarkdown } from "@/components/assistant-markdown";
 import { KatTutor, type TutorLessonContext } from "@/components/kat-tutor";
 import dynamic from "next/dynamic";
 import { SimulatorErrorBoundary } from "@/components/simulators/simulator-error-boundary";
+import { DailyChallengeCard } from "@/components/daily-challenge-card";
 import type { ExecutionLanguage } from "@/lib/execution/types";
 import {
   verifyExerciseSubmission,
@@ -164,6 +165,7 @@ export function getCourseBadgeText(courseId: string): string {
   if (courseId === "control-and-signals" || courseId.includes("control")) return "CONTROL & SIGNALS";
   if (courseId.includes("capstone")) return "EMBEDDED CAPSTONES";
   if (courseId.includes("creative")) return "CREATIVE LAB";
+  if (courseId.includes("career") || courseId.includes("gate")) return "GATE & CAREER";
   if (courseId.includes("circuits") || courseId.includes("digital")) return "DIGITAL LOGIC";
   return "SYSTEMS";
 }
@@ -177,6 +179,7 @@ function getCourseRuntimeText(courseId: string): string {
   if (courseId === "control-and-signals" || courseId.includes("control")) return "Control & signals simulator · browser";
   if (courseId.includes("capstone")) return "Embedded capstone simulator · browser";
   if (courseId.includes("creative")) return "Creative hardware lab · browser";
+  if (courseId.includes("career") || courseId.includes("gate")) return "GATE practice & simulator · browser";
   if (courseId.includes("breadboard") || courseId.includes("digital")) return "Circuit simulator · browser";
   if (courseId.includes("sql")) return "SQL.js · browser database";
   if (courseId.includes("media") || courseId.includes("photo")) return "Canvas image lab · browser";
@@ -249,9 +252,9 @@ type CourseCategory = "All" | "Systems" | "Web" | "Algorithms" | "Databases" | "
 
 function matchesCourseCategory(courseId: string, category: Exclude<CourseCategory, "All">) {
   switch (category) {
-    case "Systems": return courseId.includes("c-programming") || courseId.includes("cpp") || courseId.includes("python-programming") || courseId.includes("arduino") || courseId.includes("esp32") || courseId.includes("control") || courseId.includes("capstone");
+    case "Systems": return courseId.includes("c-programming") || courseId.includes("cpp") || courseId.includes("python-programming") || courseId.includes("arduino") || courseId.includes("esp32") || courseId.includes("control") || courseId.includes("capstone") || courseId.includes("career");
     case "Web": return courseId.includes("html") || courseId.includes("js-systems") || courseId.includes("ai-app");
-    case "Algorithms": return courseId.includes("dsa") || courseId.includes("js-systems") || courseId.includes("creative");
+    case "Algorithms": return courseId.includes("dsa") || courseId.includes("js-systems") || courseId.includes("creative") || courseId.includes("career");
     case "Databases": return courseId.includes("sql");
     case "AI & Media": return courseId.includes("prompt") || courseId.includes("photo") || courseId.includes("ai-app");
     case "Hardware": return courseId.includes("circuits") || courseId.includes("arduino") || courseId.includes("esp32") || courseId.includes("breadboard") || courseId.includes("control") || courseId.includes("capstone") || courseId.includes("creative");
@@ -1417,6 +1420,11 @@ export function LearningExperience({
               <Lightbulb size={15} /> Exercises and checkpoints are self-checks. Run code in the workspace to verify against test cases.
             </span>
           </header>
+
+          {/* Daily Engineering Challenge */}
+          <div className="mb-6">
+            <DailyChallengeCard onNavigatePractice={() => setPracticeCourseFilter("engineering-career-prep")} />
+          </div>
 
           {/* Practice Lab Multi-Course Filter Bar */}
           <div className="practice-filter-bar mb-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-3">

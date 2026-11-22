@@ -8,7 +8,7 @@ test.describe("Milestone M21 Architecture & Platform Expansion E2E Suite", () =>
 
     // Verify all courses visible under "All"
     const allCards = page.locator(".course-card-unified");
-    await expect(allCards).toHaveCount(18);
+    await expect(allCards).toHaveCount(19);
 
     // Filter by Databases
     await page.getByRole("tab", { name: "Databases" }).click();
@@ -33,7 +33,7 @@ test.describe("Milestone M21 Architecture & Platform Expansion E2E Suite", () =>
 
     // Reset to All
     await page.getByRole("tab", { name: "All" }).click();
-    await expect(page.locator(".course-card-unified")).toHaveCount(18);
+    await expect(page.locator(".course-card-unified")).toHaveCount(19);
   });
 
   test("shows the full catalog first, then keeps course details aligned with the selected category", async ({ page }) => {
@@ -49,7 +49,7 @@ test.describe("Milestone M21 Architecture & Platform Expansion E2E Suite", () =>
     await expect(details.getByRole("heading", { name: /Relational Databases & SQL Foundations/i })).toBeVisible();
     await page.getByRole("button", { name: "All courses" }).click();
     await expect(details).toBeHidden();
-    await expect(page.locator(".course-card-unified")).toHaveCount(18);
+    await expect(page.locator(".course-card-unified")).toHaveCount(19);
   });
 
   // Test 2: Unified Multi-Language Playground Switcher & HTML Live Sandbox Preview

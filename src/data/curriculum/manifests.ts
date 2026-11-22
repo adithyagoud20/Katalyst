@@ -95,6 +95,11 @@ export const learningSubjects: LearningSubject[] = [
     "id": "creative-engineering-subject",
     "title": "Creative Engineering & Puzzles",
     "description": "Engage with playful physical computing, chiptune 8-bit sound synthesis, optical Morse communications, terminal games in C, circuit bug hunting, and logic gate puzzles."
+  },
+  {
+    "id": "engineering-career-prep-subject",
+    "title": "Engineering Career & GATE Practice",
+    "description": "Master high-yield GATE (EEE, ECE, CS) technical questions, core embedded systems hardware interview diagnostics, circuit theorems, and real-time RTOS concurrency."
   }
 ];
 
@@ -8853,6 +8858,416 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "kind": "circuit",
               "title": "Interactive Combinational Maze",
               "description": "Flip binary switches to open digital security gates and unlock the vault."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "engineering-career-prep",
+    "subjectId": "engineering-career-prep-subject",
+    "title": "GATE & PSU Technical Interview Practice",
+    "description": "Master high-yield GATE (EEE, ECE, CS) questions, technical interview algorithms, core hardware diagnostics, and circuit analysis with instant auto-grading.",
+    "level": "Applied",
+    "prerequisites": [
+      "circuits-eee-core",
+      "control-and-signals",
+      "dsa-mastery"
+    ],
+    "objectives": [
+      {
+        "id": "career-gate-eee-obj",
+        "title": "Solve two-port network transmission parameters and symmetrical components for balanced/unbalanced 3-phase networks."
+      },
+      {
+        "id": "career-gate-ece-obj",
+        "title": "Evaluate continuous convolution integrals, Z-transform regions of convergence, and CMOS propagation delays."
+      },
+      {
+        "id": "career-gate-cs-obj",
+        "title": "Apply the Master Theorem to divide-and-conquer recurrences and calculate virtual memory two-level page table lookups."
+      },
+      {
+        "id": "career-embedded-c-obj",
+        "title": "Answer rigorous embedded C interview questions: volatile qualifiers, register bitfields, and interrupt reentrancy."
+      },
+      {
+        "id": "career-psu-machines-obj",
+        "title": "Analyze induction motor slip-torque curves, transformer voltage regulation, and DC machine speed control."
+      },
+      {
+        "id": "career-digital-timing-obj",
+        "title": "Calculate digital flip-flop setup/hold time slacks, maximum clock frequencies, and clock skew margins."
+      },
+      {
+        "id": "career-rtos-concurrency-obj",
+        "title": "Diagnose priority inversion hazards and evaluate priority inheritance protocols in RTOS task scheduling."
+      },
+      {
+        "id": "career-formula-drill-obj",
+        "title": "Solve high-yield engineering formulas spanning network theorems, Shannon capacity, and algorithmic time complexity."
+      }
+    ],
+    "learningOutcomes": [
+      "Solve two-port network ABCD matrices and 3-phase symmetrical fault components.",
+      "Evaluate discrete Z-transform ROC stability and CMOS digital inverter delays.",
+      "Apply the Master Theorem to divide-and-conquer recurrences and calculate virtual memory paging.",
+      "Master volatile qualifier semantics, hardware register bitmasking, and interrupt reentrancy.",
+      "Calculate induction motor slip, synchronous speed, and transformer voltage regulation.",
+      "Perform static timing analysis for setup/hold time slacks and clock skew margins.",
+      "Resolve real-time priority inversion using priority inheritance protocols.",
+      "Calculate Shannon-Hartley channel capacity and high-yield engineering formulas."
+    ],
+    "estimatedDurationMinutes": 360,
+    "publicationStatus": "published",
+    "modules": [
+      {
+        "id": "mod-career-eee-core",
+        "order": 1,
+        "title": "GATE Electrical Engineering (EEE)",
+        "summary": "Two-port network Z/Y/ABCD parameters, transmission reciprocity, and symmetrical components.",
+        "lessons": [
+          {
+            "id": "career-gate-eee-circuits",
+            "order": 1,
+            "title": "GATE EEE: Two-Port Networks & Symmetrical Components",
+            "summary": "Derive ABCD transmission matrices, reciprocity constraints, and 3-phase Fortescue sequence networks.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "career-gate-eee-obj"
+            ],
+            "prerequisiteLessonIds": [],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-career-gate-eee-circuits",
+              "title": "Two-Port Reciprocity Checker",
+              "difficulty": "Applied",
+              "expectedOutcome": "Verifies reciprocity condition AD - BC = 1.",
+              "prompt": "Given transmission parameters A = 2.0, B = 3.0, C = 1.0, D = 2.0: compute det = A * D - B * C. If Math.abs(det - 1.0) < 1e-5, log 'RECIPROCAL: TRUE', otherwise log 'RECIPROCAL: FALSE'.",
+              "objectiveId": "career-gate-eee-obj",
+              "starterCode": "// Two-port reciprocity verifier\nconst a = 2.0, b = 3.0, c = 1.0, d = 2.0;\n\n// TODO: Compute determinant and log reciprocity status\n"
+            },
+            "checkpoint": {
+              "prompt": "What is the physical interpretation of the A parameter in a two-port ABCD transmission matrix?",
+              "answer": "A = V1 / V2 when I2 = 0, which is the open-circuit reverse voltage ratio."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Two-Port Network Parameter Solver",
+              "description": "Inspect port voltage-current relationships and verify ABCD transmission reciprocity."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-career-ece-core",
+        "order": 2,
+        "title": "GATE Electronics & Communication (ECE)",
+        "summary": "Z-transform pole stability, region of convergence, and CMOS inverter propagation delay.",
+        "lessons": [
+          {
+            "id": "career-gate-ece-signals",
+            "order": 2,
+            "title": "GATE ECE: Z-Transform ROC & CMOS Propagation Delays",
+            "summary": "Analyze discrete poles, region of convergence stability, and CMOS digital inverter delay metrics.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "career-gate-ece-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "career-gate-eee-circuits"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-career-gate-ece-signals",
+              "title": "Z-Transform Pole Stability Tester",
+              "difficulty": "Applied",
+              "expectedOutcome": "Confirms system stability condition that poles lie strictly inside the unit circle.",
+              "prompt": "Given poleMag = 0.75: if poleMag < 1.0, log 'STABLE: YES, RADIUS: {poleMag.toFixed(2)}', else log 'STABLE: NO, RADIUS: {poleMag.toFixed(2)}'. Write the check.",
+              "objectiveId": "career-gate-ece-obj",
+              "starterCode": "// Z-plane pole stability check\nconst poleMag = 0.75;\n\n// TODO: Check if pole is inside unit circle and log string\n"
+            },
+            "checkpoint": {
+              "prompt": "Why must the ROC of a stable continuous system include the imaginary jw axis in the s-plane?",
+              "answer": "Because the continuous Fourier transform X(jw) is the Laplace transform evaluated along the imaginary axis."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Z-Plane Pole-Zero Visualizer",
+              "description": "Inspect discrete pole locations relative to the unit circle and observe impulse responses."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-career-cs-core",
+        "order": 3,
+        "title": "GATE Computer Science (CS)",
+        "summary": "Master Theorem divide-and-conquer recurrences and virtual memory page table translation.",
+        "lessons": [
+          {
+            "id": "career-gate-cs-algorithms",
+            "order": 3,
+            "title": "GATE CS: Master Theorem & Virtual Memory Paging",
+            "summary": "Solve recurrence relations using Master Theorem and calculate two-level page table physical addresses.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "career-gate-cs-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "career-gate-ece-signals"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-career-gate-cs-algorithms",
+              "title": "Virtual to Physical Address Translation",
+              "difficulty": "Applied",
+              "expectedOutcome": "Translates virtual address offset and frame into physical address.",
+              "prompt": "Given virtual address vaddr = 0x00401234 and physical frame = 0x05 for a 4KB (12-bit offset) page: extract offset = vaddr & 0xFFF, compute paddr = (frame << 12) | offset. Log: 'PHYSICAL: 0x{hex8}' with paddr formatted as 8-character uppercase hex padded with leading zeros.",
+              "objectiveId": "career-gate-cs-obj",
+              "starterCode": "// Address translation solver\nconst vaddr = 0x00401234, frame = 0x05;\n\n// TODO: Calculate physical address and log PHYSICAL: 0xHEX string\n"
+            },
+            "checkpoint": {
+              "prompt": "Why does a two-level page table reduce overall memory consumption compared to a single-level page table?",
+              "answer": "Page table entries for unallocated virtual address ranges do not need to be instantiated in physical RAM."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Algorithmic Complexity & Pointer Tracer",
+              "description": "Inspect data structures and verify asymptotic memory access bounds."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-career-embedded-c",
+        "order": 4,
+        "title": "Core Embedded Systems Interviews",
+        "summary": "Volatile qualifiers, memory-mapped register bitfields, and reentrant ISR code.",
+        "lessons": [
+          {
+            "id": "career-embedded-interview-c",
+            "order": 4,
+            "title": "Core Embedded Systems: Volatile, Bitfields & Reentrancy",
+            "summary": "Master volatile qualifier semantics, hardware memory-mapped register bit-flipping, and reentrant ISR code.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "career-embedded-c-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "career-gate-cs-algorithms"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-career-embedded-interview-c",
+              "title": "Register Bit Modification",
+              "difficulty": "Applied",
+              "expectedOutcome": "Accurately clears specified bit in hardware register.",
+              "prompt": "Given reg = 0x0F (binary 00001111): clear bit 2 using `reg & ~(1 << 2)`. Format the result as 2-character uppercase hex padded with leading zeros. Log: 'REG: 0x{hex}'.",
+              "objectiveId": "career-embedded-c-obj",
+              "starterCode": "// Hardware bitwise register modifier\nlet reg = 0x0F;\n\n// TODO: Clear bit 2 and log formatted REG: 0xHEX string\n"
+            },
+            "checkpoint": {
+              "prompt": "Can a variable be both const and volatile simultaneously in C?",
+              "answer": "Yes. A read-only hardware status register (e.g., const volatile uint32_t *uart_rx) changes externally by hardware, but software code is forbidden from writing to it."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Register Bitfield & IO Inspector",
+              "description": "Test bit-setting, clearing, and mask operations on simulated microcontroller registers."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-career-psu-machines",
+        "order": 5,
+        "title": "PSU & Core Industry Interviews",
+        "summary": "Induction motor slip-torque curves, synchronous speed, and transformer voltage regulation.",
+        "lessons": [
+          {
+            "id": "career-psu-power-machines",
+            "order": 5,
+            "title": "PSU Core Engineering: Induction Motors & Transformers",
+            "summary": "Calculate 3-phase induction motor synchronous speed, slip, and transformer voltage regulation.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "career-psu-machines-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "career-embedded-interview-c"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-career-psu-power-machines",
+              "title": "Induction Motor Speed & Slip Solver",
+              "difficulty": "Applied",
+              "expectedOutcome": "Calculates synchronous speed and fractional motor slip.",
+              "prompt": "Given frequency f = 50 Hz, poles P = 4, and rotor speed Nr = 1440 RPM: compute synchronous speed Ns = (120 * f) / P, and slip s = (Ns - Nr) / Ns. Log: 'NS: {Ns} RPM, SLIP: {s.toFixed(3)}'.",
+              "objectiveId": "career-psu-machines-obj",
+              "starterCode": "// Induction motor solver\nconst f = 50, P = 4, Nr = 1440;\n\n// TODO: Compute Ns and slip s and log formatted output\n"
+            },
+            "checkpoint": {
+              "prompt": "Why can an induction motor never run at synchronous speed (Nr = Ns) under motor action?",
+              "answer": "If Nr = Ns, relative speed is zero, so no EMF is induced in rotor bars, producing zero torque."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Three-Phase Power & Transformer Studio",
+              "description": "Analyze balanced 3-phase Star/Delta voltages and transformer regulation."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-career-vlsi-timing",
+        "order": 6,
+        "title": "VLSI & Digital Timing Analysis",
+        "summary": "Setup time, hold time, clock skew, and maximum operational frequency limits.",
+        "lessons": [
+          {
+            "id": "career-digital-timing-fsm",
+            "order": 6,
+            "title": "VLSI Digital Timing: Setup Time, Hold Time & Clock Skew",
+            "summary": "Calculate flip-flop timing slacks, maximum clock frequency, and hold time race violations.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "career-digital-timing-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "career-psu-power-machines"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-career-digital-timing-fsm",
+              "title": "Setup Time Slack Analyzer",
+              "difficulty": "Applied",
+              "expectedOutcome": "Calculates setup slack and verifies timing closure.",
+              "prompt": "Given clock period tclk = 10.0 ns, tcq = 1.5 ns, tcomb = 5.0 ns, tsetup = 1.0 ns, and tskew = 0.5 ns: compute required time req = tclk + tskew - tsetup, arrival time arr = tcq + tcomb, and slack = req - arr. Log: 'SLACK: {slack.toFixed(2)} ns, STATUS: {slack >= 0 ? \"MET\" : \"VIOLATED\"}'.",
+              "objectiveId": "career-digital-timing-obj",
+              "starterCode": "// Static timing analysis slack solver\nconst tclk = 10.0, tcq = 1.5, tcomb = 5.0, tsetup = 1.0, tskew = 0.5;\n\n// TODO: Compute setup slack and log formatted string\n"
+            },
+            "checkpoint": {
+              "prompt": "Why can a hold time violation NOT be resolved by decreasing the system clock frequency?",
+              "answer": "Both launch and capture occur on the same clock edge, so the clock period Tclk does not appear in the hold equation."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Sequential Clock & Timing Diagram Rig",
+              "description": "Inspect clock propagation edges, flip-flop setup windows, and hold intervals."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-career-rtos-systems",
+        "order": 7,
+        "title": "Real-Time Operating Systems (RTOS)",
+        "summary": "Priority inversion, Priority Inheritance Protocol, and Coffman deadlock conditions.",
+        "lessons": [
+          {
+            "id": "career-embedded-rtos-concurrency",
+            "order": 7,
+            "title": "RTOS Concurrency: Priority Inversion & Deadlock",
+            "summary": "Diagnose priority inversion anomalies, Priority Inheritance Protocols, and dining philosophers deadlocks.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "career-rtos-concurrency-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "career-digital-timing-fsm"
+            ],
+            "estimatedDurationMinutes": 45,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-career-embedded-rtos-concurrency",
+              "title": "Priority Inheritance Resolver",
+              "difficulty": "Applied",
+              "expectedOutcome": "Elevates mutex holder priority to prevent unbounded priority inversion.",
+              "prompt": "Given lowPriorityTask = 1, highPriorityTask = 5: under priority inheritance, when the high-priority task blocks on a mutex owned by the low-priority task, the owner inherits boostedPriority = Math.max(lowPriorityTask, highPriorityTask). Log: 'BOOSTED_PRIORITY: {boostedPriority}'.",
+              "objectiveId": "career-rtos-concurrency-obj",
+              "starterCode": "// Priority inheritance solver\nconst lowPriorityTask = 1, highPriorityTask = 5;\n\n// TODO: Compute inherited priority and log string\n"
+            },
+            "checkpoint": {
+              "prompt": "What is the difference between a binary semaphore and a mutex in an RTOS?",
+              "answer": "A mutex has ownership and supports priority inheritance; a semaphore is a signaling mechanism without ownership tracking."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "RTOS Multithreaded Task Scheduler Rig",
+              "description": "Observe dual-core FreeRTOS task slicing, mutex contention, and priority inheritance."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-career-formula-drill",
+        "order": 8,
+        "title": "Comprehensive Concept Speed Drill",
+        "summary": "Shannon-Hartley channel capacity, LC resonance, and core engineering calculations.",
+        "lessons": [
+          {
+            "id": "career-high-yield-formulas",
+            "order": 8,
+            "title": "Comprehensive Engineering Formula & Concept Speed Drill",
+            "summary": "Rapid mathematical mastery: Ohm, Thevenin, Nyquist, Shannon channel capacity, and Big-O notation.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "career-formula-drill-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "career-embedded-rtos-concurrency"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-career-high-yield-formulas",
+              "title": "Shannon Channel Capacity Solver",
+              "difficulty": "Applied",
+              "expectedOutcome": "Calculates maximum information carrying capacity of noisy channel.",
+              "prompt": "Given bandwidth B = 3000 Hz and linear SNR = 31: compute capacity C = B * Math.log2(1 + SNR). Log: 'CAPACITY: {Math.round(C)} bps'.",
+              "objectiveId": "career-formula-drill-obj",
+              "starterCode": "// Shannon capacity calculator\nconst B = 3000, SNR = 31;\n\n// TODO: Calculate C = B * log2(1 + SNR) and log formatted string\n"
+            },
+            "checkpoint": {
+              "prompt": "If a signal-to-noise ratio is given as 20 dB, what is its linear power ratio (S/N)?",
+              "answer": "SNR_linear = 10^(20 / 10) = 10^2 = 100."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Interactive Engineering Equation Bench",
+              "description": "Experiment with component values and observe instant formula calculation."
             }
           }
         ]
