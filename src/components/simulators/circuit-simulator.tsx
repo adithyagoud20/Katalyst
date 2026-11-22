@@ -3,8 +3,12 @@
 import React, { useState } from "react";
 import { Cpu, Zap, Code, Volume2, VolumeX, Activity, Radio, Compass, Monitor } from "lucide-react";
 import { getHardwareSketchPreset, runHardwareSketch, type HardwareSketchPreset } from "@/lib/hardware-sketch-interpreter";
+import { KMapSolver } from "./kmap-solver";
+import { FSMDesigner } from "./fsm-designer";
+import { ToyCpuSimulator } from "./toy-cpu-simulator";
+import { AnalogCircuitsStudio } from "./analog-circuits-studio";
 
-export type CircuitSimulatorMode = "digital" | "analog" | "breadboard" | "arduino" | "esp32";
+export type CircuitSimulatorMode = "digital" | "analog" | "breadboard" | "arduino" | "esp32" | "kmap" | "fsm" | "toycpu";
 
 export interface CircuitSimulatorProps {
   initialMode?: CircuitSimulatorMode;
@@ -19,8 +23,10 @@ export function CircuitSimulator({
   className = "",
   hideModeSwitcher = false,
 }: CircuitSimulatorProps) {
-  const [mode, setMode] = useState<"digital" | "analog" | "breadboard">(
-    initialMode === "arduino" || initialMode === "esp32" ? "breadboard" : initialMode
+  const [mode, setMode] = useState<"digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu">(
+    initialMode === "arduino" || initialMode === "esp32"
+      ? "breadboard"
+      : (initialMode as "digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu")
   );
   const [mcuTarget, setMcuTarget] = useState<"arduino" | "esp32">(
     initialMode === "esp32" ? "esp32" : "arduino"
@@ -36,10 +42,6 @@ export function CircuitSimulator({
   const [inputA, setInputA] = useState<number>(0);
   const [inputB, setInputB] = useState<number>(0);
 
-  // Analog state (Ohm's Law & RC)
-  const [voltage, setVoltage] = useState<number>(5.0); // Volts
-  const [resistance, setResistance] = useState<number>(1000); // Ohms
-  const [capacitance, setCapacitance] = useState<number>(100); // Microfarads (uF)
   const [pinD13, setPinD13] = useState<boolean>(true); // Red LED
   const [pinD12, setPinD12] = useState<boolean>(false); // Green LED
   const [pinD11, setPinD11] = useState<boolean>(false); // Blue LED
@@ -98,25 +100,6 @@ export function CircuitSimulator({
   };
 
   const digitalOutput = evaluateGate(selectedGate, inputA, inputB);
-
-  // Analog calculations
-  const currentAmps = resistance > 0 ? voltage / resistance : 0;
-  const powerWatts = voltage * currentAmps;
-  const tauSeconds = resistance * (capacitance * 1e-6); // tau = R * C
-
-  // SVG wave points for RC Charging curve
-  const generateRCCurve = (): string => {
-    const points: string[] = [];
-    const width = 280;
-    const height = 100;
-    for (let x = 0; x <= width; x += 5) {
-      const normalizedTime = (x / width) * 5; // 0 to 5 tau
-      const vNormalized = 1 - Math.exp(-normalizedTime);
-      const y = height - (vNormalized * (height - 10) + 5);
-      points.push(`${x},${y.toFixed(1)}`);
-    }
-    return points.join(" ");
-  };
 
   const truthTableRows = selectedGate === "NOT"
     ? [
@@ -235,6 +218,14 @@ export function CircuitSimulator({
                   ? "Interactive Circuit & Hardware Simulator — ESP32 IoT Lab"
                   : initialMode === "breadboard"
                   ? "Interactive Circuit & Hardware Simulator — Breadboard Circuit Lab"
+                  : initialMode === "kmap"
+                  ? "Interactive Circuit & Hardware Simulator — Karnaugh Map Minimizer"
+                  : initialMode === "fsm"
+                  ? "Interactive Circuit & Hardware Simulator — Finite State Machine Designer"
+                  : initialMode === "toycpu"
+                  ? "Interactive Circuit & Hardware Simulator — 8-Bit Educational CPU"
+                  : initialMode === "analog"
+                  ? "Interactive Circuit & Hardware Simulator — Analog Circuits & Network Theory"
                   : "Interactive Circuit & Hardware Simulator — Digital Logic Gates"
                 : "Interactive Circuit & Hardware Simulator"}
             </h3>
@@ -247,8 +238,16 @@ export function CircuitSimulator({
                 ? "ESP32 DevKit learning model for 3.3 V GPIO, ADC input, boot pins, and generated Arduino-style firmware; radio and physical I/O are not connected."
                 : initialMode === "breadboard"
                 ? "Virtual solderless breadboard prototyping with power rails (5V / 3.3V), LEDs, and sensor dividers."
+                : initialMode === "kmap"
+                ? "Interactive 2, 3, and 4-variable Gray code Karnaugh maps, prime implicant reduction, and minimal SOP derivation."
+                : initialMode === "fsm"
+                ? "Interactive Mealy and Moore finite state machine simulator with transition table and animated state graph."
+                : initialMode === "toycpu"
+                ? "Inspect 8-bit registers, 16-byte RAM, micro-instruction timing cycles (T1–T6), and ALU arithmetic step-by-step."
+                : initialMode === "analog"
+                ? "Analyze Kirchhoff's laws (KVL/KCL), Thevenin/Norton equivalents, RLC resonance, op-amps, and dual-trace oscilloscope waveforms."
                 : "Explore digital logic gates, interactive truth tables, and Boolean output states."
-              : "Explore digital logic gates, analog Ohm's Law / RC transients, and virtual Arduino / ESP32 breadboard hardware."}
+              : "Explore digital logic gates, K-maps, FSMs, 8-bit CPU architecture, analog circuits, and virtual Arduino / ESP32 breadboard hardware."}
           </p>
         </div>
 
@@ -280,6 +279,26 @@ export function CircuitSimulator({
                 Digital Logic Gates
               </span>
             )}
+            {initialMode === "kmap" && (
+              <span className="rounded px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white flex items-center gap-1">
+                K-Map Minimizer
+              </span>
+            )}
+            {initialMode === "fsm" && (
+              <span className="rounded px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white flex items-center gap-1">
+                FSM State Machine
+              </span>
+            )}
+            {initialMode === "toycpu" && (
+              <span className="rounded px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white flex items-center gap-1">
+                8-Bit Simple CPU
+              </span>
+            )}
+            {initialMode === "analog" && (
+              <span className="rounded px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white flex items-center gap-1">
+                Analog Circuits &amp; EEE
+              </span>
+            )}
           </div>
         ) : (
           <div className="flex flex-wrap items-center rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-1 gap-1">
@@ -296,6 +315,39 @@ export function CircuitSimulator({
             </button>
             <button
               type="button"
+              onClick={() => setMode("kmap")}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                mode === "kmap"
+                  ? "bg-blue-600 text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              K-Map Solver
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("fsm")}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                mode === "fsm"
+                  ? "bg-blue-600 text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              FSM Designer
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("toycpu")}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                mode === "toycpu"
+                  ? "bg-blue-600 text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              8-Bit CPU
+            </button>
+            <button
+              type="button"
               onClick={() => setMode("analog")}
               className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                 mode === "analog"
@@ -303,7 +355,7 @@ export function CircuitSimulator({
                   : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               }`}
             >
-              Analog RC
+              Analog &amp; EEE
             </button>
             <button
               type="button"
@@ -449,113 +501,27 @@ export function CircuitSimulator({
         </div>
       )}
 
+      {mode === "kmap" && (
+        <div className="mt-4">
+          <KMapSolver />
+        </div>
+      )}
+
+      {mode === "fsm" && (
+        <div className="mt-4">
+          <FSMDesigner />
+        </div>
+      )}
+
+      {mode === "toycpu" && (
+        <div className="mt-4">
+          <ToyCpuSimulator />
+        </div>
+      )}
+
       {mode === "analog" && (
-        /* ANALOG OHM & RC TRANSIENT SIMULATOR */
-        <div className="mt-4 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-                Circuit Parameters
-              </h4>
-
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-[var(--text-secondary)]">Supply Voltage (V)</span>
-                  <span className="font-mono font-bold text-blue-400">{voltage.toFixed(1)} V</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="24"
-                  step="0.5"
-                  value={voltage}
-                  onChange={(e) => setVoltage(parseFloat(e.target.value))}
-                  className="w-full accent-blue-600 cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-[var(--text-secondary)]">Resistance (R)</span>
-                  <span className="font-mono font-bold text-blue-400">{resistance} Ω</span>
-                </div>
-                <input
-                  type="range"
-                  min="100"
-                  max="10000"
-                  step="100"
-                  value={resistance}
-                  onChange={(e) => setResistance(parseInt(e.target.value, 10))}
-                  className="w-full accent-blue-600 cursor-pointer"
-                />
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="text-[var(--text-secondary)]">Capacitance (C)</span>
-                  <span className="font-mono font-bold text-blue-400">{capacitance} µF</span>
-                </div>
-                <input
-                  type="range"
-                  min="10"
-                  max="1000"
-                  step="10"
-                  value={capacitance}
-                  onChange={(e) => setCapacitance(parseInt(e.target.value, 10))}
-                  className="w-full accent-blue-600 cursor-pointer"
-                />
-              </div>
-            </div>
-
-            <div className="md:col-span-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-secondary)] p-4 flex flex-col justify-between">
-              <div className="grid grid-cols-3 gap-2 border-b border-[var(--border-subtle)] pb-3 text-center">
-                <div>
-                  <span className="block text-[10px] text-[var(--text-secondary)] uppercase">Current (I)</span>
-                  <span className="font-mono text-sm font-bold text-emerald-400">
-                    {(currentAmps * 1000).toFixed(2)} mA
-                  </span>
-                </div>
-                <div>
-                  <span className="block text-[10px] text-[var(--text-secondary)] uppercase">Power (P)</span>
-                  <span className="font-mono text-sm font-bold text-amber-400">
-                    {(powerWatts * 1000).toFixed(1)} mW
-                  </span>
-                </div>
-                <div>
-                  <span className="block text-[10px] text-[var(--text-secondary)] uppercase">Time Constant (τ)</span>
-                  <span className="font-mono text-sm font-bold text-cyan-400">
-                    {(tauSeconds * 1000).toFixed(1)} ms
-                  </span>
-                </div>
-              </div>
-
-              <div className="my-3">
-                <div className="text-xs text-[var(--text-secondary)] mb-1 flex justify-between">
-                  <span>Capacitor Voltage Transient: V(t) = V₀(1 - e^&#123;-t/τ&#125;)</span>
-                  <span className="font-mono text-blue-400">RC Charge Curve</span>
-                </div>
-                <div className="relative h-32 w-full border border-[var(--border-subtle)] rounded bg-[var(--surface-tertiary)] p-2 flex items-center justify-center">
-                  <svg viewBox="0 0 280 100" className="w-full h-full overflow-visible">
-                    <line x1="0" y1="20" x2="280" y2="20" stroke="#21262d" strokeDasharray="3 3" />
-                    <line x1="0" y1="50" x2="280" y2="50" stroke="#21262d" strokeDasharray="3 3" />
-                    <line x1="0" y1="80" x2="280" y2="80" stroke="#21262d" strokeDasharray="3 3" />
-                    <line x1="56" y1="0" x2="56" y2="100" stroke="#21262d" strokeDasharray="3 3" />
-                    <polyline
-                      fill="none"
-                      stroke="#3b82f6"
-                      strokeWidth="2.5"
-                      points={generateRCCurve()}
-                    />
-                  </svg>
-                </div>
-              </div>
-              <div className="mt-2 text-[11px] text-[var(--text-secondary)] flex justify-between font-mono">
-                <span>t = 0s (0V)</span>
-                <span>t = 1τ (63.2%)</span>
-                <span>t = 5τ ({voltage.toFixed(1)}V)</span>
-              </div>
-            </div>
-          </div>
+        <div className="mt-4">
+          <AnalogCircuitsStudio />
         </div>
       )}
 

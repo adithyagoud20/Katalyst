@@ -75,6 +75,11 @@ export const learningSubjects: LearningSubject[] = [
     "id": "digital-circuits",
     "title": "Digital Circuits & Logic",
     "description": "From physical Ohm's Law and RC timing circuits to Boolean algebra, combinational logic gates, and sequential memory latches."
+  },
+  {
+    "id": "circuits-eee-core-subject",
+    "title": "Analog Circuits, Network Theory & Core EEE",
+    "description": "Master Kirchhoff's laws, Thevenin/Norton theorems, AC phasors, RLC resonance, diodes, BJT amplifiers, operational amplifiers, and active filters."
   }
 ];
 
@@ -7365,6 +7370,474 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "kind": "circuit",
               "title": "Sequence Detector FSM Visualizer",
               "description": "Interactive state diagram tracking bit transitions between S0, S1, S2, and S3."
+            }
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "circuits-eee-core",
+    "subjectId": "circuits-eee-core-subject",
+    "title": "Circuit Theory & Analog Systems Mastery",
+    "description": "From multi-mesh KVL/KCL and Thevenin equivalents to AC phasors, RLC resonance, diode rectifiers, transistor biasing, op-amps, and active filters.",
+    "level": "Developing",
+    "version": "1.0.0",
+    "prerequisites": [
+      "Basic Ohm's Law and DC circuit intuition.",
+      "High school algebra, trigonometry, and complex numbers."
+    ],
+    "objectives": [
+      {
+        "id": "circ-kvl-kcl-obj",
+        "title": "Formulate multi-mesh loop equations and nodal admittance matrices to solve DC electrical networks."
+      },
+      {
+        "id": "circ-thev-nort-obj",
+        "title": "Synthesize Thevenin and Norton dual equivalent networks and verify Maximum Power Transfer theorem."
+      },
+      {
+        "id": "circ-rlc-obj",
+        "title": "Derive natural frequency, damping factor, and underdamped transient ringing in second-order series RLC circuits."
+      },
+      {
+        "id": "circ-phasor-pf-obj",
+        "title": "Calculate complex impedance, apparent power, and reactive power factor correction in sinusoidal AC systems."
+      },
+      {
+        "id": "circ-diode-rect-obj",
+        "title": "Analyze PN junction diode conduction, full-wave bridge rectification, and filter capacitor ripple factors."
+      },
+      {
+        "id": "circ-bjt-bias-obj",
+        "title": "Design voltage-divider stabilized Q-points and compute AC small-signal gain for Common-Emitter BJT amplifiers."
+      },
+      {
+        "id": "circ-opamp-obj",
+        "title": "Apply ideal op-amp golden rules and virtual ground principles to inverting and non-inverting topologies."
+      },
+      {
+        "id": "circ-active-filter-obj",
+        "title": "Synthesize second-order Sallen-Key low-pass and high-pass active Butterworth filters."
+      },
+      {
+        "id": "circ-555-timer-obj",
+        "title": "Calculate frequency, charge/discharge timing, and duty cycle for NE555 timer astable multivibrators."
+      },
+      {
+        "id": "circ-transformer-3ph-obj",
+        "title": "Calculate voltage/current transformations, turns ratios, and 3-phase Star/Delta line-to-phase relationships."
+      }
+    ],
+    "learningOutcomes": [
+      "Formulate and solve multi-mesh loop currents and nodal voltages using matrix Cramer's rule.",
+      "Synthesize Thevenin and Norton equivalent networks and calculate Maximum Power Transfer conditions.",
+      "Determine resonant frequency, damping ratio, and oscillatory transient response in series RLC networks.",
+      "Resolve AC complex impedance, power triangles, and power factor correction using complex phasors.",
+      "Calculate bridge rectifier DC output voltages, diode PIV ratings, and filter ripple factors.",
+      "Design stable BJT voltage-divider Q-points and compute AC small-signal Common-Emitter voltage gain.",
+      "Apply operational amplifier golden rules to inverting, non-inverting, and buffer circuits.",
+      "Design second-order Sallen-Key active Butterworth low-pass and high-pass filters.",
+      "Calculate precision timing, frequency, and duty cycle for NE555 astable multivibrators.",
+      "Analyze transformer impedance reflection and balanced 3-phase Star and Delta power systems."
+    ],
+    "estimatedDurationMinutes": 480,
+    "publicationStatus": "published",
+    "modules": [
+      {
+        "id": "mod-circ-dc-theorems",
+        "order": 1,
+        "title": "Network Theorems & DC Loop Analysis",
+        "summary": "Kirchhoff's Laws (KVL/KCL), 2-mesh matrix solutions, Thevenin/Norton equivalents, and Maximum Power Transfer.",
+        "lessons": [
+          {
+            "id": "circuits-kvl-kcl-mesh",
+            "order": 1,
+            "title": "Kirchhoff's Laws & Multi-Mesh DC Analysis",
+            "summary": "Formulate mesh current equations and nodal voltage matrices to solve arbitrary multi-loop DC circuits.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circ-kvl-kcl-obj"
+            ],
+            "prerequisiteLessonIds": [],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-mesh-solver",
+              "title": "Solve Two-Mesh DC Loop Currents",
+              "difficulty": "Developing",
+              "expectedOutcome": "Implement Cramer's rule to compute mesh currents in milliamperes.",
+              "prompt": "Write a JavaScript program that calculates the two loop currents I1 and I2 and branch current I3 = I1 - I2 for V1 = 12V, V2 = 6V, R1 = 100 ohms, R2 = 220 ohms, and R3 = 150 ohms. Print the result formatted as: 'I1: {i1} mA, I2: {i2} mA, I3: {i3} mA' with 2 decimal places.",
+              "objectiveId": "circ-kvl-kcl-obj",
+              "starterCode": "// Two-mesh loop solver\nconst v1 = 12.0, v2 = 6.0;\nconst r1 = 100.0, r2 = 220.0, r3 = 150.0;\n\n// TODO: Calculate I1, I2, I3 and print to console\n"
+            },
+            "checkpoint": {
+              "prompt": "Why does the shared resistor R2 appear with negative signs in off-diagonal matrix entries?",
+              "answer": "Because when current I1 circulates clockwise through R2, adjacent mesh current I2 circulates counter-clockwise through R2 in the opposite direction."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "2-Mesh DC Circuit Analyzer",
+              "description": "Interactive dual-mesh circuit solver with live branch currents and node potentials."
+            }
+          },
+          {
+            "id": "circuits-thevenin-norton",
+            "order": 2,
+            "title": "Thevenin & Norton Equivalent Networks",
+            "summary": "Simplify complex linear two-terminal networks into ideal equivalent sources and maximize load power transfer.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circ-thev-nort-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-kvl-kcl-mesh"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-thevenin-pmax",
+              "title": "Compute Thevenin Equivalent & Maximum Power",
+              "difficulty": "Developing",
+              "expectedOutcome": "Calculate open-circuit voltage, short-circuit current, and matched load power.",
+              "prompt": "For a 24V source driving R1 = 120 ohms and R2 = 80 ohms, compute Vth (Volts), Rth (Ohms), In (mA), and Pmax (mW). Print: 'Vth: {v_th} V, Rth: {r_th} Ohm, In: {in_ma} mA, Pmax: {p_max} mW' formatted to 2 decimals.",
+              "objectiveId": "circ-thev-nort-obj",
+              "starterCode": "// Thevenin equivalent solver\nconst vs = 24.0;\nconst r1 = 120.0, r2 = 80.0;\n\n// TODO: Calculate Vth, Rth, In, and Pmax and log result\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is maximum power transfer rarely utilized in municipal AC electrical power grids?",
+              "answer": "Because 50% power transfer efficiency means 50% of generated energy would be wasted as heat inside generators and transmission lines, causing destructive overheating."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Thevenin Equivalent & Max Power Transfer",
+              "description": "Interactive load sweep showing the classic parabolic power transfer curve peaking at RL = Rth."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-circ-ac-resonance",
+        "order": 2,
+        "title": "AC Sinusoidal Steady State & Resonant Dynamics",
+        "summary": "Second-order series RLC transient ringing, damping regimes, AC complex phasors, and power factor correction.",
+        "lessons": [
+          {
+            "id": "circuits-rlc-transients",
+            "order": 3,
+            "title": "RLC Transient Dynamics & Second-Order Resonance",
+            "summary": "Derive natural frequency, damping ratio, quality factor, and oscillatory transient response in series RLC networks.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circ-rlc-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-thevenin-norton"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-rlc-parameters",
+              "title": "Calculate RLC Natural Frequency and Damping Factor",
+              "difficulty": "Developing",
+              "expectedOutcome": "Determine second-order damping parameters from component values.",
+              "prompt": "Given R = 50 ohms, L = 10 mH (0.01 H), and C = 10 uF (0.00001 F), compute natural frequency f0 (Hz), Neper damping alpha (Np/s), damping ratio zeta, and quality factor Q. Print: 'f0: {f0} Hz, alpha: {alpha} Np/s, zeta: {zeta}, Q: {q}' with f0, alpha to 1 decimal, zeta to 3 decimals, and Q to 2 decimals.",
+              "objectiveId": "circ-rlc-obj",
+              "starterCode": "// Series RLC resonance calculator\nconst r = 50.0;\nconst l = 0.01; // 10 mH\nconst c = 0.00001; // 10 uF\n\n// TODO: Calculate f0, alpha, zeta, and Q and print formatted output\n"
+            },
+            "checkpoint": {
+              "prompt": "What critical value of series resistance R_crit results in critical damping (zeta = 1)?",
+              "answer": "R_crit = 2 * sqrt(L / C). Any resistance below this value yields oscillatory ringing; above this value yields sluggish overdamped decay."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Series RLC Resonant Ringing",
+              "description": "Interactive transient response curve displaying underdamped decay envelope and Q factor."
+            }
+          },
+          {
+            "id": "circuits-ac-phasors-power-factor",
+            "order": 4,
+            "title": "AC Phasors, Impedance, and Power Factor Correction",
+            "summary": "Represent sinusoidal AC voltages and currents as rotating complex phasors; calculate real, reactive, and apparent power.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circ-phasor-pf-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-rlc-transients"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-ac-power",
+              "title": "Calculate AC Current and Power Triangle Components",
+              "difficulty": "Developing",
+              "expectedOutcome": "Compute impedance magnitude and resolve the AC power triangle.",
+              "prompt": "A 230V RMS AC supply feeds a series load with R = 40 ohms and XL = 30 ohms. Compute Irms (A), real power P (W), reactive power Q (VAR), apparent power S (VA), and power factor PF. Print: 'Irms: {irms} A, P: {p} W, Q: {q} VAR, S: {s} VA, PF: {pf} (lagging)' with Irms and PF to 2 decimals, and P, Q, S to 1 decimal.",
+              "objectiveId": "circ-phasor-pf-obj",
+              "starterCode": "// AC phasor and power factor solver\nconst v_rms = 230.0;\nconst r = 40.0, xl = 30.0;\n\n// TODO: Compute Irms, P, Q, S, and PF and log the result\n"
+            },
+            "checkpoint": {
+              "prompt": "Why does an inductive load have a 'lagging' power factor?",
+              "answer": "Because the voltage across an inductor leads the current, meaning current reaches its sinusoidal crest after the voltage—hence current 'lags' voltage."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "AC Phasors & Power Triangle",
+              "description": "Visualize phasor angles and calculate reactive power factor correction."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-circ-diodes-transistors",
+        "order": 3,
+        "title": "Semiconductor Diodes & Transistor Biasing",
+        "summary": "PN junction forward drops, full-wave bridge rectification, capacitor ripple reduction, and BJT Common-Emitter Q-points.",
+        "lessons": [
+          {
+            "id": "circuits-diode-rectifiers-filters",
+            "order": 5,
+            "title": "PN Junction Diodes, Bridge Rectification, and Smoothing Filters",
+            "summary": "Analyze forward bias turn-on voltage, half-wave and full-wave bridge rectifiers, and capacitor filter ripple factors.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circ-diode-rect-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-ac-phasors-power-factor"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-rectifier-filter",
+              "title": "Calculate Rectified Output Voltage and Ripple",
+              "difficulty": "Developing",
+              "expectedOutcome": "Calculate full-wave rectified DC voltage and peak-to-peak ripple.",
+              "prompt": "Given 12V RMS 50Hz AC input to a full-wave bridge (two 0.7V diode drops), with RL = 100 ohms and C = 1000 uF (0.001 F), compute Vpeak_out, Vdc, Vripple_pp, and Iload in mA. Print: 'Vpeak: {v_peak} V, Vdc: {v_dc} V, Vripple: {v_rip} Vpp, Iload: {iload} mA' with voltages to 2 decimals and Iload to 1 decimal.",
+              "objectiveId": "circ-diode-rect-obj",
+              "starterCode": "// Bridge rectifier & filter solver\nconst v_rms = 12.0, f = 50.0, rl = 100.0, c = 0.001, vf = 0.7;\n\n// TODO: Calculate Vpeak, Vdc, Vripple, Iload and print output\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is the ripple frequency across a full-wave rectifier output 100 Hz in a 50 Hz grid?",
+              "answer": "Because the bridge inverts the negative half-cycles into positive pulses, producing two output DC charging peaks for every single input AC cycle."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Bridge Rectifier & RC Filter",
+              "description": "Inspect half-wave vs full-wave rectified waveforms and capacitor smoothing ripple."
+            }
+          },
+          {
+            "id": "circuits-bjt-biasing-amplifiers",
+            "order": 6,
+            "title": "BJT Transistor Biasing & Small-Signal Voltage Amplification",
+            "summary": "Establish stable Q-point DC biasing in Common-Emitter configurations and determine AC small-signal voltage gain.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circ-bjt-bias-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-diode-rectifiers-filters"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-bjt-qpoint",
+              "title": "Compute BJT Common-Emitter Q-Point and Voltage Gain",
+              "difficulty": "Developing",
+              "expectedOutcome": "Calculate DC bias voltages and small-signal common-emitter voltage gain.",
+              "prompt": "Given Vcc = 12V, R1 = 33k (33000), R2 = 10k (10000), Rc = 2.2k (2200), Re = 1k (1000), and Vbe = 0.7V, calculate Ic (mA), Vce (V), re' (Ohms), and Av. Print: 'Q-Point: Ic = {ic} mA, Vce = {vce} V | re\\' = {re_prime} Ohm, Av = {av}' with Ic, Vce, re' to 2 decimals, and Av to 1 decimal.",
+              "objectiveId": "circ-bjt-bias-obj",
+              "starterCode": "// BJT Common-Emitter Q-point and gain calculator\nconst vcc = 12.0, r1 = 33000.0, r2 = 10000.0, rc = 2200.0, re = 1000.0, vbe = 0.7;\n\n// TODO: Calculate Ic, Vce, re', and Av and print formatted output\n"
+            },
+            "checkpoint": {
+              "prompt": "Why does a bypass capacitor across the emitter resistor Re increase AC voltage gain?",
+              "answer": "Because the capacitor acts as a near-zero AC short to ground, eliminating Re from the AC equivalent circuit so that Av depends only on the tiny intrinsic resistance re' rather than Re."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Common-Emitter BJT Amplifier",
+              "description": "Inspect Q-point operating load lines and 180° inverted sinusoidal voltage amplification."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-circ-opamps-filters",
+        "order": 4,
+        "title": "Linear Integrated Circuits & Operational Amplifiers",
+        "summary": "Ideal op-amp golden rules, virtual ground, inverting/non-inverting gains, and second-order Sallen-Key active filters.",
+        "lessons": [
+          {
+            "id": "circuits-opamp-fundamentals",
+            "order": 7,
+            "title": "Operational Amplifiers, Virtual Ground, and Negative Feedback",
+            "summary": "Model ideal op-amp behavior using the golden rules: inverting, non-inverting, summing, and differential amplifier topologies.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circ-opamp-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-bjt-biasing-amplifiers"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-opamp-gains",
+              "title": "Calculate Inverting and Non-Inverting Op-Amp Outputs",
+              "difficulty": "Developing",
+              "expectedOutcome": "Compute inverting and non-inverting closed-loop gains and output voltages.",
+              "prompt": "For Vin = 1.2V, Rin = 10k (10000), and Rf = 47k (47000), compute Av and Vout for both Inverting and Non-Inverting configurations. Print: 'Inverting: Av = {av_inv}, Vout = {vout_inv} V | Non-Inv: Av = {av_noninv}, Vout = {vout_noninv} V' with values formatted to 2 decimals.",
+              "objectiveId": "circ-opamp-obj",
+              "starterCode": "// Op-Amp closed-loop gain solver\nconst vin = 1.2, rin = 10000.0, rf = 47000.0;\n\n// TODO: Compute inverting and non-inverting gains and output voltages\n"
+            },
+            "checkpoint": {
+              "prompt": "Why does no current enter the inverting input of an ideal op-amp despite a physical connection?",
+              "answer": "Because the input stage of an operational amplifier utilizes differential BJTs or MOSFETs designed with near-infinite input impedance (typically > 10^12 ohms in FET-input op-amps)."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Op-Amp Virtual Ground & Feedback",
+              "description": "Interactive inverting and non-inverting amplifier stages with live output clipping at rail limits."
+            }
+          },
+          {
+            "id": "circuits-opamp-active-filters",
+            "order": 8,
+            "title": "Active Filters: Sallen-Key Low-Pass, High-Pass, and Band-Pass",
+            "summary": "Design second-order active RC filters with precise cut-off frequencies, Butterworth flat passbands, and high input impedance.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circ-active-filter-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-opamp-fundamentals"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-sallen-key",
+              "title": "Design Sallen-Key Butterworth Active Low-Pass Filter",
+              "difficulty": "Developing",
+              "expectedOutcome": "Calculate active filter cut-off frequency and Butterworth damping resistors.",
+              "prompt": "For R = 10k (10000), C = 15 nF (0.000000015 F), and Ra = 10k, compute cut-off frequency fc in Hz, required feedback resistor Rb (Ohms) for Butterworth response (Rb = 0.586 * Ra), passband gain K, and Q factor. Print: 'Cut-off fc: {fc} Hz, Rb: {rb} Ohm, Gain K: {k}, Q: {q}' with fc to 1 decimal, Rb to 0 decimals, and K, Q to 3 decimals.",
+              "objectiveId": "circ-active-filter-obj",
+              "starterCode": "// Sallen-Key active filter designer\nconst r = 10000.0, c = 15e-9, ra = 10000.0;\n\n// TODO: Compute fc, Rb, K, Q and log output\n"
+            },
+            "checkpoint": {
+              "prompt": "What happens to the Sallen-Key filter if gain K is increased to 3 or higher?",
+              "answer": "The denominator (3 - K) reaches zero or negative, causing Q to reach infinity. The filter transitions into an unstable autonomous sine-wave oscillator."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Sallen-Key Active Filter Simulator",
+              "description": "Inspect frequency response Bode plots showing -40 dB/decade roll-off."
+            }
+          }
+        ]
+      },
+      {
+        "id": "mod-circ-timers-power",
+        "order": 5,
+        "title": "Timing Generators & Industrial Power Distribution",
+        "summary": "NE555 precision timer astable multivibrators, transformer impedance reflection, and 3-phase Star/Delta networks.",
+        "lessons": [
+          {
+            "id": "circuits-555-timer-multivibrators",
+            "order": 9,
+            "title": "NE555 Precision Timer: Astable Pulse Generators & Monostable Triggers",
+            "summary": "Harness internal comparators, flip-flop latches, and discharge transistors to generate stable clock pulses and one-shot delays.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circ-555-timer-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-opamp-active-filters"
+            ],
+            "estimatedDurationMinutes": 35,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-555-timing",
+              "title": "Calculate 555 Astable Frequency and Duty Cycle",
+              "difficulty": "Developing",
+              "expectedOutcome": "Compute 555 timer RC charge/discharge timings and oscillator frequency.",
+              "prompt": "For R1 = 4.7k (4700), R2 = 10k (10000), and C = 100 nF (0.0000001 F), compute frequency f in Hz, period in ms, Thigh in ms, Tlow in ms, and duty cycle %. Print: 'Freq: {f} Hz, Period: {period} ms, Thigh: {thigh} ms, Tlow: {tlow} ms, Duty: {duty}%' with f and duty to 1 decimal, and times to 2 decimals.",
+              "objectiveId": "circ-555-timer-obj",
+              "starterCode": "// 555 Astable timer calculator\nconst r1 = 4700.0, r2 = 10000.0, c = 1e-7;\n\n// TODO: Calculate f, period, thigh, tlow, duty and log output\n"
+            },
+            "checkpoint": {
+              "prompt": "Why must resistor R1 never be 0 ohms in a standard 555 astable circuit?",
+              "answer": "When the discharge transistor turns ON, Pin 7 connects directly to ground. If R1 were 0 ohms, the Vcc supply would short-circuit directly to ground through Pin 7, destroying the chip."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "555 Timer Astable Oscillator",
+              "description": "Interactive clock pulse generator displaying capacitor ramp voltages and output square wave."
+            }
+          },
+          {
+            "id": "circuits-transformer-three-phase",
+            "order": 10,
+            "title": "Ideal Transformers & Three-Phase Star/Delta Power Distribution",
+            "summary": "Calculate voltage transformation ratios, impedance reflection, and line vs. phase relationships in 3-phase AC networks.",
+            "type": "interactive-simulation",
+            "objectiveIds": [
+              "circ-transformer-3ph-obj"
+            ],
+            "prerequisiteLessonIds": [
+              "circuits-555-timer-multivibrators"
+            ],
+            "estimatedDurationMinutes": 40,
+            "execution": {
+              "language": "javascript",
+              "target": "browser-wasm"
+            },
+            "exercise": {
+              "id": "ex-circ-3phase-transformer",
+              "title": "Calculate Transformer Reflected Impedance and 3-Phase Power",
+              "difficulty": "Developing",
+              "expectedOutcome": "Compute impedance reflection and balanced 3-phase Star line voltage and power.",
+              "prompt": "For a transformer with Np = 500, Ns = 50, and secondary load Zload = 8 ohms, compute reflected primary impedance Zp. For a 3-phase Star network with Vphase = 230V, Iline = 15A, and PF = 0.85, calculate Vline in Volts and total power Ptotal in kW. Print: 'Reflected Z: {zp} Ohm | 3-Phase: Vline = {vline} V, Ptotal = {ptotal} kW' with Zp to 0 decimals, Vline to 1 decimal, and Ptotal to 2 decimals.",
+              "objectiveId": "circ-transformer-3ph-obj",
+              "starterCode": "// Transformer and 3-phase power calculator\nconst np = 500.0, ns = 50.0, z_load = 8.0;\nconst v_phase = 230.0, i_line = 15.0, pf = 0.85;\n\n// TODO: Calculate Zp, Vline, and Ptotal in kW and log output\n"
+            },
+            "checkpoint": {
+              "prompt": "Why is the neutral current zero in a perfectly balanced three-phase Star system?",
+              "answer": "Because the three return phase currents have identical amplitudes displaced by 120°, and the vector sum of three symmetric 120° phasors cancels to exactly zero."
+            },
+            "interactiveDemo": {
+              "kind": "circuit",
+              "title": "Three-Phase Star/Delta & Transformers",
+              "description": "Interactive line vs phase voltage waveforms with 120° phase displacements."
             }
           }
         ]

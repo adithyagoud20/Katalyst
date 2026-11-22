@@ -24,7 +24,7 @@ test.describe("Milestone M21 Architecture & Platform Expansion E2E Suite", () =>
     // Filter by Hardware
     await page.getByRole("tab", { name: "Hardware" }).click();
     const hwCards = page.locator(".course-card-unified");
-    await expect(hwCards).toHaveCount(4); // digital-logic-circuits, arduino-embedded, esp32-iot-systems & breadboard-electronics
+    await expect(hwCards).toHaveCount(5); // digital-logic-circuits, arduino-embedded, esp32-iot-systems, breadboard-electronics & circuits-eee-core
 
     // Filter by AI & Media
     await page.getByRole("tab", { name: "AI & Media" }).click();
@@ -33,7 +33,7 @@ test.describe("Milestone M21 Architecture & Platform Expansion E2E Suite", () =>
 
     // Reset to All
     await page.getByRole("tab", { name: "All" }).click();
-    await expect(page.locator(".course-card-unified")).toHaveCount(14);
+    await expect(page.locator(".course-card-unified")).toHaveCount(15);
   });
 
   test("shows the full catalog first, then keeps course details aligned with the selected category", async ({ page }) => {

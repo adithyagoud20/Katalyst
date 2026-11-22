@@ -20,6 +20,7 @@ import { dsaMasterySubject, dsaMasteryPath } from "./dsa-mastery";
 import { promptEngineeringSubject, promptEngineeringPath } from "./prompt-engineering";
 import { photoEditingMediaSubject, photoEditingMediaPath } from "./photo-editing-media";
 import { digitalCircuitsSubject, digitalCircuitsPath } from "./digital-circuits";
+import { circuitsEeeCoreSubject, circuitsEeeCorePath } from "./circuits-eee-core";
 
 export {
   cProgrammingSubject,
@@ -50,6 +51,8 @@ export {
   photoEditingMediaPath,
   digitalCircuitsSubject,
   digitalCircuitsPath,
+  circuitsEeeCoreSubject,
+  circuitsEeeCorePath,
 };
 
 export const serverSubjects: LearningSubject[] = [
@@ -67,6 +70,7 @@ export const serverSubjects: LearningSubject[] = [
   promptEngineeringSubject,
   photoEditingMediaSubject,
   digitalCircuitsSubject,
+  circuitsEeeCoreSubject,
 ];
 
 export const serverCourses: LearningCourse[] = [
@@ -84,6 +88,7 @@ export const serverCourses: LearningCourse[] = [
   promptEngineeringPath,
   photoEditingMediaPath,
   digitalCircuitsPath,
+  circuitsEeeCorePath,
 ];
 
 let _validatedCatalog: LearningCatalog | null = null;

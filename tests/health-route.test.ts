@@ -9,7 +9,7 @@ describe("GET /api/health", () => {
     expect(data).toMatchObject({
       ok: true,
       status: "healthy",
-      coursesCount: 14,
+      coursesCount: 15,
       services: {
         cloudflareConfigured: expect.any(Boolean),
         supabaseConfigured: expect.any(Boolean),

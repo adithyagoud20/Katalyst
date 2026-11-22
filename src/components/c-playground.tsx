@@ -959,6 +959,14 @@ export function CPlayground({
                   ? "ESP32 IoT Lab (Dual-Core)"
                   : circuitInitialMode === "breadboard"
                   ? "Breadboard Circuit Lab"
+                  : circuitInitialMode === "kmap"
+                  ? "K-Map Minimizer"
+                  : circuitInitialMode === "fsm"
+                  ? "FSM State Machine"
+                  : circuitInitialMode === "toycpu"
+                  ? "8-Bit Simple CPU"
+                  : circuitInitialMode === "analog"
+                  ? "Analog Circuits & EEE"
                   : "Digital Logic Gates"
                 : langDetails.title}
             </span>
@@ -1006,6 +1014,10 @@ export function CPlayground({
                 <option value="circuit:esp32">ESP32 IoT Lab</option>
                 <option value="circuit:breadboard">Breadboard Circuit Lab</option>
                 <option value="circuit:digital">Digital Logic Gates</option>
+                <option value="circuit:kmap">K-Map Minimizer</option>
+                <option value="circuit:fsm">FSM State Machine</option>
+                <option value="circuit:toycpu">8-Bit Simple CPU</option>
+                <option value="circuit:analog">Analog Circuits &amp; EEE</option>
               </optgroup>
             </select>
             <span className="ide-file-status" title={status}>
@@ -1281,6 +1293,106 @@ export function CPlayground({
               </div>
               <div className="launcher-card-action">
                 <span>Launch Logic Lab</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "kmap")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "kmap")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-indigo-500">
+                    <Cpu size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">SOP Minimization</span>
+                </div>
+                <h3>K-Map Minimizer</h3>
+                <p>
+                  Interactive 2, 3, and 4-variable Gray code Karnaugh maps, prime implicant reduction, and minimal SOP derivation.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch K-Map Solver</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "fsm")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "fsm")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-cyan-500">
+                    <Cpu size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">Sequential Logic</span>
+                </div>
+                <h3>FSM State Machine</h3>
+                <p>
+                  Model Mealy and Moore finite state machines with live state graph nodes, clock pulse stepping, and transition table logs.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch FSM Designer</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "toycpu")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "toycpu")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-amber-500">
+                    <Cpu size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">SAP-1 Architecture</span>
+                </div>
+                <h3>8-Bit Simple CPU</h3>
+                <p>
+                  Trace 8-bit registers, 16-byte RAM, micro-instruction clock cycles (T1–T6), and ALU arithmetic instruction execution.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch CPU Simulator</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "analog")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "analog")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-emerald-500">
+                    <Cpu size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">Analog &amp; Network</span>
+                </div>
+                <h3>Analog &amp; EEE Studio</h3>
+                <p>
+                  Solve Kirchhoff 2-mesh loops, Thevenin equivalents, RLC resonance ringing, Op-Amp stages, and dual-trace oscilloscope waveforms.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch Analog Studio</span>
                 <ArrowRight size={14} />
               </div>
             </div>

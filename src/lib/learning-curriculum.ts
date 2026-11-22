@@ -551,6 +551,8 @@ export {
   javascriptProgrammingPath,
   digitalCircuitsSubject,
   digitalCircuitsPath,
+  circuitsEeeCoreSubject,
+  circuitsEeeCorePath,
   sqlDatabasesSubject,
   sqlDatabasesPath,
   htmlCssWebSubject,
