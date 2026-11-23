@@ -1555,9 +1555,12 @@ console.log(calculateBatteryLifeDays(2000, 150, 2, 15, 298));`,
     prerequisiteLessonIds: ["esp32-deep-sleep-wakeup"],
     estimatedDurationMinutes: 30,
     interactiveDemo: {
-      kind: "circuit",
-      title: "MQTT Broker & Client Topic Hub Simulator",
-      description: "Publish telemetry to hierarchical MQTT topics and evaluate multi-level wildcard subscriptions (+ and #).",
+      kind: "protocol-explorer",
+      title: "Interactive MQTT Protocol & Packet Inspector",
+      description: "Inspect MQTT CONNECT, CONNACK, QoS 1 PUBLISH frames, and byte-level packet flags in action.",
+      config: {
+        scenarioId: "mqtt-telemetry",
+      },
     },
     content: `# MQTT Pub/Sub Telemetry Protocol for Constrained IoT Devices
 

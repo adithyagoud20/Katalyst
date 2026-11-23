@@ -7,7 +7,7 @@ import { cpp } from "@codemirror/lang-cpp";
 import { bracketMatching, foldGutter, HighlightStyle, indentOnInput, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import { EditorView, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
-import { Activity, ArrowLeft, ArrowRight, Check, Code2, Compass, Copy, Cpu, Database, Globe, Laptop, LayoutGrid, LoaderCircle, Play, Radio, RotateCcw, RotateCw, Smartphone, Sparkles, Square, Terminal } from "lucide-react";
+import { Activity, ArrowLeft, ArrowRight, Check, Code2, Compass, Copy, Cpu, Database, Globe, Laptop, LayoutGrid, LoaderCircle, Network, Play, Radio, RotateCcw, RotateCw, Smartphone, Sparkles, Square, Terminal } from "lucide-react";
 import { CircuitSimulator, type CircuitSimulatorMode } from "@/components/simulators/circuit-simulator";
 import { SimulatorErrorBoundary } from "@/components/simulators/simulator-error-boundary";
 import { defaultCppProgram } from "@/lib/playground-templates";
@@ -1030,6 +1030,7 @@ export function CPlayground({
                 <option value="circuit:fft">FFT &amp; Sampling Analyzer</option>
                 <option value="circuit:dsa">Interactive DSA Visualizer</option>
                 <option value="circuit:creative">Creative Engineering Studio</option>
+                <option value="circuit:protocol">Protocol &amp; Network Explorer</option>
               </optgroup>
             </select>
             <span className="ide-file-status" title={status}>
@@ -1505,6 +1506,31 @@ export function CPlayground({
               </div>
               <div className="launcher-card-action">
                 <span>Launch Creative Studio</span>
+                <ArrowRight size={14} />
+              </div>
+            </div>
+
+            <div
+              className="launcher-card"
+              role="button"
+              tabIndex={0}
+              onClick={() => switchLanguage("circuit", "protocol")}
+              onKeyDown={(e) => e.key === "Enter" && switchLanguage("circuit", "protocol")}
+            >
+              <div className="launcher-card-top">
+                <div className="launcher-card-icon-row">
+                  <div className="launcher-icon-box text-cyan-500">
+                    <Network size={20} />
+                  </div>
+                  <span className="runtime-badge badge-wasm">Interactive Topology &amp; Wireshark</span>
+                </div>
+                <h3>Protocol &amp; Network Explorer</h3>
+                <p>
+                  Animated hop-by-hop network topology, synchronized packet sequence flow, byte-level header inspector with raw hex dump, chaos toggles, and exam challenges.
+                </p>
+              </div>
+              <div className="launcher-card-action">
+                <span>Launch Protocol Explorer</span>
                 <ArrowRight size={14} />
               </div>
             </div>

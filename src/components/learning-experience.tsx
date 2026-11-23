@@ -21,6 +21,7 @@ import {
   Loader2,
   LockKeyhole,
   MessageSquare,
+  Network,
   Pin,
   Play,
   Sparkles,
@@ -117,6 +118,10 @@ const MemoryVisualizer = dynamic(() => import("@/components/simulators/memory-vi
 const ImageLabVisualizer = dynamic(() => import("@/components/simulators/image-lab-visualizer").then((module) => module.ImageLabVisualizer), {
   ssr: false,
   loading: () => <div className="lab-component-loading" aria-busy="true">Loading image lab…</div>,
+});
+const ProtocolExplorer = dynamic(() => import("@/components/simulators/protocol-explorer").then((module) => module.ProtocolExplorer), {
+  ssr: false,
+  loading: () => <div className="lab-component-loading" aria-busy="true">Loading protocol explorer…</div>,
 });
 
 const defaultJavaScriptProgram = `// JavaScript Sandbox
@@ -981,6 +986,60 @@ export function LearningExperience({
         />}
       </div>
 
+      <div className="learning-protocols-host min-h-[calc(100vh-64px)] w-full bg-[#080c14] text-slate-100" hidden={section !== "protocols"}>
+        {section === "protocols" && (
+          <div className="protocol-studio-layout flex flex-col xl:flex-row h-full w-full">
+            <div className={`protocol-studio-view flex-1 mx-auto w-full transition-all duration-300 ${katOpen ? "xl:max-w-[calc(100%-420px)]" : "w-full"}`}>
+              <SimulatorErrorBoundary fallbackTitle="Protocol Explorer encountered an error">
+                <ProtocolExplorer
+                  onAskKat={(prompt) => {
+                    setKatDraftPrompt(prompt);
+                    setKatOpen(true);
+                  }}
+                />
+              </SimulatorErrorBoundary>
+            </div>
+
+            {/* Slide-out Kat AI Network Tutor Drawer */}
+            {katOpen && (
+              <aside
+                className="protocol-kat-drawer w-full xl:w-[420px] xl:border-l border-t xl:border-t-0 border-[var(--border-subtle)] bg-[var(--surface-primary)] flex flex-col h-[650px] xl:h-[calc(100vh-64px)] xl:sticky xl:top-16 shadow-2xl z-20"
+                aria-label="Kat AI Protocol Tutor"
+              >
+                <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--surface-secondary)]">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-primary)]">
+                    <Bot size={16} className="text-blue-500" />
+                    <span>Kat AI Network Tutor</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setKatOpen(false)}
+                    className="p-1 rounded text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] transition-colors"
+                    aria-label="Close Kat tutor"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+                <div className="flex-1 overflow-hidden p-2">
+                  <KatTutor
+                    provider={provider}
+                    model={model}
+                    sessionKey={sessionKey}
+                    cloudflareAccountId={cloudflareAccountId}
+                    cloudflareMode={cloudflareMode}
+                    ollamaBaseUrl={ollamaBaseUrl}
+                    configured={configured}
+                    skills={skills}
+                    draftPrompt={katDraftPrompt}
+                    onOpenSettings={onOpenSettings}
+                  />
+                </div>
+              </aside>
+            )}
+          </div>
+        )}
+      </div>
+
       {section === "home" && (
         <>
           <section className="home-lab-hero" aria-labelledby="home-lab-title">
@@ -1023,6 +1082,28 @@ export function LearningExperience({
               ))}
             </div>
             <button className="learning-text-button" onClick={() => onNavigate("paths")}>Browse all disciplines <ArrowRight size={13} /></button>
+          </section>
+
+          <section className="home-protocol-showcase p-5 rounded-2xl border border-[var(--border-subtle)] bg-gradient-to-r from-blue-950/20 via-slate-900/40 to-cyan-950/20 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4" aria-label="Interactive Protocol & Network Explorer">
+            <div className="space-y-1.5 max-w-2xl">
+              <div className="flex items-center gap-2">
+                <span className="flex h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="text-[11px] font-mono uppercase tracking-wider text-cyan-400 font-semibold">Interactive Systems Studio</span>
+              </div>
+              <h2 className="text-lg font-bold text-[var(--text-primary)]">Protocol &amp; Network Explorer</h2>
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
+                Step through live DNS resolutions, TCP 3-way handshakes, TLS 1.3 key exchanges, QUIC/HTTP/3 streams, and MQTT telemetry. Watch packets animate hop-by-hop across the topology canvas and inspect real byte-level hex payloads.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate("protocols")}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs transition-colors shrink-0 shadow-sm"
+            >
+              <Network size={16} />
+              <span>Launch Protocol Explorer</span>
+              <ArrowRight size={14} />
+            </button>
           </section>
 
           <section className="home-starter-guide" aria-label="How to use Katalyst">
@@ -2084,6 +2165,35 @@ export function LearningExperience({
                               ? lesson.interactiveDemo.config.filter
                               : "none"
                           }
+                        />
+                      </SimulatorErrorBoundary>
+                    </div>
+                  ) : lesson.interactiveDemo.kind === "protocol-explorer" ? (
+                    <div className="mt-3">
+                      <SimulatorErrorBoundary fallbackTitle="Protocol Explorer Encountered an Error">
+                        <ProtocolExplorer
+                          initialScenarioId={
+                            typeof lesson.interactiveDemo.config?.scenarioId === "string"
+                              ? (lesson.interactiveDemo.config.scenarioId as string)
+                              : "tcp-handshake"
+                          }
+                          onAskKat={(prompt) => {
+                            setKatDraftPrompt(prompt);
+                            setKatOpen(true);
+                          }}
+                          onOpenCodeLab={(code, language, title) => {
+                            exampleRequestId.current += 1;
+                            setPendingExample({
+                              code,
+                              lessonId: lesson ? lesson.id : "protocol-lab",
+                              lessonTitle: title,
+                              requestId: exampleRequestId.current,
+                              language: (language === "c" || language === "python" || language === "javascript" || language === "cpp" || language === "sql" || language === "html") ? language : undefined,
+                            });
+                            if (smallWorkspace) {
+                              setWorkspacePanel("code");
+                            }
+                          }}
                         />
                       </SimulatorErrorBoundary>
                     </div>

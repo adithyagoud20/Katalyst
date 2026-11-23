@@ -58,9 +58,9 @@ document.body.textContent = "Mock C runtime ready.";`,
     const heading = page.getByRole("heading", { name: "Runtime & Lab Launcher" });
     await expect(heading).toBeVisible();
 
-    // Verify all 18 runtime cards are visible
+    // Verify all 19 runtime cards are visible
     const cards = page.locator(".launcher-card");
-    await expect(cards).toHaveCount(18);
+    await expect(cards).toHaveCount(19);
     await expect(page.getByText("C (C11 · WebAssembly)")).toBeVisible();
     await expect(page.getByText("C++ (C++17 · Coming soon)")).toBeVisible();
     await expect(page.getByText("Python (3.12 · WebAssembly)")).toBeVisible();

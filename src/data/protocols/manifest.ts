@@ -1,0 +1,68 @@
+import "server-only";
+import type { ProtocolManifestEntry } from "@/lib/protocols/schema";
+
+export const protocolManifest: ProtocolManifestEntry[] = [
+  {
+    id: "dns-lookup",
+    title: "DNS Resolution (UDP 53)",
+    category: "resolution",
+    summary: "Follow a recursive DNS query resolving 'katalyst.dev' from client stub resolver through Root, TLD, and Authoritative servers.",
+    stepCount: 6,
+    hasChaos: true,
+    hasExam: true,
+  },
+  {
+    id: "tcp-handshake",
+    title: "TCP 3-Way Handshake & Teardown",
+    category: "transport",
+    summary: "Establish a reliable full-duplex TCP stream (SYN -> SYN-ACK -> ACK) followed by sequence tracking and graceful FIN teardown.",
+    stepCount: 6,
+    hasChaos: true,
+    hasExam: true,
+  },
+  {
+    id: "http-exchange",
+    title: "HTTP/1.1 Request & Response",
+    category: "web",
+    summary: "Inspect an HTTP/1.1 GET request with Host and Keep-Alive headers, followed by a 200 OK chunked payload exchange.",
+    stepCount: 4,
+    hasChaos: true,
+    hasExam: true,
+  },
+  {
+    id: "tls-handshake",
+    title: "TLS 1.3 Secure Handshake",
+    category: "security",
+    summary: "Zero-RTT and 1-RTT cryptographic key exchange with ClientHello, ServerHello, EncryptedExtensions, and session traffic keys.",
+    stepCount: 4,
+    hasChaos: true,
+    hasExam: false,
+  },
+  {
+    id: "websocket-upgrade",
+    title: "WebSocket Handshake & Framing (RFC 6455)",
+    category: "web",
+    summary: "Full-duplex stream upgrade: HTTP/1.1 101 Switching Protocols with Sec-WebSocket-Accept, followed by XOR-masked text and pong frames.",
+    stepCount: 4,
+    hasChaos: true,
+    hasExam: true,
+  },
+  {
+    id: "quic-handshake",
+    title: "QUIC & HTTP/3 Multiplexing (RFC 9000)",
+    category: "transport",
+    summary: "Explore next-generation HTTP/3 transport over UDP: Initial packet with CRYPTO frames, Connection IDs (CID), 1-RTT key derivation, and Head-of-Line blocking elimination.",
+    stepCount: 4,
+    hasChaos: true,
+    hasExam: true,
+  },
+  {
+    id: "mqtt-telemetry",
+    title: "MQTT 3.1.1 IoT Telemetry & QoS Flow (OASIS)",
+    category: "transport",
+    summary: "Explore lightweight publish/subscribe messaging for constrained IoT devices: 2-byte fixed headers, Clean Session negotiation, QoS 1 delivery guarantees, and DUP retransmissions.",
+    stepCount: 6,
+    hasChaos: true,
+    hasExam: true,
+  },
+];

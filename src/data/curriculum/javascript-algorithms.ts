@@ -368,6 +368,14 @@ async function loadTelemetry() {
     objectiveIds: ["js-buffers-typedarrays"],
     prerequisiteLessonIds: ["js-promises-async-await"],
     estimatedDurationMinutes: 30,
+    interactiveDemo: {
+      kind: "protocol-explorer",
+      title: "Interactive Network Packet & Byte Buffer Inspector",
+      description: "Inspect live protocol frames, byte offsets, and hex dumps in action across TCP and WebSocket payloads.",
+      config: {
+        scenarioId: "tcp-handshake",
+      },
+    },
     content: `When dealing with network packets, audio processing, or WebAssembly interop, standard JavaScript arrays of dynamic objects are too slow and memory-intensive. JavaScript provides **TypedArrays** and **ArrayBuffer** for raw binary data manipulation.
 
 ### Binary Memory Architecture
@@ -1240,6 +1248,14 @@ async function* source() {
     objectiveIds: ["js-binary-protocol"],
     prerequisiteLessonIds: ["js-streams-pipeline"],
     estimatedDurationMinutes: 40,
+    interactiveDemo: {
+      kind: "protocol-explorer",
+      title: "WebSocket & Binary Protocol Framing Inspector",
+      description: "Explore RFC 6455 binary frame headers, FIN bits, opcodes, and 4-byte XOR masking keys.",
+      config: {
+        scenarioId: "websocket-upgrade",
+      },
+    },
     content: `### Binary Protocol Framing
 In embedded IoT networks and robotics, telemetry packets are encoded in dense binary formats rather than JSON to minimize bandwidth and CPU serialization overhead.
 

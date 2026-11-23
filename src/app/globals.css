@@ -5338,3 +5338,64 @@ html, body { width: 100%; max-width: 100%; overflow-x: clip; }
   .lesson-public-pagination { grid-template-columns: 1fr; }
   .lesson-public-pagination a:last-child { text-align: left; }
 }
+
+/* Protocol & Network Explorer */
+/* Protocol & Network Explorer Immersive Blueprint Studio */
+.main-panel[data-view="protocols"] {
+  background: #080c14;
+  color: #f1f5f9;
+}
+.main-panel[data-view="protocols"] > .topbar {
+  background: #090e1a;
+  border-bottom: 1px solid #1a253c;
+  color: #f1f5f9;
+}
+.main-panel[data-view="protocols"] > .topbar .breadcrumbs {
+  color: #94a3b8;
+}
+.main-panel[data-view="protocols"] > .topbar .breadcrumbs strong {
+  color: #38bdf8;
+}
+.learning-view.learning-protocols {
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  background: #080c14 !important;
+  min-height: calc(100vh - 64px);
+  color: #f8fafc !important;
+}
+.learning-view.learning-protocols h1,
+.learning-view.learning-protocols h2,
+.learning-view.learning-protocols h3,
+.learning-view.learning-protocols h4 {
+  color: #f8fafc !important;
+}
+.learning-view.learning-protocols > * {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+}
+.learning-protocols-host {
+  background: #080c14;
+  color: #f1f5f9;
+  width: 100%;
+}
+
+.protocol-topology-canvas {
+  background: radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.8) 100%);
+}
+.protocol-topology-canvas svg {
+  shape-rendering: geometricPrecision;
+  text-rendering: geometricPrecision;
+}
+@media (max-width: 767px) {
+  .protocol-explorer-root .protocol-playback-bar button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .protocol-explorer-root .protocol-sequence-container {
+    max-height: 380px;
+  }
+}

@@ -413,6 +413,14 @@ console.log(redactSecret("AIzaSyD-Free-Gemini-Key-99"));`,
     objectiveIds: ["ai-route-handlers"],
     prerequisiteLessonIds: ["ai-free-api-keys-model-routing"],
     estimatedDurationMinutes: 30,
+    interactiveDemo: {
+      kind: "protocol-explorer",
+      title: "Interactive HTTP Request & Route Handler Inspector",
+      description: "Inspect the HTTP/1.1 request line, Host header, payload, and response status codes exchanged between client and server.",
+      config: {
+        scenarioId: "http-exchange",
+      },
+    },
     content: `Modern full-stack React architecture routes all external API traffic through Next.js Route Handlers (\`src/app/api/.../route.ts\`).
 
 ### Why Never Call AI APIs Directly from the Browser:

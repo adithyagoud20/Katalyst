@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { ExecutionLanguage, ExecutionTarget } from "./execution/types";
 
-export type LearningSection = "home" | "paths" | "my-learning" | "playground" | "practice" | "progress" | "tutor" | "lesson";
+export type LearningSection = "home" | "paths" | "my-learning" | "playground" | "protocols" | "practice" | "progress" | "tutor" | "lesson";
 export type LearningObjective = { id: string; title: string };
 export type LearningDifficulty = "Beginner" | "Developing" | "Applied";
 
@@ -33,7 +33,7 @@ export type LessonResource = {
 };
 
 export type LessonInteractiveDemo = {
-  kind: "circuit" | "flowchart" | "memory-diagram" | "state-machine" | "image-lab";
+  kind: "circuit" | "flowchart" | "memory-diagram" | "state-machine" | "image-lab" | "protocol-explorer";
   title?: string;
   description?: string;
   config?: Record<string, unknown>;
@@ -254,7 +254,7 @@ const resourceSchema: z.ZodType<LessonResource> = z.object({
 }).strict();
 
 const interactiveDemoSchema: z.ZodType<LessonInteractiveDemo> = z.object({
-  kind: z.enum(["circuit", "flowchart", "memory-diagram", "state-machine", "image-lab"]),
+  kind: z.enum(["circuit", "flowchart", "memory-diagram", "state-machine", "image-lab", "protocol-explorer"]),
   title: z.string().trim().min(1).max(160).optional(),
   description: z.string().trim().max(1_000).optional(),
   config: z.record(z.string(), z.unknown()).optional(),

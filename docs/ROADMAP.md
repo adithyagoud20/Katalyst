@@ -431,12 +431,25 @@ The current interface uses one source-defined KATALYST mark, a high-contrast Lig
 - `npm run test:e2e` — passed, 63 browser tests; one opt-in real C compiler integration test was skipped by the default suite. The focused login and mobile lesson checks also passed.
 - `npm_config_ignore_scripts=true npm run build` — passed with Next.js 16.4.5 and 46 generated static pages. The prebuild hook was skipped to keep the protected curriculum tree untouched.
 
-### M23 — Route-based navigation and public content SEO — in progress
+### M23 — Route-based navigation and public content SEO — complete
 
 - [x] Stage (a): add App Router paths for app screens, `/my-learning`, and course/lesson URLs; map legacy `#katalyst=` links to their route equivalents; add route loading states.
 - [x] Stage (b): separate compact course summaries and a content-free learning outline from full lesson data; load course content by course ID; server-render lesson text and lazy-load the lesson editor/simulators plus heavy studio tools.
 - [x] Stage (c): add per-page SEO metadata, canonicals, social tags, sitemap, robots, JSON-LD, private-page noindex metadata, route loading boundaries, and custom 404 pages.
 - [x] Stage (d): production verification passed for the remaining JavaScript, Python, SQL, HTML/CSS, Arduino, ESP32, breadboard, and digital-logic labs with zero observed CSP console errors; the retired C runner returns 404 and app/public/API/sitemap routes retain nonce CSP and framing protections.
+
+### M24 — Kat-Integrated Protocol & Network Explorer Studio (complete)
+
+- [x] Animated Network Topology Canvas: SVG vector map with Client, Edge Router, DNS Resolver, Web Server, and Proxy nodes, dynamic wire connections, hop-by-hop animated packet markers (`<animateMotion>`), and active state rings.
+- [x] Synchronized Sequence Diagram & Capture List: Wireshark-style capture table (`No.`, `Time`, `Source`, `Destination`, `Protocol`, `Info`) synced bidirectionally to vertical sequence flow diagrams.
+- [x] Multi-Layer Decoded Packet Inspector: Collapsible protocol tree decoding Ethernet II, IPv4, UDP, TCP, HTTP/1.1, TLS 1.3, QUIC/HTTP/3, and MQTT 3.1.1 with exact byte offsets and "Ask Kat About This Field" prompts.
+- [x] Highlighted Raw Hex Dump: Dynamic 16-byte (desktop) and 8-byte (mobile) hex dump view with offset gutter, hex pairs, and ASCII representation synced with field selections.
+- [x] Failure & Chaos Injection Sandbox: Interactive toggles simulating UDP datagram drops with client timeouts, TCP SYN drops with exponential backoff, HTTP 500 errors, QUIC PTO retransmissions, and MQTT QoS 1 PUBACK drops.
+- [x] "Build It Yourself" Exam Mode: Interactive packet sequence reordering challenge with automated verification, hints, and "Ask Kat Why My Sequence Failed" AI debugging bridge.
+- [x] 7 Authored Protocol Scenarios: DNS Resolution (UDP 53), TCP 3-Way Handshake & Teardown, HTTP/1.1 Exchange, TLS 1.3 Handshake, WebSocket Framing (RFC 6455), QUIC & HTTP/3 Multiplexing (RFC 9000), and MQTT 3.1.1 IoT Telemetry (OASIS).
+- [x] Dynamic Server-Side Loading: Server-only scenario dynamic import loader and `/api/protocols` route preventing client bundle bloat with in-memory caching and offline fallbacks.
+- [x] Curriculum & Studio Integration: Attached to `ai-app-web-dev`, `esp32-iot-systems`, and `js-systems-algorithms` lessons with client-side Code Lab bridges.
+- [x] Comprehensive Verification: 398 Vitest unit tests passing across 45 suites, Playwright E2E suite (`protocol-explorer.spec.ts` + `m22-updates.spec.ts`) passing, and Next.js 16.4.5 production build clean (289 static pages).
 - **CSP decision:** Public course and lesson pages share the single nonce root layout. They are dynamic because the nonce is generated per request. Keep `generateStaticParams` for route validation; revisit public caching if Next.js SRI support covers inline App Router scripts.
 - **Superseded 2026-11-20 C runner verification:** The isolated Wasmer runner was temporarily verified, but production C compilation did not complete. The runtime was subsequently retired; its route and special policy no longer exist. Current framing and nonce-CSP expectations are covered by the retained security tests.
 - **Historical 2026-11-20 production checks (before retirement):** The sitemap contained 144 absolute URLs and private pages returned `noindex`. The runner security E2E passed while the focused production C compile timed out; the runner was then removed after the additional 300-second C/C++ probes also failed.
@@ -526,6 +539,23 @@ The current interface uses one source-defined KATALYST mark, a high-contrast Lig
 - `KATALYST_E2E_PORT=3281 npm run test:e2e` — passed, 38 browser tests; the existing optional real compiler integration test was skipped. Coverage includes Light/Dark code surfaces, collapsed/expanded rail behavior at desktop/laptop/tablet widths, mobile navigation with a saved collapsed preference, and Kat scrolling/composer behavior. A final `KATALYST_E2E_PORT=3279` focused sidebar test also passed after the compact-header adjustment.
 - `npm run build` — passed with Next.js 16.4.5 production output.
 - Provider requests were mocked; the optional real C compiler download/integration was not run. No local data schema or provider behavior changed.
+
+### Protocol & Network Explorer Integration (Complete — 2026-11-23)
+
+- [x] Dedicated Top-Level Section & Route: Added `/protocols` route and permanent navigation item in the primary sidebar with Home page showcase banner and direct breadcrumb integration.
+- [x] Authentic 2.5D Isometric Network Projection Engine: 30° isometric mathematical projection (`cos(30°) = ~0.8660`, `sin(30°) = 0.5`) on standard `45 66 810 490` viewBox matching `protocolexplorer.org` vector drawings (Client laptop with tilted screen & code lines, Edge Router with vertical dual antennas & status LEDs, Internet Transit cloud with globe latitude/longitude lines, DNS Resolver tower, and Web Server dual-rack cabinet).
+- [x] Multi-Hop Hop-by-Hop Animation Engine: Dual-directional isometric highway lanes with multi-hop packet routing (`client -> router -> internet -> web/dns`), 3-bead trailing dots stream (`Ov = [12, 24, 36]`), intermediate node micro-bounces (`translate(0, -5 * sin(pi * t))`), and destination arrival shockwave ripples.
+- [x] Interactive Studio & Packet Flow Wireshark Table: 3-column layout with OSI Layer indicator (1-7), categorized Internet Protocols list (All, Core, App, Sec) with step-by-step accordion breakdowns, view toggle (`[NETWORK]` vs `[SEQUENCE]`), and real-time synchronized Wireshark packet flow table with custom playback controls (zero video scrollbar).
+- [x] Kat AI Protocol Assistant: Context-aware network analysis card providing instant zero-credit engineering breakdowns for the active packet and layer headers, accompanied by a slide-out Kat AI Network Tutor drawer for interactive deep-dive exploration.
+- [x] Visual Lifeline Sequence Diagram (ProtocolExplorer style): Multi-party sequence swimlanes with device column headers, vertical dashed lifeline cords, horizontal directional arrows with packet pills, active traveling dot animations, failure drop markers, and a Wireshark table toggle (`No.`, `Time`, `Source`, `Destination`, `Protocol`, `Info`).
+- [x] Multi-Layer Decoded Packet Inspector: Collapsible protocol tree decoding Ethernet II, IPv4, UDP, TCP, HTTP/1.1, TLS 1.3, QUIC/HTTP/3, and MQTT 3.1.1 with exact byte offsets and "Ask Kat About This Field" contextual prompts.
+- [x] Highlighted Raw Hex Dump: Dynamic 16-byte (desktop) and 8-byte (mobile) hex dump view with offset gutter, hex pairs, and ASCII representation synced with field selections.
+- [x] Failure & Chaos Injection Sandbox: Real-world network anomaly toggles simulating UDP datagram drops with client timeouts, TCP SYN drops with exponential backoff, HTTP 500 origin errors, QUIC PTO retransmissions, and MQTT QoS 1 PUBACK drops.
+- [x] "Build It Yourself" Exam Mode: Interactive packet sequence reordering challenge with automated verification, hints, and "Ask Kat Why My Sequence Failed" AI debugging bridge.
+- [x] 7 Authored Protocol Scenarios: DNS Resolution (UDP 53), TCP 3-Way Handshake & Teardown, HTTP/1.1 Exchange, TLS 1.3 Handshake, WebSocket Framing (RFC 6455), QUIC & HTTP/3 Multiplexing (RFC 9000), and MQTT 3.1.1 IoT Telemetry (OASIS).
+- [x] Dynamic Server-Side Loading: Server-only scenario dynamic import loader and `/api/protocols` route preventing client bundle bloat with in-memory caching and offline fallbacks.
+- [x] Curriculum & Studio Integration: Attached to `ai-app-web-dev`, `esp32-iot-systems`, and `js-systems-algorithms` lessons with client-side Code Lab bridges.
+- [x] Comprehensive Verification: 398 Vitest unit tests passing across 45 suites, Playwright E2E suite (`protocol-explorer.spec.ts` + `m22-updates.spec.ts`) passing, and Next.js 16.4.5 production build clean (290 static pages).
 
 ## Current fixes — 2026-11-19
 

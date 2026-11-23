@@ -11,8 +11,9 @@ import { PidTuningSimulator } from "./pid-tuning-simulator";
 import { FftSamplingVisualizer } from "./fft-sampling-visualizer";
 import { DsaVisualizer } from "./dsa-visualizer";
 import { CreativeStudio, type CreativeStudioMode } from "./creative-studio";
+import { ProtocolExplorer } from "./protocol-explorer";
 
-export type CircuitSimulatorMode = "digital" | "analog" | "breadboard" | "arduino" | "esp32" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa" | "creative" | "melody" | "morse" | "snake" | "maze";
+export type CircuitSimulatorMode = "digital" | "analog" | "breadboard" | "arduino" | "esp32" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa" | "creative" | "melody" | "morse" | "snake" | "maze" | "protocol";
 
 export interface CircuitSimulatorProps {
   initialMode?: CircuitSimulatorMode;
@@ -33,12 +34,12 @@ export function CircuitSimulator({
       ? initialMode
       : "melody"
   );
-  const [mode, setMode] = useState<"digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa" | "creative">(
+  const [mode, setMode] = useState<"digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa" | "creative" | "protocol">(
     initialMode === "arduino" || initialMode === "esp32"
       ? "breadboard"
       : isCreativeMode
       ? "creative"
-      : (initialMode as "digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa" | "creative")
+      : (initialMode as "digital" | "analog" | "breadboard" | "kmap" | "fsm" | "toycpu" | "pid" | "fft" | "dsa" | "creative" | "protocol")
   );
   const [mcuTarget, setMcuTarget] = useState<"arduino" | "esp32">(
     initialMode === "esp32" ? "esp32" : "arduino"
@@ -431,6 +432,17 @@ export function CircuitSimulator({
             </button>
             <button
               type="button"
+              onClick={() => setMode("protocol")}
+              className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
+                mode === "protocol"
+                  ? "bg-cyan-600 text-white"
+                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              Protocol Explorer
+            </button>
+            <button
+              type="button"
               onClick={() => setMode("creative")}
               className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
                 mode === "creative"
@@ -623,6 +635,12 @@ export function CircuitSimulator({
       {mode === "dsa" && (
         <div className="mt-4">
           <DsaVisualizer />
+        </div>
+      )}
+
+      {mode === "protocol" && (
+        <div className="mt-4">
+          <ProtocolExplorer />
         </div>
       )}
 

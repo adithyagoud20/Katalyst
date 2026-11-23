@@ -2452,6 +2452,11 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             "checkpoint": {
               "prompt": "Why must input validation happen on the server even if client-side validation is already in place?",
               "answer": "Client-side validation is easily bypassed using curl, Postman, or automated scripts. Server-side validation guarantees that malicious or corrupted requests cannot reach downstream databases or billable model APIs."
+            },
+            "interactiveDemo": {
+              "kind": "protocol-explorer",
+              "title": "Interactive HTTP Request & Route Handler Inspector",
+              "description": "Inspect the HTTP/1.1 request line, Host header, payload, and response status codes exchanged between client and server."
             }
           }
         ]
@@ -3607,9 +3612,9 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
               "answer": "MQTT maintains an open TCP socket with a tiny 2-byte header, avoiding the heavy HTTP header overhead, TLS re-handshakes, and connection teardown of REST."
             },
             "interactiveDemo": {
-              "kind": "circuit",
-              "title": "MQTT Broker & Client Topic Hub Simulator",
-              "description": "Publish telemetry to hierarchical MQTT topics and evaluate multi-level wildcard subscriptions (+ and #)."
+              "kind": "protocol-explorer",
+              "title": "Interactive MQTT Protocol & Packet Inspector",
+              "description": "Inspect MQTT CONNECT, CONNACK, QoS 1 PUBLISH frames, and byte-level packet flags in action."
             }
           },
           {
@@ -4293,6 +4298,11 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             "checkpoint": {
               "prompt": "Why is DataView preferred over Float32Array when parsing binary network protocols?",
               "answer": "DataView allows reading multiple different data types at arbitrary non-aligned byte offsets with explicit endianness, whereas Float32Array views assume homogeneous elements and platform-native endianness."
+            },
+            "interactiveDemo": {
+              "kind": "protocol-explorer",
+              "title": "Interactive Network Packet & Byte Buffer Inspector",
+              "description": "Inspect live protocol frames, byte offsets, and hex dumps in action across TCP and WebSocket payloads."
             }
           },
           {
@@ -4627,6 +4637,11 @@ export const publishedLearningCourses: LearningCourseSummary[] = [
             "checkpoint": {
               "prompt": "Why is DataView preferred over typed array views (like Float32Array) when parsing network protocol headers?",
               "answer": "DataView allows reading multiple heterogeneous types (Uint16, Uint8, Float32) at arbitrary unaligned byte offsets and explicitly controlling endianness."
+            },
+            "interactiveDemo": {
+              "kind": "protocol-explorer",
+              "title": "WebSocket & Binary Protocol Framing Inspector",
+              "description": "Explore RFC 6455 binary frame headers, FIN bits, opcodes, and 4-byte XOR masking keys."
             }
           }
         ]
