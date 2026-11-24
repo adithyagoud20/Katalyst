@@ -126,7 +126,7 @@ export function PlaybackControls({
           type="button"
           onClick={onStepPrev}
           disabled={currentStepIndex === 0}
-          className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center justify-center min-w-[36px] min-h-[36px] sm:min-w-[32px] sm:min-h-[32px] rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title="Step backward (Left Arrow)"
           aria-label="Step backward"
         >
@@ -137,7 +137,7 @@ export function PlaybackControls({
         <button
           type="button"
           onClick={isPlaying ? onPause : onPlay}
-          className="flex items-center justify-center h-8 px-3 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-500 shadow-sm transition-colors gap-1.5 text-xs"
+          className="flex items-center justify-center min-h-[36px] sm:min-h-[32px] px-3.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-500 shadow-sm transition-colors gap-1.5 text-xs"
           title={isPlaying ? "Pause animation (Space)" : "Play animation (Space)"}
           aria-label={isPlaying ? "Pause animation" : "Play animation"}
         >
@@ -150,7 +150,7 @@ export function PlaybackControls({
           type="button"
           onClick={onStepNext}
           disabled={currentStepIndex >= totalSteps - 1}
-          className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center justify-center min-w-[36px] min-h-[36px] sm:min-w-[32px] sm:min-h-[32px] rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           title="Step forward (Right Arrow)"
           aria-label="Step forward"
         >
@@ -161,7 +161,7 @@ export function PlaybackControls({
         <button
           type="button"
           onClick={onReset}
-          className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-subtle)] transition-colors"
+          className="flex items-center justify-center min-w-[36px] min-h-[36px] sm:min-w-[32px] sm:min-h-[32px] rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-subtle)] transition-colors"
           title="Reset playback to step 1"
           aria-label="Reset playback"
         >

@@ -159,6 +159,50 @@ export function resolveMultiHopLanes(fromId: string, toId: string): string[] {
 export const easeOutBack = (t: number) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
 export const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 export const easeInCubic = (t: number) => t * t * t;
+export const easeInOutCubic = (t: number) =>
+  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+export type CameraViewBox = [number, number, number, number]; // [x, y, width, height]
+
+export const DEFAULT_VIEWBOX: CameraViewBox = [45, 66, 810, 490];
+
+/**
+ * Calculates the framed viewBox for active communicating nodes matching protocolexplorer.org
+ */
+export function calculateTargetViewBox(fromNodeId?: string, toNodeId?: string): CameraViewBox {
+  if (!fromNodeId || !toNodeId) return DEFAULT_VIEWBOX;
+  const normFrom = NODE_ALIAS_MAP[fromNodeId.toLowerCase()] ?? "client";
+  const normTo = NODE_ALIAS_MAP[toNodeId.toLowerCase()] ?? "web";
+
+  // Local LAN: client <-> router
+  if (
+    (normFrom === "client" && normTo === "router") ||
+    (normFrom === "router" && normTo === "client")
+  ) {
+    // Zoom in to client and router
+    return [68, 246, 520, 315];
+  }
+
+  // DNS Lookup: client/router <-> internet <-> dns
+  if (
+    normFrom === "dns" || normTo === "dns" ||
+    normFrom === "resolver" || normTo === "resolver"
+  ) {
+    // Zoom to frame from client to DNS Resolver
+    return [92, 118, 730, 440];
+  }
+
+  // Web Server: client/router <-> internet <-> web
+  if (
+    normFrom === "web" || normTo === "web" ||
+    normFrom === "server" || normTo === "server"
+  ) {
+    // Zoom and pan to frame highway from client to web server
+    return [96, 122, 770, 465];
+  }
+
+  return DEFAULT_VIEWBOX;
+}
 
 export function interpolateLine(
   [x1, y1, x2, y2]: [number, number, number, number],

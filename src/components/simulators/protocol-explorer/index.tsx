@@ -190,12 +190,12 @@ Can you explain the engineering significance of this header field and why it is 
         {/* TOP STATUS & OSI BAR */}
         <header className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-[#0b1120] border-b border-[#1a253c] z-10">
           {/* Brand & Protocol Dropdown */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 w-full sm:w-auto">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center justify-center">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/15 text-blue-400 border border-blue-500/30 flex items-center justify-center flex-shrink-0">
                 <Network size={16} />
               </div>
-              <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-2">
+              <h1 className="text-sm font-bold tracking-tight text-white whitespace-nowrap">
                 Protocol &amp; Network Explorer
               </h1>
             </div>
@@ -206,7 +206,7 @@ Can you explain the engineering significance of this header field and why it is 
                 value={selectedScenarioId}
                 onChange={(e) => void switchScenario(e.target.value)}
                 disabled={loading}
-                className="text-xs font-semibold rounded-lg border border-[#223254] bg-[#131d33] text-slate-200 px-2.5 py-1.5 focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm"
+                className="text-xs font-semibold rounded-lg border border-[#223254] bg-[#131d33] text-slate-200 px-2.5 py-1.5 focus:outline-none focus:border-blue-500 cursor-pointer shadow-sm w-full sm:w-auto truncate max-w-[280px]"
                 aria-label="Select protocol scenario"
               >
                 {scenarioOptions.map((p) => (
@@ -219,8 +219,8 @@ Can you explain the engineering significance of this header field and why it is 
           </div>
 
           {/* Center: NOW LEARNING & OSI LAYER CHIPS */}
-          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 mx-auto">
-            <div className="text-center sm:text-left">
+          <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2 sm:gap-4 w-full sm:w-auto">
+            <div className="text-left">
               <div className="text-[10px] uppercase font-mono tracking-wider text-slate-400">
                 NOW LEARNING: <strong className="text-white">{state.scenario.title.split(" ")[0]}</strong> • {state.scenario.category.toUpperCase()}
               </div>
@@ -251,7 +251,7 @@ Can you explain the engineering significance of this header field and why it is 
           </div>
 
           {/* Right: Search & Kat AI button */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto sm:ml-0">
             <div className="relative hidden xl:flex items-center">
               <Search size={13} className="absolute left-2.5 text-slate-400 pointer-events-none" />
               <input
@@ -281,10 +281,61 @@ Can you explain the engineering significance of this header field and why it is 
           </div>
         </header>
 
+        {/* MOBILE SEGMENTED VIEW JUMP BAR (Visible on mobile/tablet < xl) */}
+        <nav
+          className="flex xl:hidden items-center gap-1.5 px-3 py-2 bg-[#0b1222] border-b border-[#1a253c] overflow-x-auto select-none sticky top-0 z-20"
+          aria-label="Mobile Navigation"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              document.getElementById("proto-canvas-section")?.scrollIntoView({ behavior: "smooth" });
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#131d33] hover:bg-[#1a2846] text-slate-200 border border-[#1e2e4f] text-xs font-mono font-semibold whitespace-nowrap active:bg-blue-600 active:text-white transition-colors"
+          >
+            <span>🗺️</span>
+            <span>Diagram</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              document.getElementById("proto-flow-section")?.scrollIntoView({ behavior: "smooth" });
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#131d33] hover:bg-[#1a2846] text-slate-200 border border-[#1e2e4f] text-xs font-mono font-semibold whitespace-nowrap active:bg-blue-600 active:text-white transition-colors"
+          >
+            <span>⚡</span>
+            <span>Packet Flow</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              document.getElementById("proto-inspector-section")?.scrollIntoView({ behavior: "smooth" });
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#131d33] hover:bg-[#1a2846] text-slate-200 border border-[#1e2e4f] text-xs font-mono font-semibold whitespace-nowrap active:bg-blue-600 active:text-white transition-colors"
+          >
+            <span>🔍</span>
+            <span>Inspector &amp; Specs</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSidebarOpen(true);
+              document.getElementById("proto-catalog-section")?.scrollIntoView({ behavior: "smooth" });
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#131d33] hover:bg-[#1a2846] text-slate-200 border border-[#1e2e4f] text-xs font-mono font-semibold whitespace-nowrap active:bg-blue-600 active:text-white transition-colors"
+          >
+            <span>🌐</span>
+            <span>Protocols</span>
+          </button>
+        </nav>
+
         {/* 3-COLUMN STUDIO LAYOUT MATCHING PROTOCOLEXPLORER.ORG */}
         <div className="grid grid-cols-1 xl:grid-cols-[250px_1fr_330px] gap-3 p-3 bg-[#080c14] flex-1">
           {/* COLUMN 1: LEFT SIDEBAR (PROTOCOLS ACCORDION & CATEGORIES) */}
-          <aside className="w-full xl:w-[250px] flex-shrink-0 flex flex-col gap-2.5 bg-[#0b1222] p-3 rounded-xl border border-[#1a253c] h-fit">
+          <aside
+            id="proto-catalog-section"
+            className="order-3 xl:order-1 w-full xl:w-[250px] flex-shrink-0 flex flex-col gap-2.5 bg-[#0b1222] p-3 rounded-xl border border-[#1a253c] h-fit"
+          >
             {/* Header info */}
             <div>
               <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 block">
@@ -432,7 +483,7 @@ Can you explain the engineering significance of this header field and why it is 
           </aside>
 
           {/* COLUMN 2: CENTER STAGE (NETWORK CANVAS & PACKET FLOW TABLE) */}
-          <main className="flex-1 flex flex-col gap-3 min-w-0">
+          <main id="proto-canvas-section" className="order-1 xl:order-2 flex-1 flex flex-col gap-3 min-w-0">
             {/* View Mode Switcher Pills: [NETWORK] [SEQUENCE] */}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1 bg-[#0b1222] p-1 rounded-lg border border-[#1a253c]">
@@ -496,19 +547,21 @@ Can you explain the engineering significance of this header field and why it is 
             )}
 
             {/* PACKET FLOW WIRESHARK TABLE WITH INTEGRATED CONTROLS */}
-            <PacketFlowTable
-              steps={state.activeSteps}
-              currentStepIndex={state.currentStepIndex}
-              isPlaying={state.isPlaying}
-              speed={state.speed}
-              onPlay={() => dispatch({ type: "PLAY" })}
-              onPause={() => dispatch({ type: "PAUSE" })}
-              onStepNext={() => dispatch({ type: "STEP_NEXT" })}
-              onStepPrev={() => dispatch({ type: "STEP_PREV" })}
-              onSelectStep={(idx) => dispatch({ type: "GO_TO_STEP", stepIndex: idx })}
-              onSetSpeed={(spd) => dispatch({ type: "SET_SPEED", speed: spd as PlaybackSpeed })}
-              onReset={() => dispatch({ type: "RESET" })}
-            />
+            <div id="proto-flow-section">
+              <PacketFlowTable
+                steps={state.activeSteps}
+                currentStepIndex={state.currentStepIndex}
+                isPlaying={state.isPlaying}
+                speed={state.speed}
+                onPlay={() => dispatch({ type: "PLAY" })}
+                onPause={() => dispatch({ type: "PAUSE" })}
+                onStepNext={() => dispatch({ type: "STEP_NEXT" })}
+                onStepPrev={() => dispatch({ type: "STEP_PREV" })}
+                onSelectStep={(idx) => dispatch({ type: "GO_TO_STEP", stepIndex: idx })}
+                onSetSpeed={(spd) => dispatch({ type: "SET_SPEED", speed: spd as PlaybackSpeed })}
+                onReset={() => dispatch({ type: "RESET" })}
+              />
+            </div>
 
             {/* SEQUENCE DIAGRAM SWIMLANES (Always mounted in network mode for full causality trace) */}
             {centerViewMode === "network" && (
@@ -539,7 +592,10 @@ Can you explain the engineering significance of this header field and why it is 
           </main>
 
           {/* COLUMN 3: RIGHT SIDEBAR (PROTOCOL OVERVIEW & INSPECTORS) */}
-          <aside className="w-full xl:w-[330px] flex-shrink-0 flex flex-col gap-3">
+          <aside
+            id="proto-inspector-section"
+            className="order-2 xl:order-3 w-full xl:w-[330px] flex-shrink-0 flex flex-col gap-3"
+          >
             {/* PROTOCOL OVERVIEW CARD MATCHING PROTOCOLEXPLORER.ORG */}
             <div className="p-4 rounded-xl bg-[#0b1222] border border-[#1a253c] space-y-3 shadow-xl">
               <div className="flex items-center justify-between">

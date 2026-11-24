@@ -90,7 +90,7 @@ export function PacketFlowTable({
           <select
             value={speed}
             onChange={(e) => onSetSpeed(parseFloat(e.target.value))}
-            className="text-xs font-mono font-semibold rounded-lg border border-[#1e2e4f] bg-[#131d33] text-slate-200 px-2 py-1 focus:outline-none cursor-pointer"
+            className="text-xs font-mono font-semibold rounded-lg border border-[#1e2e4f] bg-[#131d33] text-slate-200 px-2 py-1.5 sm:py-1 min-h-[36px] sm:min-h-[30px] focus:outline-none cursor-pointer"
             aria-label="Playback speed"
           >
             <option value={0.5}>0.5x</option>
@@ -103,18 +103,18 @@ export function PacketFlowTable({
             type="button"
             onClick={onStepPrev}
             disabled={currentStepIndex <= 0}
-            className="p-1.5 rounded-lg border border-[#1e2e4f] bg-[#131d33] text-slate-300 hover:text-white hover:bg-[#1a2744] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            className="p-2 sm:p-1.5 min-h-[36px] min-w-[36px] sm:min-h-[30px] sm:min-w-[30px] flex items-center justify-center rounded-lg border border-[#1e2e4f] bg-[#131d33] text-slate-300 hover:text-white hover:bg-[#1a2744] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             title="Previous packet"
             aria-label="Previous packet"
           >
-            <ChevronLeft size={14} />
+            <ChevronLeft size={15} />
           </button>
 
           {/* Play / Pause Primary Button */}
           <button
             type="button"
             onClick={isPlaying ? onPause : onPlay}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono font-semibold text-xs shadow-sm transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 sm:py-1 min-h-[36px] sm:min-h-[30px] rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-mono font-semibold text-xs shadow-sm transition-colors"
             aria-label={isPlaying ? "Pause simulation" : "Play simulation"}
           >
             {isPlaying ? (
@@ -135,7 +135,7 @@ export function PacketFlowTable({
             type="button"
             onClick={onStepNext}
             disabled={currentStepIndex >= steps.length - 1}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-[#1e2e4f] bg-[#131d33] text-slate-300 hover:text-white hover:bg-[#1a2744] disabled:opacity-30 disabled:cursor-not-allowed text-xs font-mono font-semibold transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 sm:py-1 min-h-[36px] sm:min-h-[30px] rounded-lg border border-[#1e2e4f] bg-[#131d33] text-slate-300 hover:text-white hover:bg-[#1a2744] disabled:opacity-30 disabled:cursor-not-allowed text-xs font-mono font-semibold transition-colors"
             title="Next packet"
             aria-label="Next packet"
           >
@@ -147,7 +147,7 @@ export function PacketFlowTable({
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-[#1e2e4f] bg-[#131d33] text-slate-400 hover:text-white hover:bg-[#1a2744] text-xs font-mono font-semibold transition-colors"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 sm:py-1 min-h-[36px] sm:min-h-[30px] rounded-lg border border-[#1e2e4f] bg-[#131d33] text-slate-400 hover:text-white hover:bg-[#1a2744] text-xs font-mono font-semibold transition-colors"
             title="Reset simulation"
             aria-label="Reset simulation"
           >

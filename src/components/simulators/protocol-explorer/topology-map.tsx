@@ -1,16 +1,19 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { AlertOctagon } from "lucide-react";
 import type { TopologyMapProps } from "./types";
 import {
-  ISO_VIEWBOX,
   CANONICAL_NODES,
   HIGHWAY_LANES,
   resolveMultiHopLanes,
   interpolateLine,
   lineLength,
   NODE_ALIAS_MAP,
+  DEFAULT_VIEWBOX,
+  calculateTargetViewBox,
+  easeInOutCubic,
+  type CameraViewBox,
 } from "./isometric-engine";
 import {
   IsometricLaptop,
@@ -57,6 +60,93 @@ export function TopologyMap({
     const parts = currentStep.arrowLabel.split(" ");
     return parts.slice(0, 3).join(" ");
   }, [currentStep]);
+
+  // Camera Zoom & Dynamic Tracking State matching protocolexplorer.org
+  const [viewBox, setViewBox] = useState<CameraViewBox>(DEFAULT_VIEWBOX);
+  const [autoCamera, setAutoCamera] = useState<boolean>(true);
+  const viewBoxRef = useRef<CameraViewBox>(DEFAULT_VIEWBOX);
+
+  useEffect(() => {
+    viewBoxRef.current = viewBox;
+  }, [viewBox]);
+
+  // Camera interpolation animation driven by requestAnimationFrame with easeInOutCubic
+  useEffect(() => {
+    if (!autoCamera) return;
+    const targetVb = calculateTargetViewBox(currentStep?.fromNodeId, currentStep?.toNodeId);
+    const startVb = [...viewBoxRef.current] as CameraViewBox;
+    let animId: number;
+    let startTime: number | null = null;
+    const duration = 650;
+
+    const animateCamera = (now: number) => {
+      if (startTime === null) startTime = now;
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = easeInOutCubic(progress);
+
+      const nextVb: CameraViewBox = [
+        startVb[0] + (targetVb[0] - startVb[0]) * eased,
+        startVb[1] + (targetVb[1] - startVb[1]) * eased,
+        startVb[2] + (targetVb[2] - startVb[2]) * eased,
+        startVb[3] + (targetVb[3] - startVb[3]) * eased,
+      ];
+      setViewBox(nextVb);
+
+      if (progress < 1) {
+        animId = requestAnimationFrame(animateCamera);
+      }
+    };
+
+    animId = requestAnimationFrame(animateCamera);
+    return () => cancelAnimationFrame(animId);
+  }, [currentStep?.stepIndex, currentStep?.fromNodeId, currentStep?.toNodeId, autoCamera]);
+
+  const handleZoomIn = () => {
+    setAutoCamera(false);
+    setViewBox((prev) => {
+      const factor = 1.25;
+      const newW = Math.max(380, prev[2] / factor);
+      const newH = Math.max(230, prev[3] / factor);
+      const cx = prev[0] + prev[2] / 2;
+      const cy = prev[1] + prev[3] / 2;
+      return [cx - newW / 2, cy - newH / 2, newW, newH];
+    });
+  };
+
+  const handleZoomOut = () => {
+    setAutoCamera(false);
+    setViewBox((prev) => {
+      const factor = 1.25;
+      const newW = Math.min(DEFAULT_VIEWBOX[2] * 1.15, prev[2] * factor);
+      const newH = Math.min(DEFAULT_VIEWBOX[3] * 1.15, prev[3] * factor);
+      const cx = prev[0] + prev[2] / 2;
+      const cy = prev[1] + prev[3] / 2;
+      return [cx - newW / 2, cy - newH / 2, newW, newH];
+    });
+  };
+
+  const handleResetZoom = () => {
+    setAutoCamera(true);
+    const startVb = [...viewBoxRef.current] as CameraViewBox;
+    const targetVb = calculateTargetViewBox(currentStep?.fromNodeId, currentStep?.toNodeId);
+    let startTime: number | null = null;
+    const duration = 500;
+    const animate = (now: number) => {
+      if (startTime === null) startTime = now;
+      const elapsed = now - startTime;
+      const progress = Math.min(1, elapsed / duration);
+      const eased = easeInOutCubic(progress);
+      setViewBox([
+        startVb[0] + (targetVb[0] - startVb[0]) * eased,
+        startVb[1] + (targetVb[1] - startVb[1]) * eased,
+        startVb[2] + (targetVb[2] - startVb[2]) * eased,
+        startVb[3] + (targetVb[3] - startVb[3]) * eased,
+      ]);
+      if (progress < 1) requestAnimationFrame(animate);
+    };
+    requestAnimationFrame(animate);
+  };
 
   // Dynamic animation state driven by requestAnimationFrame
   const [animState, setAnimState] = useState<{
@@ -112,8 +202,9 @@ export function TopologyMap({
       const targetT = currentHopIdx === dropHopIndex ? Math.min(0.5, rawT) : rawT;
 
       const lead = interpolateLine(laneCoords, targetT);
-      const trail = [0.08, 0.16, 0.24].map((offset) =>
-        interpolateLine(laneCoords, Math.max(0, targetT - offset))
+      const TRAIL_OFFSETS = [12, 24, 36];
+      const trail = TRAIL_OFFSETS.map((offsetPx) =>
+        interpolateLine(laneCoords, Math.max(0, targetT - offsetPx / totalDist))
       );
 
       setAnimState({
@@ -181,8 +272,8 @@ export function TopologyMap({
   return (
     <div className="protocol-topology-canvas relative w-full overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[#070b14] shadow-2xl">
       <svg
-        viewBox={ISO_VIEWBOX}
-        className="w-full h-auto select-none block"
+        viewBox={`${viewBox[0].toFixed(2)} ${viewBox[1].toFixed(2)} ${viewBox[2].toFixed(2)} ${viewBox[3].toFixed(2)}`}
+        className="w-full h-auto select-none block transition-all"
         preserveAspectRatio="xMidYMid meet"
         role="img"
         aria-label="Network Topology Map"
@@ -291,15 +382,19 @@ export function TopologyMap({
           })}
         </g>
 
-        {/* DESTINATION ARRIVAL SHOCKWAVE (Expanding Ripple Ring) */}
+        {/* DESTINATION ARRIVAL SHOCKWAVE (Expanding Ripple Rings matching protocolexplorer.org) */}
         {impactNode && CANONICAL_NODES[impactNode] && (
           <g
             transform={`translate(${CANONICAL_NODES[impactNode].center[0]}, ${CANONICAL_NODES[impactNode].center[1]})`}
             filter="url(#impactWaveGlow)"
           >
-            <circle r="18" fill="none" stroke={packetColor} strokeWidth="2">
-              <animate attributeName="r" values="18;64" dur="0.7s" fill="freeze" />
+            <circle r="14" fill="none" stroke={packetColor} strokeWidth="2.5">
+              <animate attributeName="r" values="14;64" dur="0.7s" fill="freeze" />
               <animate attributeName="opacity" values="0.75;0" dur="0.7s" fill="freeze" />
+            </circle>
+            <circle r="14" fill={packetColor} opacity="0.18">
+              <animate attributeName="r" values="14;48" dur="0.7s" fill="freeze" />
+              <animate attributeName="opacity" values="0.35;0" dur="0.7s" fill="freeze" />
             </circle>
           </g>
         )}
@@ -307,34 +402,34 @@ export function TopologyMap({
         {/* LIVE PACKET PARTICLES & TRAIL STREAM */}
         {currentStep && (
           <g key={`packet-${currentStep.stepIndex}-${animState.hopIndex}`}>
-            {/* 3 Trailing Dots */}
+            {/* 3 Trailing Bead Particles with true distance offsets */}
             {animState.trail.map((pos, idx) => (
               <circle
                 key={idx}
                 cx={pos.x}
                 cy={pos.y}
-                r={3.4 - idx * 0.9}
+                r={3.6 - idx * 0.9}
                 fill={packetColor}
                 opacity={0.45 - idx * 0.12}
               />
             ))}
 
-            {/* Lead Packet Bead */}
+            {/* Lead Packet Bead with Aura and Core Spark */}
             <circle
               cx={animState.leadX}
               cy={animState.leadY}
-              r={12}
+              r={13}
               fill={packetColor}
-              opacity={0.2}
+              opacity={0.18}
               filter="url(#packetGlow)"
             />
             <circle
               cx={animState.leadX}
               cy={animState.leadY}
-              r={5.5}
+              r={6}
               fill={packetColor}
               stroke="#070b14"
-              strokeWidth="1.8"
+              strokeWidth={2}
             />
             <circle
               cx={animState.leadX}
@@ -346,7 +441,7 @@ export function TopologyMap({
             {/* Floating Packet Tag Pill */}
             {!animState.isDroppedMidway && (
               <g
-                transform={`translate(${animState.leadX}, ${animState.leadY - 24})`}
+                transform={`translate(${animState.leadX}, ${animState.leadY - 26})`}
                 filter="url(#packetGlow)"
               >
                 <rect
@@ -560,6 +655,51 @@ export function TopologyMap({
           </g>
         </g>
       </svg>
+
+      {/* Floating Camera & Zoom Controls */}
+      <div className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-[#0b1324]/90 backdrop-blur-md px-2 py-1.5 rounded-lg border border-[#1e2e4f] shadow-lg z-10 select-none">
+        <button
+          type="button"
+          onClick={() => setAutoCamera((v) => !v)}
+          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-colors ${
+            autoCamera
+              ? "bg-blue-600/30 text-blue-300 border border-blue-500/40"
+              : "text-slate-400 hover:text-slate-200"
+          }`}
+          title={autoCamera ? "Camera Auto-Tracking Active" : "Camera Auto-Tracking Paused (Manual Framing)"}
+          aria-label={autoCamera ? "Camera Auto-Tracking Active" : "Camera Auto-Tracking Paused"}
+        >
+          {autoCamera ? "CAM: AUTO" : "CAM: MANUAL"}
+        </button>
+        <div className="w-[1px] h-3 bg-[#1e2e4f]" />
+        <button
+          type="button"
+          onClick={handleZoomIn}
+          className="w-6 h-6 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-[#16233d] text-sm font-bold transition-colors"
+          title="Zoom In (+)"
+          aria-label="Zoom In"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={handleZoomOut}
+          className="w-6 h-6 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-[#16233d] text-sm font-bold transition-colors"
+          title="Zoom Out (-)"
+          aria-label="Zoom Out"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          onClick={handleResetZoom}
+          className="w-6 h-6 flex items-center justify-center rounded text-slate-300 hover:text-white hover:bg-[#16233d] text-xs font-bold transition-colors"
+          title="Reset Zoom / Fit Network"
+          aria-label="Reset Zoom"
+        >
+          ⛶
+        </button>
+      </div>
     </div>
   );
 }
