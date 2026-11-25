@@ -1,82 +1,135 @@
-/**
- * True 2.5D Isometric Network Projection Engine
- * Faithfully reproduces the isometric coordinate scheme, vector devices,
- * and multi-hop routing architecture of protocolexplorer.org
- */
-
-export const ISO_VIEWBOX = "45 66 810 490";
-
-// Mathematical constants for 30-degree isometric projection
-const COS_30 = Math.cos(Math.PI / 6); // ~0.8660254
-const SIN_30 = 0.5;
+import type { ProtocolNode } from "@/lib/protocols/schema";
 
 /**
- * Projects 3D isometric space (x, y, z) into 2D SVG screen coordinates
- * @param x0 SVG origin X
- * @param y0 SVG origin Y
+ * Canonical SVG coordinate engine matching ProtocolExplorer's 1000x445 isometric topology.
+ * Every device has a fixed visual center and cable anchor so nodes never overlap and
+ * multi-hop packets traverse clean straight-line wires across any protocol scenario.
  */
-export function createIsoProjector(x0: number, y0: number) {
-  return (x: number, y: number, z: number = 0): [number, number] => [
-    x0 + (x - y) * COS_30,
-    y0 + (x + y) * SIN_30 - z,
-  ];
-}
 
-// Canonical isometric node centers and screen coordinates
-export interface CanonicalNodeInfo {
-  id: string;
-  type: "client" | "router" | "resolver" | "server" | "internet";
-  basePos: [number, number];
+export const LAB_VIEWBOX = "0 0 1000 445";
+export type CameraViewBox = [number, number, number, number];
+export const DEFAULT_VIEWBOX: CameraViewBox = [0, 0, 1000, 445];
+
+export type CanonicalSlotId = "client" | "router" | "internet" | "dns" | "web";
+export type SlotDeviceKind = "laptop" | "router" | "cloud" | "server";
+
+export interface SlotGeometry {
+  slotId: CanonicalSlotId;
   center: [number, number];
+  anchor: [number, number];
   defaultName: string;
   defaultIp: string;
+  defaultKind: SlotDeviceKind;
+  defaultRole: string;
 }
 
-export const CANONICAL_NODES: Record<string, CanonicalNodeInfo> = {
+export const CANONICAL_SLOTS: Record<CanonicalSlotId, SlotGeometry> = {
   client: {
-    id: "client",
-    type: "client",
-    basePos: [240, 446],
-    center: [214, 446],
-    defaultName: "Client Browser",
+    slotId: "client",
+    center: [115, 215],
+    anchor: [115, 250],
+    defaultName: "Client",
     defaultIp: "192.168.1.10",
+    defaultKind: "laptop",
+    defaultRole: "Originating client endpoint",
   },
   router: {
-    id: "router",
-    type: "router",
-    basePos: [440, 339],
-    center: [440, 360],
+    slotId: "router",
+    center: [370, 215],
+    anchor: [370, 250],
     defaultName: "Edge Router / NAT",
     defaultIp: "192.168.1.1",
+    defaultKind: "router",
+    defaultRole: "Local gateway performing NAT & L3 forwarding",
   },
   internet: {
-    id: "internet",
-    type: "internet",
-    basePos: [728, 460],
-    center: [732, 458],
-    defaultName: "Internet (Transit)",
-    defaultIp: "AS 64500",
+    slotId: "internet",
+    center: [625, 215],
+    anchor: [625, 250],
+    defaultName: "Internet",
+    defaultIp: "WAN Transit",
+    defaultKind: "cloud",
+    defaultRole: "Autonomous ISP backbone routing packets across WAN",
   },
   dns: {
-    id: "dns",
-    type: "resolver",
-    basePos: [701, 185],
-    center: [701, 180],
+    slotId: "dns",
+    center: [855, 96],
+    anchor: [855, 131],
     defaultName: "DNS Resolver",
     defaultIp: "8.8.8.8",
+    defaultKind: "server",
+    defaultRole: "Resolves domain names into routable IP addresses",
   },
   web: {
-    id: "web",
-    type: "server",
-    basePos: [812, 203],
-    center: [812, 206],
+    slotId: "web",
+    center: [855, 312],
+    anchor: [855, 347],
     defaultName: "Web Server",
     defaultIp: "203.0.113.10",
+    defaultKind: "server",
+    defaultRole: "Destination host serving the application protocol",
   },
 };
 
-// Aliases for scenario node ids
-export const NODE_ALIAS_MAP: Record<string, string> = {
+export interface PhysicalCableSpec {
+  id: string;
+  fromSlot: CanonicalSlotId;
+  toSlot: CanonicalSlotId;
+  coords: [number, number, number, number];
+}
+
+export const PHYSICAL_CABLES: PhysicalCableSpec[] = [
+  {
+    id: "client-router",
+    fromSlot: "client",
+    toSlot: "router",
+    coords: [115, 250, 370, 250],
+  },
+  {
+    id: "router-internet",
+    fromSlot: "router",
+    toSlot: "internet",
+    coords: [370, 250, 625, 250],
+  },
+  {
+    id: "internet-dns",
+    fromSlot: "internet",
+    toSlot: "dns",
+    coords: [625, 250, 855, 131],
+  },
+  {
+    id: "internet-web",
+    fromSlot: "internet",
+    toSlot: "web",
+    coords: [625, 250, 855, 347],
+  },
+];
+
+const ADJACENCY: Record<CanonicalSlotId, CanonicalSlotId[]> = {
+  client: ["router"],
+  router: ["client", "internet"],
+  internet: ["router", "dns", "web"],
+  dns: ["internet"],
+  web: ["internet"],
+};
+
+export interface ResolvedSlotNode {
+  slotId: CanonicalSlotId;
+  nodeId: string;
+  label: string;
+  ip: string;
+  mac?: string;
+  deviceKind: SlotDeviceKind;
+  roleDescription: string;
+  inScenario: boolean;
+}
+
+export interface ResolvedTopology {
+  slots: Record<CanonicalSlotId, ResolvedSlotNode>;
+  aliasToSlot: Record<string, CanonicalSlotId>;
+}
+
+const STATIC_ALIAS_DEFAULTS: Record<string, CanonicalSlotId> = {
   client: "client",
   browser: "client",
   pc: "client",
@@ -86,9 +139,12 @@ export const NODE_ALIAS_MAP: Record<string, string> = {
   internet: "internet",
   cloud: "internet",
   wan: "internet",
+  proxy: "internet",
   dns: "dns",
   resolver: "dns",
   nameserver: "dns",
+  "root-dns": "dns",
+  "auth-dns": "web",
   web: "web",
   server: "web",
   host: "web",
@@ -97,121 +153,194 @@ export const NODE_ALIAS_MAP: Record<string, string> = {
 };
 
 /**
- * Dual-directional isometric highway lane coordinates [x1, y1, x2, y2]
+ * Maps arbitrary scenario node definitions cleanly onto the 5 canonical isometric slots.
+ * Ensures multi-node scenarios (e.g. DNS recursive + root + auth, or HTTP client + proxy + origin)
+ * place every participating node on a distinct physical slot with proper icons and labels.
  */
-export const HIGHWAY_LANES: Record<string, [number, number, number, number]> = {
-  "client>router": [262, 430, 371, 383],
-  "router>client": [376, 355, 268, 403],
-  "router>internet": [508.4, 357.1, 668.4, 434.8],
-  "internet>router": [663.6, 444.6, 503.6, 366.9],
-  "internet>dns": [690, 418, 690, 231],
-  "dns>internet": [712, 229, 712, 404],
-  "internet>web": [776, 418, 776, 254],
-  "web>internet": [797, 264, 797, 438],
-  // Fallbacks for direct wiring if needed
-  "client>dns": [262, 430, 371, 383],
-  "dns>client": [376, 355, 268, 403],
-  "client>web": [262, 430, 371, 383],
-  "web>client": [376, 355, 268, 403],
-  "router>web": [508.4, 357.1, 668.4, 434.8],
-  "web>router": [663.6, 444.6, 503.6, 366.9],
-};
+export function resolveScenarioTopology(nodes: ProtocolNode[]): ResolvedTopology {
+  const slots: Record<CanonicalSlotId, ResolvedSlotNode> = {
+    client: {
+      slotId: "client",
+      nodeId: "client",
+      label: CANONICAL_SLOTS.client.defaultName,
+      ip: CANONICAL_SLOTS.client.defaultIp,
+      deviceKind: "laptop",
+      roleDescription: CANONICAL_SLOTS.client.defaultRole,
+      inScenario: false,
+    },
+    router: {
+      slotId: "router",
+      nodeId: "router",
+      label: CANONICAL_SLOTS.router.defaultName,
+      ip: CANONICAL_SLOTS.router.defaultIp,
+      deviceKind: "router",
+      roleDescription: CANONICAL_SLOTS.router.defaultRole,
+      inScenario: false,
+    },
+    internet: {
+      slotId: "internet",
+      nodeId: "internet",
+      label: CANONICAL_SLOTS.internet.defaultName,
+      ip: CANONICAL_SLOTS.internet.defaultIp,
+      deviceKind: "cloud",
+      roleDescription: CANONICAL_SLOTS.internet.defaultRole,
+      inScenario: false,
+    },
+    dns: {
+      slotId: "dns",
+      nodeId: "dns",
+      label: CANONICAL_SLOTS.dns.defaultName,
+      ip: CANONICAL_SLOTS.dns.defaultIp,
+      deviceKind: "server",
+      roleDescription: CANONICAL_SLOTS.dns.defaultRole,
+      inScenario: false,
+    },
+    web: {
+      slotId: "web",
+      nodeId: "web",
+      label: CANONICAL_SLOTS.web.defaultName,
+      ip: CANONICAL_SLOTS.web.defaultIp,
+      deviceKind: "server",
+      roleDescription: CANONICAL_SLOTS.web.defaultRole,
+      inScenario: false,
+    },
+  };
 
-/**
- * Multi-hop path sequence: maps any source->destination to intermediate physical wire hops
- */
-export const MULTI_HOP_ROUTING: Record<string, string[]> = {
-  "client>web": ["client>router", "router>internet", "internet>web"],
-  "web>client": ["web>internet", "internet>router", "router>client"],
-  "client>dns": ["client>router", "router>internet", "internet>dns"],
-  "dns>client": ["dns>internet", "internet>router", "router>client"],
-  "client>router": ["client>router"],
-  "router>client": ["router>client"],
-  "router>internet": ["router>internet"],
-  "internet>router": ["internet>router"],
-  "internet>dns": ["internet>dns"],
-  "dns>internet": ["dns>internet"],
-  "internet>web": ["internet>web"],
-  "web>internet": ["web>internet"],
-  "router>web": ["router>internet", "internet>web"],
-  "web>router": ["web>internet", "internet>router"],
-  "router>dns": ["router>internet", "internet>dns"],
-  "dns>router": ["dns>internet", "internet>router"],
-};
+  const aliasToSlot: Record<string, CanonicalSlotId> = { ...STATIC_ALIAS_DEFAULTS };
+  const hasRootOrAuthDns = nodes.some((n) => n.id === "root-dns" || n.id === "auth-dns");
 
-/**
- * Resolves a scenario from/to pair into an array of highway lane keys
- */
-export function resolveMultiHopLanes(fromId: string, toId: string): string[] {
-  const normFrom = NODE_ALIAS_MAP[fromId.toLowerCase()] ?? "client";
-  const normTo = NODE_ALIAS_MAP[toId.toLowerCase()] ?? "web";
-  const key = `${normFrom}>${normTo}`;
-  if (MULTI_HOP_ROUTING[key]) {
-    return MULTI_HOP_ROUTING[key];
+  for (const node of nodes) {
+    const idLower = node.id.toLowerCase();
+    let targetSlot: CanonicalSlotId = "web";
+    let deviceKind: SlotDeviceKind = "server";
+    let roleDescription = CANONICAL_SLOTS.web.defaultRole;
+
+    if (idLower === "client" || node.type === "client") {
+      targetSlot = "client";
+      deviceKind = "laptop";
+      roleDescription = "Initiates requests and inspects protocol responses";
+    } else if (idLower === "router" || node.type === "router") {
+      targetSlot = "router";
+      deviceKind = "router";
+      roleDescription = "Forwards LAN packets to upstream transit links";
+    } else if (node.type === "proxy" || idLower === "proxy") {
+      targetSlot = "internet";
+      deviceKind = "cloud";
+      roleDescription = "Edge reverse proxy terminating & forwarding traffic";
+    } else if (hasRootOrAuthDns && idLower === "resolver") {
+      targetSlot = "internet";
+      deviceKind = "server";
+      roleDescription = "Recursive DNS resolver querying root & authoritative nameservers";
+    } else if (idLower === "root-dns" || idLower === "dns" || node.type === "resolver") {
+      targetSlot = "dns";
+      deviceKind = "server";
+      roleDescription =
+        idLower === "root-dns"
+          ? "Root nameserver returning TLD delegation referrals"
+          : "DNS nameserver resolving hostnames to IP records";
+    } else if (idLower === "auth-dns") {
+      targetSlot = "web";
+      deviceKind = "server";
+      roleDescription = "Authoritative nameserver holding final domain DNS records";
+    } else {
+      targetSlot = "web";
+      deviceKind = "server";
+      roleDescription = "Target destination host processing protocol frames";
+    }
+
+    slots[targetSlot] = {
+      slotId: targetSlot,
+      nodeId: node.id,
+      label: node.label,
+      ip: node.ip,
+      mac: node.mac,
+      deviceKind,
+      roleDescription,
+      inScenario: true,
+    };
+    aliasToSlot[idLower] = targetSlot;
   }
-  // Generic fallback if not explicitly in table
-  if (normFrom === normTo) return [];
-  if (HIGHWAY_LANES[key]) return [key];
-  return ["client>router", "router>internet", "internet>web"];
+
+  return { slots, aliasToSlot };
 }
 
-// Math easing functions matching protocolexplorer.org
-export const easeOutBack = (t: number) => 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
-export const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-export const easeInCubic = (t: number) => t * t * t;
-export const easeInOutCubic = (t: number) =>
+export interface HopSegment {
+  key: string;
+  cableId: string;
+  fromSlot: CanonicalSlotId;
+  toSlot: CanonicalSlotId;
+  coords: [number, number, number, number];
+}
+
+function slotToSlotPath(start: CanonicalSlotId, end: CanonicalSlotId): CanonicalSlotId[] {
+  if (start === end) return [start];
+  const queue: CanonicalSlotId[][] = [[start]];
+  const visited = new Set<CanonicalSlotId>([start]);
+
+  while (queue.length > 0) {
+    const path = queue.shift()!;
+    const current = path[path.length - 1];
+    for (const neighbor of ADJACENCY[current]) {
+      if (neighbor === end) {
+        return [...path, neighbor];
+      }
+      if (!visited.has(neighbor)) {
+        visited.add(neighbor);
+        queue.push([...path, neighbor]);
+      }
+    }
+  }
+  return [start, end];
+}
+
+/**
+ * Resolves a scenario step's fromNodeId -> toNodeId into sequential physical cable hops.
+ */
+export function resolveStepHops(
+  fromNodeId: string,
+  toNodeId: string,
+  aliasToSlot: Record<string, CanonicalSlotId> = STATIC_ALIAS_DEFAULTS
+): HopSegment[] {
+  const fromSlot = aliasToSlot[fromNodeId.toLowerCase()] ?? "client";
+  const toSlot = aliasToSlot[toNodeId.toLowerCase()] ?? "web";
+  if (fromSlot === toSlot) return [];
+
+  const path = slotToSlotPath(fromSlot, toSlot);
+  const hops: HopSegment[] = [];
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i];
+    const b = path[i + 1];
+    const cable = PHYSICAL_CABLES.find(
+      (c) => (c.fromSlot === a && c.toSlot === b) || (c.fromSlot === b && c.toSlot === a)
+    );
+    if (!cable) continue;
+
+    const [x1, y1] = CANONICAL_SLOTS[a].anchor;
+    const [x2, y2] = CANONICAL_SLOTS[b].anchor;
+    hops.push({
+      key: `${a}>${b}`,
+      cableId: cable.id,
+      fromSlot: a,
+      toSlot: b,
+      coords: [x1, y1, x2, y2],
+    });
+  }
+
+  return hops;
+}
+
+export const easeInOutCubic = (t: number): number =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-
-export type CameraViewBox = [number, number, number, number]; // [x, y, width, height]
-
-export const DEFAULT_VIEWBOX: CameraViewBox = [45, 66, 810, 490];
-
-/**
- * Calculates the framed viewBox for active communicating nodes matching protocolexplorer.org
- */
-export function calculateTargetViewBox(fromNodeId?: string, toNodeId?: string): CameraViewBox {
-  if (!fromNodeId || !toNodeId) return DEFAULT_VIEWBOX;
-  const normFrom = NODE_ALIAS_MAP[fromNodeId.toLowerCase()] ?? "client";
-  const normTo = NODE_ALIAS_MAP[toNodeId.toLowerCase()] ?? "web";
-
-  // Local LAN: client <-> router
-  if (
-    (normFrom === "client" && normTo === "router") ||
-    (normFrom === "router" && normTo === "client")
-  ) {
-    // Zoom in to client and router
-    return [68, 246, 520, 315];
-  }
-
-  // DNS Lookup: client/router <-> internet <-> dns
-  if (
-    normFrom === "dns" || normTo === "dns" ||
-    normFrom === "resolver" || normTo === "resolver"
-  ) {
-    // Zoom to frame from client to DNS Resolver
-    return [92, 118, 730, 440];
-  }
-
-  // Web Server: client/router <-> internet <-> web
-  if (
-    normFrom === "web" || normTo === "web" ||
-    normFrom === "server" || normTo === "server"
-  ) {
-    // Zoom and pan to frame highway from client to web server
-    return [96, 122, 770, 465];
-  }
-
-  return DEFAULT_VIEWBOX;
-}
 
 export function interpolateLine(
   [x1, y1, x2, y2]: [number, number, number, number],
   t: number
 ): { x: number; y: number } {
-  const clampedT = Math.max(0, Math.min(1, t));
+  const clamped = Math.max(0, Math.min(1, t));
   return {
-    x: x1 + (x2 - x1) * clampedT,
-    y: y1 + (y2 - y1) * clampedT,
+    x: x1 + (x2 - x1) * clamped,
+    y: y1 + (y2 - y1) * clamped,
   };
 }
 

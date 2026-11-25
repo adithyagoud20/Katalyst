@@ -5339,38 +5339,190 @@ html, body { width: 100%; max-width: 100%; overflow-x: clip; }
   .lesson-public-pagination a:last-child { text-align: left; }
 }
 
-/* Protocol & Network Explorer */
-/* Protocol & Network Explorer Immersive Blueprint Studio */
+/* Protocol & Network Explorer (Light & Dark Theme-Matched Tokens) */
+:root,
+.app-shell[data-theme="light"] {
+  --pe-canvas: var(--canvas, #fafafa);
+  --pe-surface: var(--surface-primary, #ffffff);
+  --pe-surface-alt: var(--surface-secondary, #f4f5f7);
+  --pe-surface-inset: var(--surface-tertiary, #f1f5f9);
+  --pe-border: var(--border-subtle, #e4e4e7);
+  --pe-border-strong: #cbd5e1;
+  --pe-text: var(--text-primary, #09090b);
+  --pe-text-secondary: var(--text-secondary, #18181b);
+  --pe-text-muted: #52525b;
+  --pe-accent: var(--accent-primary, #2563eb);
+  --pe-accent-soft: rgb(37 99 235 / 10%);
+  --pe-accent-text: #1d4ed8;
+  --pe-green: #16a34a;
+  --pe-green-soft: rgb(22 163 74 / 12%);
+  --pe-orange: #ea580c;
+  --pe-orange-light: #fb923c;
+  --pe-orange-dark: #c2410c;
+  --pe-orange-soft: rgb(234 88 12 / 11%);
+  --pe-danger: #dc2626;
+  --pe-danger-soft: #fef2f2;
+  --pe-warning: #d97706;
+  --pe-warning-soft: #fffbeb;
+  --pe-grid-dot: #cbd5e1;
+  --pe-cable-idle: #cbd5e1;
+
+  --pe-dev-shadow: rgb(15 23 42 / 11%);
+  --pe-dev-top: #ffffff;
+  --pe-dev-body: #f1f5f9;
+  --pe-dev-side: #cbd5e1;
+  --pe-dev-edge: #334155;
+  --pe-dev-stroke: #475569;
+  --pe-dev-stroke-active: #2563eb;
+  --pe-dev-screen: #0f172a;
+  --pe-dev-paper: #f8fafc;
+  --pe-dev-keys: #e2e8f0;
+  --pe-dev-bay: #1e293b;
+  --pe-dev-led: #16a34a;
+  --pe-dev-accent: #2563eb;
+  --pe-dev-line: #64748b;
+}
+
+:root[data-theme="dark"],
+.app-shell[data-theme="dark"] {
+  --pe-canvas: var(--canvas, #09090b);
+  --pe-surface: var(--surface-primary, #111216);
+  --pe-surface-alt: var(--surface-secondary, #18181d);
+  --pe-surface-inset: #1d1f27;
+  --pe-border: var(--border-subtle, rgb(255 255 255 / 9%));
+  --pe-border-strong: rgb(255 255 255 / 18%);
+  --pe-text: var(--text-primary, #fafafa);
+  --pe-text-secondary: var(--text-secondary, #e4e4e7);
+  --pe-text-muted: #a1a1aa;
+  --pe-accent: var(--accent-primary, #38bdf8);
+  --pe-accent-soft: rgb(56 189 248 / 14%);
+  --pe-accent-text: #38bdf8;
+  --pe-green: #34d399;
+  --pe-green-soft: rgb(52 211 153 / 14%);
+  --pe-orange: #f97316;
+  --pe-orange-light: #fdba74;
+  --pe-orange-dark: #c2410c;
+  --pe-orange-soft: rgb(249 115 22 / 15%);
+  --pe-danger: #f87171;
+  --pe-danger-soft: rgb(239 68 68 / 14%);
+  --pe-warning: #fbbf24;
+  --pe-warning-soft: rgb(245 158 11 / 14%);
+  --pe-grid-dot: rgb(255 255 255 / 14%);
+  --pe-cable-idle: rgb(148 163 184 / 28%);
+
+  --pe-dev-shadow: rgb(0 0 0 / 45%);
+  --pe-dev-top: #272b36;
+  --pe-dev-body: #1a1d26;
+  --pe-dev-side: #11131a;
+  --pe-dev-edge: #475569;
+  --pe-dev-stroke: #64748b;
+  --pe-dev-stroke-active: #38bdf8;
+  --pe-dev-screen: #090b10;
+  --pe-dev-paper: #181d29;
+  --pe-dev-keys: #262b38;
+  --pe-dev-bay: #0c0e14;
+  --pe-dev-led: #34d399;
+  --pe-dev-accent: #38bdf8;
+  --pe-dev-line: #64748b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"],
+  .app-shell[data-theme="system"] {
+    --pe-canvas: var(--canvas, #09090b);
+    --pe-surface: var(--surface-primary, #111216);
+    --pe-surface-alt: var(--surface-secondary, #18181d);
+    --pe-surface-inset: #1d1f27;
+    --pe-border: var(--border-subtle, rgb(255 255 255 / 9%));
+    --pe-border-strong: rgb(255 255 255 / 18%);
+    --pe-text: var(--text-primary, #fafafa);
+    --pe-text-secondary: var(--text-secondary, #e4e4e7);
+    --pe-text-muted: #a1a1aa;
+    --pe-accent: var(--accent-primary, #38bdf8);
+    --pe-accent-soft: rgb(56 189 248 / 14%);
+    --pe-accent-text: #38bdf8;
+    --pe-green: #34d399;
+    --pe-green-soft: rgb(52 211 153 / 14%);
+    --pe-orange: #f97316;
+    --pe-orange-light: #fdba74;
+    --pe-orange-dark: #c2410c;
+    --pe-orange-soft: rgb(249 115 22 / 15%);
+    --pe-danger: #f87171;
+    --pe-danger-soft: rgb(239 68 68 / 14%);
+    --pe-warning: #fbbf24;
+    --pe-warning-soft: rgb(245 158 11 / 14%);
+    --pe-grid-dot: rgb(255 255 255 / 14%);
+    --pe-cable-idle: rgb(148 163 184 / 28%);
+
+    --pe-dev-shadow: rgb(0 0 0 / 45%);
+    --pe-dev-top: #272b36;
+    --pe-dev-body: #1a1d26;
+    --pe-dev-side: #11131a;
+    --pe-dev-edge: #475569;
+    --pe-dev-stroke: #64748b;
+    --pe-dev-stroke-active: #38bdf8;
+    --pe-dev-screen: #090b10;
+    --pe-dev-paper: #181d29;
+    --pe-dev-keys: #262b38;
+    --pe-dev-bay: #0c0e14;
+    --pe-dev-led: #34d399;
+    --pe-dev-accent: #38bdf8;
+    --pe-dev-line: #64748b;
+  }
+}
+
+/* Protocol Badge Tokens (Readable in both Light & Dark Mode) */
+.pe-badge-orange { background: var(--pe-orange-soft); color: var(--pe-orange); border-color: color-mix(in srgb, var(--pe-orange) 40%, transparent); }
+.pe-badge-green { background: var(--pe-green-soft); color: var(--pe-green); border-color: color-mix(in srgb, var(--pe-green) 40%, transparent); }
+.pe-badge-cyan { background: rgb(8 145 178 / 14%); color: #0e7490; border-color: rgb(8 145 178 / 35%); }
+.pe-badge-blue { background: var(--pe-accent-soft); color: var(--pe-accent-text); border-color: color-mix(in srgb, var(--pe-accent) 40%, transparent); }
+.pe-badge-purple { background: rgb(124 58 237 / 12%); color: #6d28d9; border-color: rgb(124 58 237 / 32%); }
+.pe-badge-pink { background: rgb(219 39 119 / 12%); color: #be185d; border-color: rgb(219 39 119 / 32%); }
+.pe-badge-red { background: var(--pe-danger-soft); color: var(--pe-danger); border-color: color-mix(in srgb, var(--pe-danger) 40%, transparent); }
+.pe-badge-neutral { background: var(--pe-surface-alt); color: var(--pe-text-secondary); border-color: var(--pe-border); }
+
+:root[data-theme="dark"] .pe-badge-cyan,
+.app-shell[data-theme="dark"] .pe-badge-cyan { color: #22d3ee; }
+:root[data-theme="dark"] .pe-badge-purple,
+.app-shell[data-theme="dark"] .pe-badge-purple { color: #c4b5fd; }
+:root[data-theme="dark"] .pe-badge-pink,
+.app-shell[data-theme="dark"] .pe-badge-pink { color: #f472b6; }
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="system"] .pe-badge-cyan,
+  .app-shell[data-theme="system"] .pe-badge-cyan { color: #22d3ee; }
+  :root[data-theme="system"] .pe-badge-purple,
+  .app-shell[data-theme="system"] .pe-badge-purple { color: #c4b5fd; }
+  :root[data-theme="system"] .pe-badge-pink,
+  .app-shell[data-theme="system"] .pe-badge-pink { color: #f472b6; }
+}
+
 .main-panel[data-view="protocols"] {
-  background: #080c14;
-  color: #f1f5f9;
+  background: var(--pe-canvas);
+  color: var(--pe-text);
 }
 .main-panel[data-view="protocols"] > .topbar {
-  background: #090e1a;
-  border-bottom: 1px solid #1a253c;
-  color: #f1f5f9;
+  background: var(--surface-glass);
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
 }
 .main-panel[data-view="protocols"] > .topbar .breadcrumbs {
-  color: #94a3b8;
+  color: var(--text-muted);
 }
 .main-panel[data-view="protocols"] > .topbar .breadcrumbs strong {
-  color: #38bdf8;
+  color: var(--accent-text);
 }
 .learning-view.learning-protocols {
   display: flex;
   flex-direction: column;
+  flex: 1 1 0%;
+  min-height: 0;
   padding: 0 !important;
   max-width: 100% !important;
   width: 100% !important;
-  background: #080c14 !important;
-  min-height: calc(100vh - 64px);
-  color: #f8fafc !important;
-}
-.learning-view.learning-protocols h1,
-.learning-view.learning-protocols h2,
-.learning-view.learning-protocols h3,
-.learning-view.learning-protocols h4 {
-  color: #f8fafc !important;
+  overflow-y: auto;
+  overflow-x: clip;
+  background: var(--pe-canvas);
+  color: var(--pe-text);
 }
 .learning-view.learning-protocols > * {
   width: 100% !important;
@@ -5378,24 +5530,142 @@ html, body { width: 100%; max-width: 100%; overflow-x: clip; }
   margin: 0 !important;
 }
 .learning-protocols-host {
-  background: #080c14;
-  color: #f1f5f9;
+  background: var(--pe-canvas);
+  color: var(--pe-text);
   width: 100%;
-}
-
-.protocol-topology-canvas {
-  background: radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.4) 0%, rgba(15, 23, 42, 0.8) 100%);
+  min-width: 0;
 }
 .protocol-topology-canvas svg {
   shape-rendering: geometricPrecision;
   text-rendering: geometricPrecision;
 }
+
+/* Protocol Explorer Animations (matching a2aprotocol.ai/tools/protocol-explorer engine) */
+@keyframes pe-lane-flow {
+  to {
+    stroke-dashoffset: -11;
+  }
+}
+
+@keyframes pe-caret {
+  0%, 49% {
+    opacity: 1;
+  }
+  50%, 100% {
+    opacity: 0;
+  }
+}
+
+@keyframes pe-url-in {
+  from {
+    opacity: 0;
+    transform: scale(0.84) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes pe-check-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pe-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pe-seg-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes pe-dot-pop {
+  0%, 100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.35);
+  }
+}
+
+.pe-lane {
+  transition: stroke 0.35s cubic-bezier(0.16, 1, 0.3, 1), stroke-width 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s;
+}
+
+.pe-lane.is-active {
+  stroke-dasharray: 6 5;
+  animation: pe-lane-flow 0.55s linear infinite;
+}
+
+.pe-node {
+  transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pe-url-bar {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: pe-url-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pe-url-caret {
+  animation: pe-caret 0.9s steps(1) infinite;
+}
+
+.pe-check-path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: pe-check-draw 0.38s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pe-step-in {
+  animation: pe-step-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pe-seg-active {
+  transform-origin: left center;
+  animation: pe-seg-fill 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pe-dot-pop {
+  animation: pe-dot-pop 0.55s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pe-lane.is-active,
+  .pe-url-bar,
+  .pe-url-caret,
+  .pe-check-path,
+  .pe-step-in,
+  .pe-seg-active,
+  .pe-dot-pop {
+    animation: none !important;
+  }
+  .pe-lane,
+  .pe-node {
+    transition: none !important;
+  }
+}
+
 @media (max-width: 767px) {
   .protocol-explorer-root .protocol-playback-bar button {
     min-height: 44px;
     min-width: 44px;
-  }
-  .protocol-explorer-root .protocol-sequence-container {
-    max-height: 380px;
   }
 }

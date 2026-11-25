@@ -245,6 +245,8 @@ export function CircuitSimulator({
                   ? "Interactive Circuit & Hardware Simulator — Nyquist Sampling & FFT"
                   : initialMode === "dsa"
                   ? "Interactive Circuit & Hardware Simulator — Data Structures & Algorithms"
+                  : initialMode === "protocol"
+                  ? "Protocol & Network Explorer — Packet & Wire-Format Lab"
                   : "Interactive Circuit & Hardware Simulator — Digital Logic Gates"
                 : "Interactive Circuit & Hardware Simulator"}
             </h3>
@@ -271,8 +273,10 @@ export function CircuitSimulator({
                 ? "Explore continuous-to-discrete conversion, aliasing distortion, Nyquist criterion (fs ≥ 2 fin), and real-time DFT frequency spectrum."
                 : initialMode === "dsa"
                 ? "Step through contiguous arrays, linked pointer chains, binary search trees, and in-place sorting routines."
+                : initialMode === "protocol"
+                ? "Step through network topology hops, sequence timelines, wire-format packet trees, and interactive hex bytes."
                 : "Explore digital logic gates, interactive truth tables, and Boolean output states."
-              : "Explore digital logic gates, K-maps, FSMs, 8-bit CPU architecture, analog circuits, PID loops, FFT sampling, DSA, and virtual Arduino / ESP32 breadboard hardware."}
+              : "Explore digital logic gates, K-maps, FSMs, 8-bit CPU architecture, analog circuits, PID loops, FFT sampling, DSA, protocols, and virtual Arduino / ESP32 breadboard hardware."}
           </p>
         </div>
 
@@ -337,6 +341,11 @@ export function CircuitSimulator({
             {initialMode === "dsa" && (
               <span className="rounded px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white flex items-center gap-1">
                 DSA Lab
+              </span>
+            )}
+            {initialMode === "protocol" && (
+              <span className="rounded px-2.5 py-1 text-xs font-semibold bg-blue-600 text-white flex items-center gap-1">
+                Protocol Lab
               </span>
             )}
           </div>

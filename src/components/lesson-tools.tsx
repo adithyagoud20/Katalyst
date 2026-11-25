@@ -32,6 +32,10 @@ const ImageLabVisualizer = dynamic(() => import("@/components/simulators/image-l
   ssr: false,
   loading: () => <div className="lab-component-loading" aria-busy="true">Loading image lab…</div>,
 });
+const ProtocolExplorer = dynamic(() => import("@/components/simulators/protocol-explorer").then((module) => module.ProtocolExplorer), {
+  ssr: false,
+  loading: () => <div className="lab-component-loading" aria-busy="true">Loading protocol explorer…</div>,
+});
 
 export type LessonToolsProps = {
   courseId: string;
@@ -190,7 +194,8 @@ export function LessonTools(props: LessonToolsProps) {
           } />
             : props.interactiveDemo.kind === "memory-diagram" ? <MemoryVisualizer initialScenario={props.interactiveDemo.config?.mode === "heap" ? "heap-lifecycle" : props.interactiveDemo.config?.mode === "pointers" ? "pointers" : "stack-frames"} />
               : props.interactiveDemo.kind === "image-lab" ? <ImageLabVisualizer initialFilter={typeof props.interactiveDemo.config?.filter === "string" ? props.interactiveDemo.config.filter : "none"} />
-                : <div className="demo-stage-card">This lesson includes a {props.interactiveDemo.kind} demonstration.</div>}
+                : props.interactiveDemo.kind === "protocol-explorer" ? <ProtocolExplorer initialScenarioId={typeof props.interactiveDemo.config?.scenarioId === "string" ? props.interactiveDemo.config.scenarioId : "tcp-handshake"} />
+                  : <div className="demo-stage-card">This lesson includes a {props.interactiveDemo.kind} demonstration.</div>}
         </div>
       )}
       {!hasCode && !hasDemo && <p>This lesson is ready to explore. Open the lesson workspace to continue your practice.</p>}

@@ -7,7 +7,6 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
-  Gauge,
 } from "lucide-react";
 import type { PlaybackSpeed } from "@/lib/protocols/state-machine";
 
@@ -38,18 +37,27 @@ export function PlaybackControls({
   onSetSpeed,
   onReset,
 }: PlaybackControlsProps) {
-  // Global keyboard shortcuts (Space to toggle play, Left/Right arrows to step)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
       if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        (e.target as HTMLElement)?.isContentEditable
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        target?.isContentEditable
       ) {
         return;
       }
 
       if (e.code === "Space") {
+        // Allow Space to activate focused buttons/links natively
+        if (
+          target instanceof HTMLButtonElement ||
+          target instanceof HTMLAnchorElement ||
+          target?.getAttribute("role") === "button"
+        ) {
+          return;
+        }
         e.preventDefault();
         if (isPlaying) onPause();
         else onPlay();
@@ -67,101 +75,96 @@ export function PlaybackControls({
   }, [isPlaying, onPause, onPlay, onStepNext, onStepPrev]);
 
   return (
-    <div className="protocol-playback-bar flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] shadow-sm">
-      {/* Step Sequence Indicator (Clickable Step Pills — No Range Slider) */}
-      <div className="flex items-center gap-2 overflow-x-auto py-0.5">
-        <span className="text-xs font-semibold text-[var(--text-secondary)] whitespace-nowrap">
-          Timeline:
-        </span>
-        <div className="flex items-center gap-1.5">
-          {Array.from({ length: totalSteps }).map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => onGoToStep(i)}
-              className={`flex items-center justify-center transition-all ${
-                i === currentStepIndex
-                  ? "min-w-[28px] h-7 px-2 rounded-lg bg-blue-600 text-white text-xs font-mono font-bold shadow-sm ring-2 ring-blue-400/40"
-                  : i < currentStepIndex
-                  ? "w-7 h-7 rounded-lg bg-blue-500/15 text-blue-500 hover:bg-blue-500/25 text-xs font-mono font-medium border border-blue-500/30"
-                  : "w-7 h-7 rounded-lg bg-[var(--surface-secondary)] text-[var(--text-muted)] hover:bg-[var(--surface-tertiary)] hover:text-[var(--text-primary)] text-xs font-mono border border-[var(--border-subtle)]"
-              }`}
-              title={`Jump to Step ${i + 1}`}
-              aria-label={`Jump to Step ${i + 1}`}
-            >
-              {i + 1}
-            </button>
-          ))}
-        </div>
-        <span className="text-xs font-mono text-[var(--text-muted)] ml-1 whitespace-nowrap">
-          (Step {currentStepIndex + 1} of {totalSteps})
-        </span>
-      </div>
+    <div className="protocol-playback-bar flex flex-wrap items-center gap-3 px-3.5 py-2.5 rounded-xl border border-[var(--pe-border)] bg-[var(--pe-surface)] shadow-xs">
+      {/* Left: Play/Pause circle + Prev/Next */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <button
+          type="button"
+          onClick={isPlaying ? onPause : onPlay}
+          className="w-10 h-10 sm:w-9 sm:h-9 rounded-full flex items-center justify-center bg-[var(--pe-green)] text-white hover:opacity-90 shadow-xs transition-opacity cursor-pointer"
+          title={isPlaying ? "Pause animation (Space)" : "Play animation (Space)"}
+          aria-label={isPlaying ? "Pause animation" : "Play animation"}
+        >
+          {isPlaying ? <Pause size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" className="ml-0.5" />}
+        </button>
 
-      {/* Animation Controls (Play/Pause, Prev, Step, Reset, Speed) */}
-      <div className="flex items-center gap-2 ml-auto">
-        {/* Speed Selector */}
-        <div className="flex items-center gap-1 bg-[var(--surface-secondary)] p-1 rounded-lg border border-[var(--border-subtle)]">
-          <Gauge size={13} className="text-[var(--text-muted)] ml-1 hidden sm:block" />
-          {([0.5, 1, 2] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => onSetSpeed(s)}
-              className={`px-2 py-0.5 rounded text-xs font-mono transition-colors ${
-                speed === s
-                  ? "bg-blue-600 text-white font-bold shadow-sm"
-                  : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-              }`}
-              title={`Playback speed: ${s}x`}
-              aria-label={`Speed ${s}x`}
-            >
-              {s}x
-            </button>
-          ))}
-        </div>
-
-        {/* Step Backward */}
         <button
           type="button"
           onClick={onStepPrev}
-          disabled={currentStepIndex === 0}
-          className="flex items-center justify-center min-w-[36px] min-h-[36px] sm:min-w-[32px] sm:min-h-[32px] rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          disabled={currentStepIndex <= 0}
+          className="w-9 h-9 rounded-lg flex items-center justify-center border border-[var(--pe-border)] bg-[var(--pe-surface-alt)] text-[var(--pe-text-secondary)] hover:text-[var(--pe-text)] hover:border-[var(--pe-border-strong)] disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
           title="Step backward (Left Arrow)"
           aria-label="Step backward"
         >
           <ChevronLeft size={16} />
         </button>
 
-        {/* Play / Pause Button */}
-        <button
-          type="button"
-          onClick={isPlaying ? onPause : onPlay}
-          className="flex items-center justify-center min-h-[36px] sm:min-h-[32px] px-3.5 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-500 shadow-sm transition-colors gap-1.5 text-xs"
-          title={isPlaying ? "Pause animation (Space)" : "Play animation (Space)"}
-          aria-label={isPlaying ? "Pause animation" : "Play animation"}
-        >
-          {isPlaying ? <Pause size={14} /> : <Play size={14} />}
-          <span>{isPlaying ? "Pause" : "Play"}</span>
-        </button>
-
-        {/* Step Forward */}
         <button
           type="button"
           onClick={onStepNext}
           disabled={currentStepIndex >= totalSteps - 1}
-          className="flex items-center justify-center min-w-[36px] min-h-[36px] sm:min-w-[32px] sm:min-h-[32px] rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-subtle)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          className="w-9 h-9 rounded-lg flex items-center justify-center border border-[var(--pe-border)] bg-[var(--pe-surface-alt)] text-[var(--pe-text-secondary)] hover:text-[var(--pe-text)] hover:border-[var(--pe-border-strong)] disabled:opacity-35 disabled:cursor-not-allowed transition-colors"
           title="Step forward (Right Arrow)"
           aria-label="Step forward"
         >
           <ChevronRight size={16} />
         </button>
+      </div>
 
-        {/* Reset Playback */}
+      {/* Center: ProtocolExplorer Segmented Step Progress Bar */}
+      <div
+        className="order-last sm:order-none basis-full sm:basis-0 sm:flex-1 min-w-0 flex items-center gap-1.5"
+        role="group"
+        aria-label="Step timeline"
+      >
+        {Array.from({ length: totalSteps }).map((_, i) => {
+          const isCurrent = i === currentStepIndex;
+          const isCompleted = i < currentStepIndex;
+
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onGoToStep(i)}
+              className="group flex-1 py-2.5 flex items-center cursor-pointer"
+              title={`Jump to Step ${i + 1}`}
+              aria-label={`Jump to Step ${i + 1}`}
+              aria-current={isCurrent ? "step" : undefined}
+            >
+              <span className="relative block w-full h-1.5 rounded-full overflow-hidden bg-[var(--pe-border-strong)] group-hover:bg-[var(--pe-text-muted)] transition-colors">
+                {isCurrent && (
+                  <span
+                    key={`seg-cur-${currentStepIndex}`}
+                    className="pe-seg-active block w-full h-full rounded-full bg-[var(--pe-orange)]"
+                  />
+                )}
+                {isCompleted && (
+                  <span className="block w-full h-full rounded-full bg-[var(--pe-green)]" />
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Right: Speed Selector & Reset */}
+      <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+        <select
+          value={speed}
+          onChange={(e) => onSetSpeed(parseFloat(e.target.value) as PlaybackSpeed)}
+          className="h-9 rounded-lg border border-[var(--pe-border)] bg-[var(--pe-surface-alt)] px-2 text-xs font-mono font-semibold text-[var(--pe-text)] focus:outline-none cursor-pointer"
+          aria-label="Playback speed"
+        >
+          <option value={0.5}>0.5×</option>
+          <option value={1}>1×</option>
+          <option value={1.5}>1.5×</option>
+          <option value={2}>2×</option>
+        </select>
+
         <button
           type="button"
           onClick={onReset}
-          className="flex items-center justify-center min-w-[36px] min-h-[36px] sm:min-w-[32px] sm:min-h-[32px] rounded-lg bg-[var(--surface-secondary)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-tertiary)] border border-[var(--border-subtle)] transition-colors"
+          className="w-9 h-9 rounded-lg flex items-center justify-center border border-[var(--pe-border)] bg-[var(--pe-surface-alt)] text-[var(--pe-text-secondary)] hover:text-[var(--pe-text)] hover:border-[var(--pe-border-strong)] transition-colors"
           title="Reset playback to step 1"
           aria-label="Reset playback"
         >

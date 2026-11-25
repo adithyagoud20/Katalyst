@@ -1969,7 +1969,7 @@ export function Workspace({ initialView, initialLessonId }: { initialView?: AppV
           <button className="icon-button mobile-menu" aria-label="Open navigation" aria-expanded={mobileNav} aria-controls="sidebar-nav" onClick={() => setMobileNav(true)}><Menu size={20} /></button>
           <div className="breadcrumbs"><Link className="breadcrumb-root" role="button" href="/" onClick={() => { setView("home"); setMobileNav(false); }}>KATALYST</Link>{view === "workspace" && <><span className="crumb-sep">/</span><span>{activeProject?.name ?? "Workspace"}</span></>}<span className="crumb-sep">/</span><strong>{view === "workspace" ? (activeChat?.title ?? "New conversation") : view === "skills" ? "Skill library" : view === "settings" ? "Settings" : view === "home" ? "Learning Home" : view === "paths" ? "Learning Paths" : view === "my-learning" ? "My Learning" : view === "playground" ? "Playground" : view === "protocols" ? "Protocol Explorer" : view === "practice" ? "Practice Lab" : view === "progress" ? "Progress" : view === "tutor" ? "AI Tutor" : "Lesson"}</strong></div>
           <div className="topbar-actions">
-            {view === "home" && <button
+            {(view === "home" || view === "protocols") && <button
               type="button"
               className="theme-quick-toggle"
               aria-label={preferences.theme === "system" ? "Toggle light and dark mode" : `Switch to ${preferences.theme === "dark" ? "light" : "dark"} mode`}

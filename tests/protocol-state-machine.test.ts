@@ -4,6 +4,7 @@ import {
   simulationReducer,
 } from "@/lib/protocols/state-machine";
 import { tcpHandshakeScenario } from "@/data/protocols/tcp-handshake";
+import { httpsExchangeScenario } from "@/data/protocols/https-exchange";
 
 describe("Protocol Simulation State Machine", () => {
   it("initializes state at step 0 in paused mode", () => {
@@ -53,13 +54,33 @@ describe("Protocol Simulation State Machine", () => {
     expect(state.currentStepIndex).toBe(tcpHandshakeScenario.steps.length - 1);
   });
 
-  it("adjusts playback speed multiplier", () => {
+  it("adjusts playback speed multiplier including 1.5x", () => {
     let state = createInitialSimulationState(tcpHandshakeScenario);
+    state = simulationReducer(state, { type: "SET_SPEED", speed: 1.5 });
+    expect(state.speed).toBe(1.5);
+
     state = simulationReducer(state, { type: "SET_SPEED", speed: 2 });
     expect(state.speed).toBe(2);
 
     state = simulationReducer(state, { type: "SET_SPEED", speed: 0.5 });
     expect(state.speed).toBe(0.5);
+  });
+
+  it("tracks selected and hovered byte ranges with optional layerName", () => {
+    let state = createInitialSimulationState(tcpHandshakeScenario);
+    state = simulationReducer(state, {
+      type: "SELECT_FIELD_RANGE",
+      range: [20, 24],
+      layerName: "TCP",
+    });
+    expect(state.selectedFieldRange).toEqual([20, 24]);
+    expect(state.selectedLayerName).toBe("TCP");
+
+    state = simulationReducer(state, {
+      type: "HOVER_FIELD_RANGE",
+      range: [0, 4],
+    });
+    expect(state.hoveredFieldRange).toEqual([0, 4]);
   });
 
   it("toggles chaos mode and branches steps", () => {
@@ -76,6 +97,20 @@ describe("Protocol Simulation State Machine", () => {
     state = simulationReducer(state, { type: "TOGGLE_CHAOS", chaosId: "drop-syn" });
     expect(state.activeChaosId).toBeNull();
     expect(state.activeSteps).toEqual(tcpHandshakeScenario.steps);
+  });
+
+  it("switches scenarios cleanly via SET_SCENARIO and resets active state", () => {
+    let state = createInitialSimulationState(tcpHandshakeScenario);
+    state = simulationReducer(state, { type: "GO_TO_STEP", stepIndex: 2 });
+    state = simulationReducer(state, { type: "TOGGLE_CHAOS", chaosId: "drop-syn" });
+    state = simulationReducer(state, { type: "SELECT_FIELD_RANGE", range: [2, 6], layerName: "TCP" });
+
+    state = simulationReducer(state, { type: "SET_SCENARIO", scenario: httpsExchangeScenario });
+    expect(state.scenario.id).toBe("https-exchange");
+    expect(state.currentStepIndex).toBe(0);
+    expect(state.activeChaosId).toBeNull();
+    expect(state.selectedFieldRange).toBeNull();
+    expect(state.activeSteps).toEqual(httpsExchangeScenario.steps);
   });
 
   it("resets state to initial values", () => {

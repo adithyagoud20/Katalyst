@@ -1,0 +1,213 @@
+import type { ProtocolScenario } from "@/lib/protocols/schema";
+
+export const icmpPingScenario: ProtocolScenario = {
+  id: "icmp-ping",
+  title: "ICMP Echo Request & Reply (Ping Diagnostics)",
+  category: "transport",
+  summary: "Inspect Layer 3 Internet Control Message Protocol diagnostics: Echo Request (Type 8), Echo Reply (Type 0), Sequence tracking, and TTL expiration.",
+  osiLayer: 3,
+  overviewDescription: "ICMP operates directly inside IPv4 (Protocol 1) with no TCP or UDP ports. Tools like ping send Type 8 Echo Requests and measure round-trip time from Type 0 Echo Replies, while traceroute relies on Type 11 Time Exceeded errors.",
+  defaultPort: "N/A (Layer 3 Protocol 1)",
+  transportType: "IP (Protocol 1)",
+  dataFormat: "Binary (ICMP Type/Code + Payload)",
+  commonMethods: "Echo Request (8), Echo Reply (0), Time Exceeded (11)",
+  rfc: "RFC 792",
+  nodes: [
+    {
+      id: "client",
+      label: "Workstation",
+      type: "client",
+      ip: "192.168.1.105",
+      mac: "00:1a:2b:3c:4d:5e",
+      xPercent: 15,
+      yPercent: 50,
+    },
+    {
+      id: "router",
+      label: "Edge Router / NAT",
+      type: "router",
+      ip: "192.168.1.1",
+      mac: "52:54:00:12:34:56",
+      xPercent: 48,
+      yPercent: 50,
+    },
+    {
+      id: "server",
+      label: "Target Host (katalyst.dev)",
+      type: "server",
+      ip: "76.76.21.21",
+      mac: "00:50:56:fe:dc:ba",
+      xPercent: 85,
+      yPercent: 50,
+    },
+  ],
+  wires: [
+    { id: "wire-c-r", fromNodeId: "client", toNodeId: "router", label: "Hop 1 (TTL-1)" },
+    { id: "wire-r-s", fromNodeId: "router", toNodeId: "server", label: "WAN IP" },
+  ],
+  steps: [
+    {
+      stepIndex: 0,
+      timeMs: 0,
+      fromNodeId: "client",
+      toNodeId: "server",
+      protocolName: "ICMP",
+      arrowLabel: "Echo (ping) Request [id=0x0400, seq=1, ttl=64]",
+      summary: "Workstation transmits ICMP Type 8 (Echo Request) encapsulated directly in IPv4 (Protocol=1) with Sequence 1 and TTL=64.",
+      status: "normal",
+      rawHex: "005056fedcba001a2b3c4d5e08004500002c1a2b400040018505c0a801694c4c151508004d5a040000016162636465666768696a6b6c6d6e6f70",
+      layers: [
+        {
+          name: "Internet Protocol Version 4",
+          layer: "network",
+          fields: [
+            { name: "Time to Live (TTL)", value: "64", byteRange: [22, 23], description: "Decremented by 1 at every L3 router hop" },
+            { name: "Protocol", value: "1 (ICMP)", byteRange: [23, 24], description: "Indicates ICMP payload without UDP/TCP ports" },
+            { name: "Source IP", value: "192.168.1.105", byteRange: [26, 30], description: "Originating workstation IP" },
+            { name: "Destination IP", value: "76.76.21.21", byteRange: [30, 34], description: "Target host IP" },
+          ],
+        },
+        {
+          name: "Internet Control Message Protocol",
+          layer: "network",
+          fields: [
+            { name: "Type", value: "8 (Echo Request)", byteRange: [34, 35], description: "Ping request message type" },
+            { name: "Code", value: "0", byteRange: [35, 36], description: "Standard Echo code" },
+            { name: "Checksum", value: "0x4d5a", byteRange: [36, 38], description: "16-bit ones-complement ICMP checksum" },
+            { name: "Identifier", value: "0x0400", byteRange: [38, 40], description: "Matches ping process replies" },
+            { name: "Sequence Number", value: "1", byteRange: [40, 42], description: "Tracks per-packet RTT and packet loss" },
+            { name: "Echo Data", value: "abcdefghijklmnop", byteRange: [42, 58], description: "Payload echoed back verbatim by target" },
+          ],
+        },
+      ],
+    },
+    {
+      stepIndex: 1,
+      timeMs: 18,
+      fromNodeId: "server",
+      toNodeId: "client",
+      protocolName: "ICMP",
+      arrowLabel: "Echo (ping) Reply [id=0x0400, seq=1, rtt=18ms]",
+      summary: "Target host receives Echo Request and responds with ICMP Type 0 (Echo Reply), matching Identifier 0x0400 and Sequence 1.",
+      status: "normal",
+      rawHex: "001a2b3c4d5e005056fedcba08004500002c2b3c400039017b164c4c1515c0a801690000555a040000016162636465666768696a6b6c6d6e6f70",
+      layers: [
+        {
+          name: "Internet Control Message Protocol (Reply)",
+          layer: "network",
+          fields: [
+            { name: "Type", value: "0 (Echo Reply)", byteRange: [34, 35], description: "Ping response message type" },
+            { name: "Identifier", value: "0x0400", byteRange: [38, 40], description: "Correlates reply with client ping session" },
+            { name: "Sequence Number", value: "1", byteRange: [40, 42], description: "Measured RTT = 18 ms" },
+          ],
+        },
+      ],
+    },
+    {
+      stepIndex: 2,
+      timeMs: 1000,
+      fromNodeId: "client",
+      toNodeId: "server",
+      protocolName: "ICMP",
+      arrowLabel: "Echo (ping) Request [id=0x0400, seq=2]",
+      summary: "One second later, ping transmits Echo Request Sequence 2 to sample ongoing link stability and jitter.",
+      status: "normal",
+      rawHex: "005056fedcba001a2b3c4d5e08004500002c1a2c400040018504c0a801694c4c151508004d59040000026162636465666768696a6b6c6d6e6f70",
+      layers: [
+        {
+          name: "Internet Control Message Protocol",
+          layer: "network",
+          fields: [
+            { name: "Type", value: "8 (Echo Request)", byteRange: [34, 35], description: "Second ping probe" },
+            { name: "Sequence Number", value: "2", byteRange: [40, 42], description: "Incremented sequence counter" },
+          ],
+        },
+      ],
+    },
+    {
+      stepIndex: 3,
+      timeMs: 1017,
+      fromNodeId: "server",
+      toNodeId: "client",
+      protocolName: "ICMP",
+      arrowLabel: "Echo (ping) Reply [id=0x0400, seq=2, rtt=17ms]",
+      summary: "Server returns Echo Reply Sequence 2 (RTT=17ms), confirming bidirectional L3 IP reachability with 0% loss.",
+      status: "normal",
+      rawHex: "001a2b3c4d5e005056fedcba08004500002c2b3d400039017b154c4c1515c0a8016900005559040000026162636465666768696a6b6c6d6e6f70",
+      layers: [
+        {
+          name: "Internet Control Message Protocol (Reply)",
+          layer: "network",
+          fields: [
+            { name: "Type", value: "0 (Echo Reply)", byteRange: [34, 35], description: "Second ping reply" },
+            { name: "Sequence Number", value: "2", byteRange: [40, 42], description: "Measured RTT = 17 ms" },
+          ],
+        },
+      ],
+    },
+  ],
+  chaosVariants: [
+    {
+      id: "ttl-expired",
+      name: "TTL=1 Expired in Transit (Traceroute Probe)",
+      description: "Send probe with TTL=1. The edge router decrements TTL to 0, drops the packet, and emits ICMP Type 11 (Time Exceeded).",
+      triggerStepIndex: 0,
+      action: "drop_packet",
+      alternateSteps: [
+        {
+          stepIndex: 0,
+          timeMs: 0,
+          fromNodeId: "client",
+          toNodeId: "router",
+          protocolName: "ICMP",
+          arrowLabel: "Echo Request [TTL=1] (Dropped at Router)",
+          summary: "Workstation sends probe with TTL=1 (the exact mechanism used by traceroute to discover hop #1).",
+          status: "dropped",
+          rawHex: "005056fedcba001a2b3c4d5e08004500002c1a2b40000101c405c0a801694c4c151508004d5a040000016162636465666768696a6b6c6d6e6f70",
+          layers: [
+            {
+              name: "Internet Protocol Version 4",
+              layer: "network",
+              fields: [
+                { name: "Time to Live (TTL)", value: "1 (Will expire at next hop)", byteRange: [22, 23], description: "Prevents routing loops from circulating forever" },
+              ],
+            },
+          ],
+        },
+        {
+          stepIndex: 1,
+          timeMs: 4,
+          fromNodeId: "router",
+          toNodeId: "client",
+          protocolName: "ICMP",
+          arrowLabel: "ICMP Type 11 [Time-to-Live Exceeded]",
+          summary: "Edge Router drops the expired probe and returns ICMP Type 11 Code 0, revealing its IP 192.168.1.1 to traceroute.",
+          status: "retransmission",
+          rawHex: "001a2b3c4d5e52540012345608004500002c2b3c40004001a8a4c0a80101c0a801690b00f4ff000000004500002c1a2b40000101c405c0a80169",
+          layers: [
+            {
+              name: "ICMP Time Exceeded (Type 11)",
+              layer: "network",
+              fields: [
+                { name: "Type", value: "11 (Time Exceeded)", byteRange: [34, 35], description: "TTL reached 0 in transit" },
+                { name: "Code", value: "0 (TTL expired in transit)", byteRange: [35, 36], description: "Router hop revealed to sender" },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  examChallenge: {
+    id: "icmp-ping-order",
+    title: "Sequence Two ICMP Ping Cycles",
+    prompt: "Arrange the two consecutive ping request/reply cycles in chronological order.",
+    shuffledStepIds: [2, 0, 3, 1],
+    correctSequence: [0, 1, 2, 3],
+    hints: [
+      "Sequence 1 request and reply complete before Sequence 2 begins.",
+      "Type 8 (Request) always precedes Type 0 (Reply) for the same sequence number.",
+    ],
+    explanation: "Ping executes in sequence pairs: Request (seq=1) -> Reply (seq=1) -> Request (seq=2) -> Reply (seq=2).",
+  },
+};

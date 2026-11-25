@@ -1,0 +1,210 @@
+import type { ProtocolScenario } from "@/lib/protocols/schema";
+
+export const udpDatagramScenario: ProtocolScenario = {
+  id: "udp-datagram",
+  title: "UDP Connectionless Datagram Transport (RFC 768)",
+  category: "transport",
+  summary: "Inspect lightweight, connectionless UDP datagrams: minimal 8-byte headers, zero handshake overhead, and immediate packet emission for real-time telemetry and media.",
+  osiLayer: 4,
+  overviewDescription: "User Datagram Protocol (UDP) provides minimal, message-oriented transport over IP without handshakes, sequence tracking, or automatic retransmissions. Real-time voice, video, DNS, and QUIC choose UDP for predictable low latency.",
+  defaultPort: "Various (e.g., 53, 123, 5000)",
+  transportType: "IP (Protocol 17)",
+  dataFormat: "Binary (8-byte header + datagram)",
+  commonMethods: "Unicast, Multicast, Broadcast Datagrams",
+  rfc: "RFC 768",
+  nodes: [
+    {
+      id: "client",
+      label: "Telemetry Sensor",
+      type: "client",
+      ip: "192.168.1.105",
+      mac: "00:1a:2b:3c:4d:5e",
+      xPercent: 15,
+      yPercent: 50,
+    },
+    {
+      id: "router",
+      label: "Edge Router / NAT",
+      type: "router",
+      ip: "192.168.1.1",
+      mac: "52:54:00:12:34:56",
+      xPercent: 48,
+      yPercent: 50,
+    },
+    {
+      id: "server",
+      label: "Telemetry Collector",
+      type: "server",
+      ip: "76.76.21.21",
+      mac: "00:50:56:fe:dc:ba",
+      xPercent: 85,
+      yPercent: 50,
+    },
+  ],
+  wires: [
+    { id: "wire-c-r", fromNodeId: "client", toNodeId: "router", label: "LAN" },
+    { id: "wire-r-s", fromNodeId: "router", toNodeId: "server", label: "WAN" },
+  ],
+  steps: [
+    {
+      stepIndex: 0,
+      timeMs: 0,
+      fromNodeId: "client",
+      toNodeId: "server",
+      protocolName: "UDP",
+      arrowLabel: "UDP Datagram #1 [51200 -> 5000, Len=24]",
+      summary: "Client immediately transmits datagram #1 with zero prior SYN handshake. The entire UDP header is only 8 bytes.",
+      status: "normal",
+      rawHex: "005056fedcba001a2b3c4d5e08004500002c1a2b4000401184f5c0a801694c4c1515c800138800189a127365713d313b74656d703d32342e350a",
+      layers: [
+        {
+          name: "Internet Protocol Version 4",
+          layer: "network",
+          fields: [
+            { name: "Protocol", value: "17 (UDP)", byteRange: [23, 24], description: "IPv4 protocol number for UDP" },
+            { name: "Source IP", value: "192.168.1.105", byteRange: [26, 30], description: "Sender IPv4 address" },
+            { name: "Destination IP", value: "76.76.21.21", byteRange: [30, 34], description: "Collector IPv4 address" },
+          ],
+        },
+        {
+          name: "User Datagram Protocol (8-Byte Header)",
+          layer: "transport",
+          fields: [
+            { name: "Source Port", value: "51200", byteRange: [34, 36], description: "Sender ephemeral port" },
+            { name: "Destination Port", value: "5000", byteRange: [36, 38], description: "Collector UDP listener port" },
+            { name: "Length", value: "24 bytes (8B hdr + 16B data)", byteRange: [38, 40], description: "Total UDP datagram length", katContext: "Unlike TCP's 20–60 byte header, UDP uses a fixed 8-byte header with no sequence numbers or windowing." },
+            { name: "Checksum", value: "0x9a12", byteRange: [40, 42], description: "16-bit integrity checksum over pseudo-header, UDP header, and payload" },
+            { name: "Payload", value: "seq=1;temp=24.5", byteRange: [42, 58], description: "Opaque application message boundary preserved" },
+          ],
+        },
+      ],
+    },
+    {
+      stepIndex: 1,
+      timeMs: 14,
+      fromNodeId: "server",
+      toNodeId: "client",
+      protocolName: "UDP",
+      arrowLabel: "UDP App Reply [5000 -> 51200, OK]",
+      summary: "Application server optionally sends a stateless UDP acknowledgment packet; UDP itself generates no transport ACKs.",
+      status: "normal",
+      rawHex: "001a2b3c4d5e005056fedcba08004500002c2b3c40003f1174064c4c1515c0a801691388c8000018b1c261636b3d313b737461743d6f6b0a2020",
+      layers: [
+        {
+          name: "User Datagram Protocol",
+          layer: "transport",
+          fields: [
+            { name: "Source Port", value: "5000", byteRange: [34, 36], description: "Collector port" },
+            { name: "Destination Port", value: "51200", byteRange: [36, 38], description: "Client ephemeral return port" },
+            { name: "Payload", value: "ack=1;stat=ok", byteRange: [42, 58], description: "Application-defined reply message" },
+          ],
+        },
+      ],
+    },
+    {
+      stepIndex: 2,
+      timeMs: 25,
+      fromNodeId: "client",
+      toNodeId: "server",
+      protocolName: "UDP",
+      arrowLabel: "UDP Datagram #2 [seq=2;temp=24.6]",
+      summary: "Client streams next independent datagram without waiting for congestion window expansion.",
+      status: "normal",
+      rawHex: "005056fedcba001a2b3c4d5e08004500002c1a2c4000401184f4c0a801694c4c1515c800138800189a117365713d323b74656d703d32342e360a",
+      layers: [
+        {
+          name: "User Datagram Protocol",
+          layer: "transport",
+          fields: [
+            { name: "Length", value: "24 bytes", byteRange: [38, 40], description: "Independent self-contained datagram" },
+            { name: "Payload", value: "seq=2;temp=24.6", byteRange: [42, 58], description: "Next telemetry sample" },
+          ],
+        },
+      ],
+    },
+    {
+      stepIndex: 3,
+      timeMs: 36,
+      fromNodeId: "client",
+      toNodeId: "server",
+      protocolName: "UDP",
+      arrowLabel: "UDP Datagram #3 [seq=3;temp=24.7]",
+      summary: "Datagrams arrive independently; if #2 is lost in transit, #3 is still delivered immediately without Head-of-Line blocking.",
+      status: "normal",
+      rawHex: "005056fedcba001a2b3c4d5e08004500002c1a2d4000401184f3c0a801694c4c1515c800138800189a107365713d333b74656d703d32342e370a",
+      layers: [
+        {
+          name: "User Datagram Protocol",
+          layer: "transport",
+          fields: [
+            { name: "Length", value: "24 bytes", byteRange: [38, 40], description: "Self-contained message frame" },
+            { name: "Payload", value: "seq=3;temp=24.7", byteRange: [42, 58], description: "Latest sensor sample" },
+          ],
+        },
+      ],
+    },
+  ],
+  chaosVariants: [
+    {
+      id: "udp-silent-drop",
+      name: "Unrecovered Datagram Loss (No Retransmit)",
+      description: "Drop datagram #2 in transit and observe how UDP delivers #3 right away without pausing or retransmitting #2.",
+      triggerStepIndex: 2,
+      action: "drop_packet",
+      alternateSteps: [
+        {
+          stepIndex: 2,
+          timeMs: 25,
+          fromNodeId: "client",
+          toNodeId: "server",
+          protocolName: "UDP",
+          arrowLabel: "UDP Datagram #2 (DROPPED — No Retry)",
+          summary: "Congested router drops datagram #2. Because UDP tracks no sequence numbers or ACKs, the transport layer never retransmits it.",
+          status: "dropped",
+          rawHex: "005056fedcba001a2b3c4d5e08004500002c1a2c4000401184f4c0a801694c4c1515c800138800189a117365713d323b74656d703d32342e360a",
+          layers: [
+            {
+              name: "UDP Loss Semantics",
+              layer: "transport",
+              fields: [
+                { name: "Transport Behavior", value: "Best-Effort (Silent Drop)", byteRange: [34, 42], description: "No RTO timer, no ACK, no automatic retry" },
+              ],
+            },
+          ],
+        },
+        {
+          stepIndex: 3,
+          timeMs: 36,
+          fromNodeId: "client",
+          toNodeId: "server",
+          protocolName: "UDP",
+          arrowLabel: "UDP Datagram #3 (Delivered Immediately)",
+          summary: "Datagram #3 arrives immediately at the collector—real-time streams prefer fresh samples over stalled retransmissions.",
+          status: "normal",
+          rawHex: "005056fedcba001a2b3c4d5e08004500002c1a2d4000401184f3c0a801694c4c1515c800138800189a107365713d333b74656d703d32342e370a",
+          layers: [
+            {
+              name: "User Datagram Protocol",
+              layer: "transport",
+              fields: [
+                { name: "Payload", value: "seq=3;temp=24.7", byteRange: [42, 58], description: "Delivered without Head-of-Line delay" },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+  examChallenge: {
+    id: "udp-order-challenge",
+    title: "Order the UDP Telemetry Exchange",
+    prompt: "Arrange the connectionless UDP sensor transmission and reply flow in chronological order.",
+    shuffledStepIds: [2, 0, 3, 1],
+    correctSequence: [0, 1, 2, 3],
+    hints: [
+      "UDP begins immediately with Datagram #1 (no SYN handshake step).",
+      "The collector sends an optional application reply before samples #2 and #3.",
+    ],
+    explanation: "Connectionless UDP sends Datagram #1 immediately -> Collector reply -> Datagram #2 -> Datagram #3.",
+  },
+};

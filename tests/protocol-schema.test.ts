@@ -7,14 +7,17 @@ import { protocolManifest } from "@/data/protocols/manifest";
 import { dnsLookupScenario } from "@/data/protocols/dns-lookup";
 import { tcpHandshakeScenario } from "@/data/protocols/tcp-handshake";
 import { httpExchangeScenario } from "@/data/protocols/http-exchange";
+import { httpsExchangeScenario } from "@/data/protocols/https-exchange";
 import { tlsHandshakeScenario } from "@/data/protocols/tls-handshake";
 import { websocketUpgradeScenario } from "@/data/protocols/websocket-upgrade";
 import { quicHandshakeScenario } from "@/data/protocols/quic-handshake";
 import { mqttTelemetryScenario } from "@/data/protocols/mqtt-telemetry";
+import { udpDatagramScenario } from "@/data/protocols/udp-datagram";
+import { icmpPingScenario } from "@/data/protocols/icmp-ping";
 
 describe("Protocol Scenarios & Schema Verification", () => {
   it("validates protocol manifest entries", () => {
-    expect(protocolManifest.length).toBeGreaterThanOrEqual(7);
+    expect(protocolManifest.length).toBeGreaterThanOrEqual(10);
     for (const entry of protocolManifest) {
       const parsed = ProtocolManifestEntrySchema.safeParse(entry);
       expect(parsed.success).toBe(true);
@@ -25,10 +28,13 @@ describe("Protocol Scenarios & Schema Verification", () => {
     dnsLookupScenario,
     tcpHandshakeScenario,
     httpExchangeScenario,
+    httpsExchangeScenario,
     tlsHandshakeScenario,
     websocketUpgradeScenario,
     quicHandshakeScenario,
     mqttTelemetryScenario,
+    udpDatagramScenario,
+    icmpPingScenario,
   ];
 
   for (const scenario of scenarios) {
@@ -61,6 +67,18 @@ describe("Protocol Scenarios & Schema Verification", () => {
         for (const variant of scenario.chaosVariants) {
           expect(variant.triggerStepIndex).toBeLessThan(scenario.steps.length);
           expect(variant.alternateSteps.length).toBeGreaterThan(0);
+          for (const altStep of variant.alternateSteps) {
+            const altLen = altStep.rawHex.length / 2;
+            expect(Number.isInteger(altLen)).toBe(true);
+            for (const layer of altStep.layers) {
+              for (const field of layer.fields) {
+                const [start, end] = field.byteRange;
+                expect(start).toBeLessThan(end);
+                expect(start).toBeGreaterThanOrEqual(0);
+                expect(end).toBeLessThanOrEqual(altLen);
+              }
+            }
+          }
         }
       }
     });

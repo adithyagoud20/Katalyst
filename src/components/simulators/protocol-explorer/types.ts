@@ -6,7 +6,7 @@ import type {
 } from "@/lib/protocols/schema";
 import type { PlaybackSpeed } from "@/lib/protocols/state-machine";
 
-export type ProtocolExplorerTab = "flow" | "packet" | "hex" | "exam";
+export type ProtocolExplorerTab = "flow" | "packet" | "hex" | "exam" | "kat" | "chaos";
 
 export interface ProtocolExplorerProps {
   initialScenarioId?: string;
@@ -22,6 +22,9 @@ export interface TopologyMapProps {
   currentStep: PacketStep | null;
   isPlaying: boolean;
   speed: PlaybackSpeed;
+  scenarioId?: string;
+  stepIndex?: number;
+  totalSteps?: number;
 }
 
 export interface SequenceDiagramProps {
@@ -45,4 +48,7 @@ export interface HexDumpViewProps {
   selectedRange: [number, number] | null;
   hoveredRange: [number, number] | null;
   bytesPerRow?: number;
+  activeFieldLabel?: string | null;
+  onSelectByteOffset?: (offset: number) => void;
+  onHoverByteOffset?: (offset: number | null) => void;
 }

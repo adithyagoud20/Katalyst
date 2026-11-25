@@ -1,6 +1,6 @@
 import type { PacketStep, ProtocolScenario } from "./schema";
 
-export type PlaybackSpeed = 0.5 | 1 | 2;
+export type PlaybackSpeed = 0.5 | 1 | 1.5 | 2;
 
 export interface SimulationState {
   scenario: ProtocolScenario;

@@ -986,7 +986,7 @@ export function LearningExperience({
         />}
       </div>
 
-      <div className="learning-protocols-host min-h-[calc(100vh-64px)] w-full bg-[#080c14] text-slate-100" hidden={section !== "protocols"}>
+      <div className="learning-protocols-host w-full min-w-0 bg-[var(--pe-canvas)] text-[var(--pe-text)]" hidden={section !== "protocols"}>
         {section === "protocols" && (
           <div className="protocol-studio-layout flex flex-col xl:flex-row h-full w-full">
             <div className={`protocol-studio-view flex-1 mx-auto w-full transition-all duration-300 ${katOpen ? "xl:max-w-[calc(100%-420px)]" : "w-full"}`}>
@@ -1084,11 +1084,11 @@ export function LearningExperience({
             <button className="learning-text-button" onClick={() => onNavigate("paths")}>Browse all disciplines <ArrowRight size={13} /></button>
           </section>
 
-          <section className="home-protocol-showcase p-5 rounded-2xl border border-[var(--border-subtle)] bg-gradient-to-r from-blue-950/20 via-slate-900/40 to-cyan-950/20 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-4" aria-label="Interactive Protocol & Network Explorer">
+          <section className="home-protocol-showcase p-5 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-primary)] shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4" aria-label="Interactive Protocol & Network Explorer">
             <div className="space-y-1.5 max-w-2xl">
               <div className="flex items-center gap-2">
-                <span className="flex h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="text-[11px] font-mono uppercase tracking-wider text-cyan-400 font-semibold">Interactive Systems Studio</span>
+                <span className="flex h-2 w-2 rounded-full bg-[var(--accent-primary)]" />
+                <span className="text-[11px] font-mono uppercase tracking-wider text-[var(--accent-text)] font-semibold">Interactive Systems Studio</span>
               </div>
               <h2 className="text-lg font-bold text-[var(--text-primary)]">Protocol &amp; Network Explorer</h2>
               <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
@@ -1098,7 +1098,7 @@ export function LearningExperience({
             <button
               type="button"
               onClick={() => onNavigate("protocols")}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black font-semibold text-xs transition-colors shrink-0 shadow-sm"
+              className="primary-button shrink-0"
             >
               <Network size={16} />
               <span>Launch Protocol Explorer</span>
